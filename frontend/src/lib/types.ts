@@ -7,6 +7,26 @@ export const ORDER_STRATEGIES = [
 
 export type OrderStrategy = (typeof ORDER_STRATEGIES)[number];
 
+export type EventStatus = "live" | "limited" | "upcoming" | "sold_out";
+
+export type EventSummary = {
+  ticketItemId: number;
+  title: string;
+  eyebrow: string;
+  date: string;
+  time: string;
+  venue: string;
+  city: string;
+  category: string;
+  priceOriginal: number;
+  priceFlash: number;
+  status: EventStatus;
+  stockLabel: string;
+  saleLabel: string;
+  description: string;
+  featured?: boolean;
+};
+
 export type ApiEnvelope<T> = {
   success: boolean;
   message: string;
