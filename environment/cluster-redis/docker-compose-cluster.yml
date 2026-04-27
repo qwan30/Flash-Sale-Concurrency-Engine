@@ -1,0 +1,82 @@
+version: '3.8'
+ 
+networks:
+  redis-network:
+    driver: bridge
+ 
+services:
+  redis-master:
+    image: redis:7.2.4
+    container_name: redis-master
+    command: ["sh", "-c", "redis-server --protected-mode no --slave-announce-ip 192.168.1.116 --slave-announce-port 6379 --requirepass 123456"]
+    ports:
+      - "6379:6379"
+    networks:
+      - redis-network
+ 
+  redis-slave1:
+    image: redis:7.2.4
+    container_name: redis-slave1
+    ports:
+      - "6380:6379"
+    depends_on:
+      - redis-master
+    command: ["sh", "-c", "redis-server --slaveof redis-master 6379 --masterauth 123456 --requirepass 123456 --protected-mode no --slave-announce-ip 192.168.1.116 --slave-announce-port 6380"]
+    networks:
+      - redis-network
+ 
+  redis-slave2:
+    image: redis:7.2.4
+    container_name: redis-slave2
+    ports:
+      - "6381:6379"
+    depends_on:
+      - redis-master
+    command: ["sh", "-c", "redis-server --slaveof redis-master 6379 --masterauth 123456 --requirepass 123456 --protected-mode no --slave-announce-ip 192.168.1.116 --slave-announce-port 6381"]
+    networks:
+      - redis-network
+ 
+  redis-sentinel1:
+    image: redis:7.2.4
+    container_name: redis-sentinel1
+    depends_on:
+      - redis-master
+      - redis-slave1
+      - redis-slave2
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    ports:
+      - "26379:26379"
+    networks:
+      - redis-network
+ 
+  redis-sentinel2:
+    image: redis:7.2.4
+    container_name: redis-sentinel2
+    depends_on:
+      - redis-master
+      - redis-slave1
+      - redis-slave2
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    ports:
+      - "26380:26379"
+    networks:
+      - redis-network
+ 
+  redis-sentinel3:
+    image: redis:7.2.4
+    container_name: redis-sentinel3
+    depends_on:
+      - redis-master
+      - redis-slave1
+      - redis-slave2
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    ports:
+      - "26381:26379"
+    networks:
+      - redis-network

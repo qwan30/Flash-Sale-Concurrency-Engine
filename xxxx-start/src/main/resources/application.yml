@@ -1,0 +1,90 @@
+server:
+  port: 1122
+  tomcat:
+    threads:
+      max: 500
+      min-spare: 50
+    accept-count: 20000
+
+spring:
+  application:
+    name: xxxx.com
+  datasource:
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3316/vetautet}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root1234}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+  jpa:
+    database: mysql
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+  jackson:
+    serialization:
+      indent-output: true
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6319}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 30000
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 5
+  threads:
+    virtual:
+      enabled: true
+
+app:
+  redisson:
+    mode: ${REDISSON_MODE:single}
+    single-address: redis://${REDIS_HOST:127.0.0.1}:${REDIS_PORT:6319}
+    password: ${REDIS_PASSWORD:}
+    sentinel:
+      master: ${REDIS_SENTINEL_MASTER:mymaster}
+      nodes: ${REDIS_SENTINEL_NODES:redis://localhost:26379,redis://localhost:26380,redis://localhost:26381}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      checkRandom:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+  ratelimiter:
+    instances:
+      backendA:
+        limitForPeriod: 2
+        limitRefreshPeriod: 10s
+        timeoutDuration: 0
+        registerHealthIndicator: true
+        eventConsumerBufferSize: 100
+      backendB:
+        limitForPeriod: 5
+        limitRefreshPeriod: 10s
+        timeoutDuration: 3s
+
+management:
+  health:
+    circuitbreakers:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - '*'
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true

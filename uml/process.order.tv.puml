@@ -1,0 +1,20 @@
+@startuml
+participant Người_dùng
+participant Ứng_dụng
+participant "Trung_tâm_sản_phẩm" as TTSP
+participant "Trung_tâm_đơn_hàng" as TTDH
+
+Người_dùng -> Ứng_dụng : Duyệt danh sách sản phẩm, tìm sản phẩm mong muốn
+Người_dùng -> Ứng_dụng : Nhấn để vào trang chi tiết sản phẩm
+Ứng_dụng -> TTSP : Truy vấn chi tiết sản phẩm
+TTSP --> Ứng_dụng : Chi tiết sản phẩm
+Người_dùng -> Ứng_dụng : Nhấn để thanh toán (Nhấn mua ngay)
+Ứng_dụng <--> Người_dùng : Chuyển hướng đến trang xem trước sản phẩm (Trang đặt hàng)
+Ứng_dụng -> TTDH : Giao diện đặt hàng trước tạo chi tiết đơn hàng sản phẩm
+Người_dùng -> Ứng_dụng : Chọn địa chỉ giao hàng, chọn ưu đãi
+Người_dùng -> Ứng_dụng : Đi đến thanh toán
+Ứng_dụng <--> Người_dùng : Chuyển hướng đến trang thanh toán
+Ứng_dụng -> TTDH : Gửi đơn hàng (Một loạt kiểm tra)
+Người_dùng -> Ứng_dụng : Chọn phương thức thanh toán, thanh toán
+
+@enduml
