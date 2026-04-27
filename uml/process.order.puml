@@ -4,17 +4,14 @@ participant App
 participant "Product Center" as PC
 participant "Order Center" as OC
 
-User -> App : Browse product list, find desired product
-User -> App : Click to enter product details page
-App -> PC : Query product details
-PC --> App : Product details
-User -> App : Click to checkout (Click to buy immediately)
-App <--> User : Redirect to product preview page (Order form)
-App -> OC: Pre-order interface generates product order details
-User -> App : Select shipping address, select discount
-User -> App : Go to payment
-App <--> User: Redirect the payment page
-App -> OC : Submit order (a series of verifications)
-User -> App : Select payment method, pay
+Operator -> App : Select ticket fixture and strategy
+App -> PC : Query ticket and stock details
+PC --> App : Ticket and stock details
+Operator -> App : Submit controlled order probe
+App -> OC : Create order with selected deduction strategy
+OC --> App : Accepted or rejected order result
+Operator -> App : Refresh consistency snapshot
+App -> PC : Compare Redis stock and DB stock
+PC --> App : Stock, order count, oversold, and drift metrics
 
 @enduml

@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 const publicLinks = [
-  { href: "/", label: "Home" },
-  { href: "/events", label: "Events" },
-  { href: "/booking", label: "Booking" },
-  { href: "/my-orders", label: "My Orders" },
-  { href: "/admin/control-desk", label: "Admin Lab" },
+  { href: "/", label: "Lab Overview" },
+  { href: "/events", label: "Fixtures" },
+  { href: "/booking", label: "Order Probe" },
+  { href: "/my-orders", label: "Order Traces" },
+  { href: "/admin/control-desk", label: "Control Desk" },
 ];
 
 export default function PublicLayout({
@@ -21,7 +21,7 @@ export default function PublicLayout({
             href="/"
             className="font-display text-xl font-semibold leading-none text-[#242424]"
           >
-            Flash Tickets
+            Flash-Sale Lab
           </Link>
           <nav aria-label="Public navigation" className="flex flex-wrap items-center gap-2">
             {publicLinks.map((link) => (

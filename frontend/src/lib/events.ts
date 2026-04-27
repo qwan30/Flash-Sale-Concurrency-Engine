@@ -26,9 +26,9 @@ export const eventSummaries: EventSummary[] = [
     priceFlash: 699000,
     status: "live",
     stockLabel: "1,000 VIP seats",
-    saleLabel: "Live until 23:59",
+    saleLabel: "Benchmark stock",
     description:
-      "A limited VIP ticket release for a high-demand night show with a fast, refresh-safe checkout.",
+      "A high-demand ticket fixture used to exercise stock deduction, idempotency, and order persistence.",
     featured: true,
   },
   {
@@ -44,7 +44,7 @@ export const eventSummaries: EventSummary[] = [
     priceFlash: 520000,
     status: "limited",
     stockLabel: "Low allocation",
-    saleLabel: "Preview sale",
+    saleLabel: "Fixture only",
     description:
       "Two nights of indie acts and late-night DJ sets with a small ticket allocation.",
   },
@@ -61,7 +61,7 @@ export const eventSummaries: EventSummary[] = [
     priceFlash: 290000,
     status: "upcoming",
     stockLabel: "Opens soon",
-    saleLabel: "Starts May 1",
+    saleLabel: "Fixture only",
     description:
       "Talks, founder demos, and networking seats for a compact evening program.",
   },
@@ -78,7 +78,7 @@ export const eventSummaries: EventSummary[] = [
     priceFlash: 410000,
     status: "sold_out",
     stockLabel: "Allocation closed",
-    saleLabel: "Sold out",
+    saleLabel: "Closed fixture",
     description:
       "A small-room classical performance with reserved seats and limited inventory.",
   },

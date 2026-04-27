@@ -5,11 +5,10 @@ import {
   CheckCircle2,
   Loader2,
   MapPin,
+  Send,
   Settings2,
-  ShoppingCart,
   Ticket,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -23,7 +22,13 @@ import {
 } from "@/lib/events";
 import { nextIdempotencyKey } from "@/lib/order-client";
 import { strategyDetails } from "@/lib/strategy";
-import { ORDER_STRATEGIES, type EventSummary, type OrderStrategy, type TicketDetail } from "@/lib/types";
+import {
+  ORDER_STRATEGIES,
+  type CreateOrderResponse,
+  type EventSummary,
+  type OrderStrategy,
+  type TicketDetail,
+} from "@/lib/types";
 import { cn, formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
 
 import { Alert } from "@/components/ui/alert";
@@ -48,13 +53,13 @@ export function UserBookingDashboard({
   event?: EventSummary;
   compact?: boolean;
 }) {
-  const router = useRouter();
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [userId, setUserId] = useState(DEFAULT_USER_ID);
   const [strategy, setStrategy] = useState<OrderStrategy>(DEFAULT_CUSTOMER_STRATEGY);
   const [isLoadingTicket, setIsLoadingTicket] = useState(false);
-  const [isBuying, setIsBuying] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastOrder, setLastOrder] = useState<CreateOrderResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadTicket = useCallback(async () => {
@@ -79,9 +84,10 @@ export function UserBookingDashboard({
     void loadTicket();
   }, [loadTicket]);
 
-  const onBuy = async (eventPayload: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (eventPayload: React.FormEvent<HTMLFormElement>) => {
     eventPayload.preventDefault();
-    setIsBuying(true);
+    setIsSubmitting(true);
+    setLastOrder(null);
     setErrorMessage(null);
 
     try {
@@ -93,20 +99,15 @@ export function UserBookingDashboard({
         idempotencyKey: nextIdempotencyKey(userId),
       });
 
-      if (envelope.result.success && envelope.result.orderNumber) {
-        toast.success("Order created");
-        router.push(`/orders/${encodeURIComponent(envelope.result.orderNumber)}`);
-        return;
-      }
-
-      toast.message(envelope.result.message || "Order rejected");
+      setLastOrder(envelope.result);
+      toast.message(envelope.result.message || "Order probe completed");
       await loadTicket();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create order";
       setErrorMessage(message);
       toast.error(message);
     } finally {
-      setIsBuying(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -179,13 +180,13 @@ export function UserBookingDashboard({
 
       <Card className="lg:sticky lg:top-6">
         <CardHeader>
-          <CardTitle>Checkout</CardTitle>
+          <CardTitle>Order probe</CardTitle>
           <CardDescription>
-            Choose a quantity, confirm the demo user, and continue to your receipt.
+            Submit one controlled order request and observe how the selected strategy changes stock.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="space-y-4" onSubmit={onBuy}>
+          <form className="space-y-4" onSubmit={onSubmit}>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="booking-user-id">User ID</Label>
@@ -235,19 +236,25 @@ export function UserBookingDashboard({
             </details>
 
             {errorMessage ? <Alert>{errorMessage}</Alert> : null}
+            {lastOrder ? (
+              <Alert>
+                {lastOrder.success ? "Accepted" : "Rejected"}: {lastOrder.message}
+                {lastOrder.orderNumber ? ` (${lastOrder.orderNumber})` : ""}
+              </Alert>
+            ) : null}
 
             <Button
               type="submit"
               size="lg"
               className="w-full"
-              disabled={isBuying || isSoldOut || quantity < 1 || userId < 1}
+              disabled={isSubmitting || isSoldOut || quantity < 1 || userId < 1}
             >
-              {isBuying ? (
+              {isSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <ShoppingCart className="h-4 w-4" />
+                <Send className="h-4 w-4" />
               )}
-              Buy tickets
+              Submit order probe
             </Button>
           </form>
         </CardContent>

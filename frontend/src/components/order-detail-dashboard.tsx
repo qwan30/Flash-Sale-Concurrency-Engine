@@ -55,11 +55,11 @@ export function OrderDetailDashboard({ orderNumber }: { orderNumber: string }) {
           <div className="mb-3 flex flex-wrap gap-2">
             <Badge variant={order ? "success" : "outline"}>
               <CheckCircle2 className="mr-1 h-3 w-3" />
-              {order ? "Order confirmed" : "Loading order"}
+              {order ? "Order row loaded" : "Loading order"}
             </Badge>
           </div>
           <h1 className="font-display text-4xl font-semibold leading-[1.1] text-[#242424] sm:text-5xl">
-            Order detail
+            Order trace
           </h1>
           <p className="mt-3 break-words text-base leading-7 text-[#898989]">
             {orderNumber}
@@ -79,8 +79,8 @@ export function OrderDetailDashboard({ orderNumber }: { orderNumber: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Receipt</CardTitle>
-          <CardDescription>Order facts stay available after page refresh.</CardDescription>
+          <CardTitle>Stored order facts</CardTitle>
+          <CardDescription>Order rows stay available after page refresh.</CardDescription>
         </CardHeader>
         <CardContent>
           {order ? (
@@ -91,6 +91,8 @@ export function OrderDetailDashboard({ orderNumber }: { orderNumber: string }) {
               <InfoBlock label="Terminal" value={order.terminalId} />
               <InfoBlock label="Order date" value={formatDateTime(order.orderDate)} />
               <InfoBlock label="Created" value={formatDateTime(order.createdAt)} />
+              <InfoBlock label="Updated" value={formatDateTime(order.updatedAt)} />
+              <InfoBlock label="Notes" value={order.orderNotes} />
             </div>
           ) : (
             <div className="rounded-lg bg-[#f7f7f7] p-6 text-sm text-[#898989]">
@@ -104,11 +106,11 @@ export function OrderDetailDashboard({ orderNumber }: { orderNumber: string }) {
         <Button asChild>
           <Link href="/events/4">
             <Ticket className="h-4 w-4" />
-            Buy again
+            Run another probe
           </Link>
         </Button>
         <Button asChild variant="secondary">
-          <Link href="/my-orders">View my orders</Link>
+          <Link href="/my-orders">View order traces</Link>
         </Button>
       </div>
     </main>

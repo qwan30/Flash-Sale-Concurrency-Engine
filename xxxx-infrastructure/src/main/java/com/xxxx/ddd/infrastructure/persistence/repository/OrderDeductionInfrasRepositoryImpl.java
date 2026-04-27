@@ -39,9 +39,9 @@ public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionReposit
                 "id INT(8) NOT NULL AUTO_INCREMENT COMMENT 'Unique ticket sales ID', " +
                 "user_id INT(8) NOT NULL COMMENT 'userId', " +
                 "order_number VARCHAR(50) NOT NULL COMMENT 'Unique order number', " +
-                "total_amount DECIMAL(10,3) NOT NULL COMMENT 'Total payment amount', " +
+                "total_amount DECIMAL(10,3) NOT NULL COMMENT 'Total order amount', " +
                 "terminal_id VARCHAR(20) NOT NULL COMMENT 'ID of the sales terminal', " +
-                "order_date TIMESTAMP NOT NULL COMMENT 'Date and time of the ticket purchase', " +
+                "order_date TIMESTAMP NOT NULL COMMENT 'Date and time of the ticket order request', " +
                 "order_notes VARCHAR(100) NULL DEFAULT 'None' COMMENT 'Additional notes for the order', " +
                 "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Timestamp of the last update', " +
                 "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Creation timestamp', " +

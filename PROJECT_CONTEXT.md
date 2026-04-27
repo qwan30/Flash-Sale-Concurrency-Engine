@@ -2,7 +2,7 @@
 
 ## Project Identity
 
-This project is a flash-sale ticketing backend lab. The goal is to demonstrate progressively safer inventory deduction strategies under high concurrency.
+This project is a flash-sale concurrency backend lab. The goal is to demonstrate progressively safer inventory deduction strategies under high concurrency.
 
 ## Main Learning Goals
 
@@ -11,11 +11,18 @@ This project is a flash-sale ticketing backend lab. The goal is to demonstrate p
 - Measure throughput, latency, success rate, and consistency.
 - Document trade-offs between correctness, performance, and complexity.
 
+## What This Project Proves
+
+- Whether a strategy can prevent overselling.
+- How Redis/Lua behaves as a pre-deduction gate.
+- How Redis and MySQL can drift, and how compensation restores consistency.
+- How to reset, warm, run, measure, and re-check a benchmark reproducibly.
+
 ## Non-goals
 
-- This is not a full end-user ticketing product.
-- No frontend UI is required.
-- No payment integration is required.
+- This is not a full end-user sales product.
+- Frontend work, if present, is only a lab dashboard/operator console and is not the core product.
+- Buyer-facing flows, external gateway integrations, and post-order business workflows are not part of the project scope.
 - No Kubernetes is required.
 - No complex microservice architecture is required.
 

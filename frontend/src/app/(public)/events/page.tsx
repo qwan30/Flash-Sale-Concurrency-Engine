@@ -9,11 +9,11 @@ export default function EventsPage() {
           Events
         </p>
         <h1 className="mt-4 font-display text-4xl font-semibold leading-[1.1] text-[#242424] sm:text-5xl">
-          Pick the drop before it moves.
+          Scenario fixtures for order probes.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-[#898989]">
-          A compact event board with live-sale status, stock signals, and direct access
-          to the featured checkout flow for ticket item 4.
+          A compact board of ticket fixtures with stock signals and direct access to the
+          featured order probe for ticket item 4.
         </p>
       </header>
 

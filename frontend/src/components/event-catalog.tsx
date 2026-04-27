@@ -47,12 +47,12 @@ export function EventCatalog({ events }: { events: EventSummary[] }) {
     <section className="space-y-6">
       <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
         <label className="relative block">
-          <span className="sr-only">Search events</span>
+          <span className="sr-only">Search fixtures</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#898989]" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search city, venue, or category"
+            placeholder="Search fixture, city, or category"
             className="pl-9"
           />
         </label>
@@ -79,7 +79,7 @@ export function EventCatalog({ events }: { events: EventSummary[] }) {
           aria-label="Sort events"
         >
           <option value="soonest">Soonest</option>
-          <option value="price">Lowest price</option>
+          <option value="price">Lowest fixture value</option>
         </select>
       </div>
 
@@ -142,7 +142,7 @@ function EventCard({ event }: { event: EventSummary }) {
           {canOpenDetail ? (
             <Button asChild>
               <Link href={`/events/${event.ticketItemId}`}>
-                Buy
+                Probe
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>

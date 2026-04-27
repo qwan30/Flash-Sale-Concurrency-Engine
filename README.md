@@ -1,6 +1,35 @@
-# Flash-Sale Ticketing Backend Lab
+# Flash-Sale Concurrency Backend Lab
 
-This repository is a Spring Boot backend lab for comparing inventory deduction strategies under concurrent flash-sale load. It is intentionally backend-only: MySQL, Redis/Lua, Redisson, monthly order tables, Actuator/Micrometer metrics, and JMeter benchmarks.
+This repository is a Spring Boot backend reliability lab for proving inventory deduction behavior under concurrent flash-sale load. The core story is correctness first: stock must not oversell, Redis/Lua behavior must be explainable, database state must stay consistent, and benchmark results must be reproducible.
+
+The ticket domain is only the test fixture. The project is not positioned as a complete ticket sales platform.
+
+## What This Project Proves
+
+- Naive stock updates can oversell under load.
+- MySQL conditional updates provide a simple safe baseline.
+- Redis/Lua can reject excess demand quickly before hitting the database.
+- Redis-first strategies need compensation rules when database/order writes fail.
+- Consistency checks can compare Redis stock, DB stock, order count, oversold rows, and drift after each run.
+- JMeter results are only useful when the reset, warmup, workload, and result table are reproducible.
+
+## Intentionally Out Of Scope
+
+- Buyer-facing product flows, account management, gateway integrations, and post-order business workflows.
+- Production hardening of public admin endpoints.
+- Microservices, Kubernetes, message queues, and distributed workflow orchestration.
+- A full frontend application. Any UI in this repository is an operator dashboard for lab setup, benchmark review, stock consistency, and system health.
+
+## Repository Layout
+
+| Path | Purpose |
+|---|---|
+| `xxxx-domain`, `xxxx-application`, `xxxx-infrastructure`, `xxxx-controller`, `xxxx-start` | Spring Boot backend modules |
+| `frontend` | Optional operator dashboard for lab controls and result inspection |
+| `benchmark` | JMeter plans, smoke scripts, and reproducibility assets |
+| `environment` | Local Docker dependencies and database bootstrap |
+| `docs` | Supporting design notes and dashboard screenshots |
+| `uml` | Lightweight process diagrams |
 
 ## Run Locally
 
@@ -25,7 +54,17 @@ Optional observability stack:
 docker compose -f environment/docker-compose-dev.yml --profile observability up -d
 ```
 
-## API Contract
+## Operator Dashboard Artifacts
+
+- [Design notes](docs/DESIGN.md)
+- [Lab overview](docs/screenshots/home.png)
+- [Fixture board](docs/screenshots/events.png)
+- [Order traces](docs/screenshots/order-traces.png)
+- [Control desk](docs/screenshots/admin-control-desk.png)
+- [Benchmark report](docs/screenshots/admin-benchmark.png)
+- [Consistency view](docs/screenshots/admin-consistency.png)
+
+## Lab API Contract
 
 | API | Purpose |
 |---|---|
@@ -60,7 +99,7 @@ Strategies:
 | `REDIS_LUA` | Redis gate prevents excess accepts, but DB failure can cause Redis-DB drift | High | Medium | Shows Redis as a fast pre-deduction gate |
 | `REDIS_LUA_WITH_COMPENSATION` | No oversell and compensates Redis on DB/order failure | High | Medium | Shows the practical consistency rule for Redis-first ordering |
 
-## Smoke Flow
+## How To Run And Verify
 
 ```bash
 curl -X POST http://localhost:1122/admin/benchmarks/reset ^
@@ -108,6 +147,12 @@ Notes:
 
 Use this framing on a junior backend CV:
 
-> Built a Spring Boot flash-sale ticketing lab comparing DB conditional updates, Redis Lua gating, and Redis-DB compensation under concurrent load, with benchmark reports and consistency checks.
+> Built a Spring Boot flash-sale concurrency lab comparing DB conditional updates, Redis Lua gating, and Redis-DB compensation under load, with benchmark reports and consistency checks.
 
-Do not present this as a complete ticketing product. It deliberately excludes frontend, payment, microservices, Kubernetes, and message queues.
+Do not present this as a complete ticket sales product. The project is a backend reliability lab, not an end-user platform.
+
+## Conclusion
+
+This project is useful when judged as a focused backend lab: it makes the correctness and performance trade-offs of flash-sale stock deduction visible, measurable, and reproducible. The strongest story is not "a ticketing app"; it is "a practical concurrency lab that proves why naive stock updates oversell and how safer Redis/DB strategies behave under load."
+
+Keep future work centered on the backend proof: clearer strategy separation, stronger concurrency tests, reproducible benchmark scripts, consistency checks, and concise architecture documentation. Any UI should stay secondary as an operator dashboard for running and explaining the lab.

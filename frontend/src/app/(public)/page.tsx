@@ -18,24 +18,24 @@ export default function Home() {
       <section className="grid gap-10 pb-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.08em] text-[#898989]">
-            Flash-sale tickets
+            Backend reliability lab
           </p>
           <h1 className="mt-4 font-display text-5xl font-semibold leading-[1.1] text-[#242424] sm:text-6xl">
-            Tickets built for the rush.
+            Prove stock correctness under load.
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-[#898989]">
-            Browse limited event drops, move through checkout quickly, and keep the
-            benchmark lab in the admin area where it belongs.
+            Run controlled order probes, compare Redis and DB stock, and keep benchmark
+            results reproducible across reset, warmup, load, and consistency checks.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link href="/events/4">
-                Buy featured tickets
+              <Link href="/admin/control-desk">
+                Open control desk
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="secondary">
-              <Link href="/events">Browse events</Link>
+              <Link href="/admin/benchmark">View benchmarks</Link>
             </Button>
           </div>
         </div>
@@ -55,20 +55,20 @@ export default function Home() {
             </div>
             <div className="mt-10 grid gap-3 sm:grid-cols-3">
               <TrustItem icon={Ticket} label="Stock" value={featuredEvent.stockLabel} />
-              <TrustItem icon={Clock3} label="Sale" value={featuredEvent.saleLabel} />
+              <TrustItem icon={Clock3} label="Fixture" value={featuredEvent.saleLabel} />
               <TrustItem
                 icon={Zap}
-                label="From"
+                label="Value"
                 value={formatCurrency(featuredEvent.priceFlash)}
               />
             </div>
           </div>
           <div className="mt-4 flex items-center justify-between gap-4">
             <div className="text-sm leading-6 text-[#898989]">
-              {featuredEvent.date} at {featuredEvent.venue}
+              Fixture {featuredEvent.ticketItemId}: {featuredEvent.date} at {featuredEvent.venue}
             </div>
             <Button asChild variant="secondary" size="sm">
-              <Link href="/events/4">Details</Link>
+              <Link href="/events/4">Open probe</Link>
             </Button>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function Home() {
       <section className="grid gap-4 border-t border-black/[0.06] py-10 md:grid-cols-3">
         <ProofItem icon={ShieldCheck} label="Correctness" value="0 oversold in safe runs" />
         <ProofItem icon={Zap} label="Fast path" value="354.33 req/s recorded" />
-        <ProofItem icon={CheckCircle2} label="Refresh-safe" value="Orders load by number" />
+        <ProofItem icon={CheckCircle2} label="Consistency" value="Redis and DB compared" />
       </section>
 
       <section className="pb-10">
@@ -87,11 +87,11 @@ export default function Home() {
               Next drops
             </p>
             <h2 className="mt-2 font-display text-3xl font-semibold leading-tight text-[#242424]">
-              More events on the board
+              Scenario fixtures on the board
             </h2>
           </div>
           <Button asChild variant="secondary">
-            <Link href="/events">View all events</Link>
+            <Link href="/events">View fixtures</Link>
           </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
