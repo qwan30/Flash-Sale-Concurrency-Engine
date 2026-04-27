@@ -6,6 +6,7 @@ param(
   [string]$Strategy = "REDIS_LUA_WITH_COMPENSATION"
 )
 
+$ErrorActionPreference = "Stop"
 $headers = @{ "Content-Type" = "application/json" }
 
 $resetBody = @{

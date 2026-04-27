@@ -80,6 +80,7 @@ public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionReposit
     }
 
     @Override
+    @Transactional
     public List<Object[]> findAll(String yearMonth) {
         ensureMonthlyOrderTable(yearMonth);
         String tableName = getTableName(yearMonth);
@@ -88,6 +89,7 @@ public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionReposit
     }
 
     @Override
+    @Transactional
     public List<Object[]> findAllByUser(String yearMonth, Long userId) {
         ensureMonthlyOrderTable(yearMonth);
         String tableName = getTableName(yearMonth);
@@ -98,6 +100,7 @@ public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionReposit
     }
 
     @Override
+    @Transactional
     public Object[] findByOrderNumber(String yearMonth, String orderNumber) {
         ensureMonthlyOrderTable(yearMonth);
         String tableName = getTableName(yearMonth);
@@ -109,6 +112,7 @@ public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionReposit
     }
 
     @Override
+    @Transactional
     public List<Object[]> findByDateRange(String yearMonth, LocalDateTime startDate, LocalDateTime endDate) {
         ensureMonthlyOrderTable(yearMonth);
         String tableName = getTableName(yearMonth);
@@ -128,6 +132,7 @@ public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionReposit
     }
 
     @Override
+    @Transactional
     public long countOrders(String yearMonth) {
         ensureMonthlyOrderTable(yearMonth);
         String tableName = getTableName(yearMonth);

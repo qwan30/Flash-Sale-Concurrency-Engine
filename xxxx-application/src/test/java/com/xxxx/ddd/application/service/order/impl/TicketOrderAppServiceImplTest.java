@@ -1,5 +1,6 @@
 package com.xxxx.ddd.application.service.order.impl;
 
+import com.xxxx.ddd.application.model.order.BenchmarkResetRequest;
 import com.xxxx.ddd.application.model.order.CreateOrderRequest;
 import com.xxxx.ddd.application.model.order.CreateOrderResponse;
 import com.xxxx.ddd.application.model.order.OrderStrategy;
@@ -93,6 +94,26 @@ class TicketOrderAppServiceImplTest {
 
         assertThat(second.getOrderNumber()).isEqualTo(first.getOrderNumber());
         verify(orderDeductionDomainService, times(1)).insertOrder(anyString(), any());
+    }
+
+    @Test
+    void resetBenchmarkClearsIdempotencyCacheForRepeatableRuns() {
+        CreateOrderRequest request = request(OrderStrategy.CONDITIONAL_DB);
+        when(tickerOrderDomainService.decreaseStockLevel1(4L, 2)).thenReturn(true);
+        when(tickerOrderDomainService.getStockAvailable(4L)).thenReturn(998);
+        when(orderDeductionDomainService.countOrders("202604")).thenReturn(0L);
+
+        service.createOrder(request);
+
+        BenchmarkResetRequest resetRequest = new BenchmarkResetRequest();
+        resetRequest.setTicketItemId(4L);
+        resetRequest.setStock(1000);
+        resetRequest.setYearMonth("202604");
+        service.resetBenchmark(resetRequest);
+
+        service.createOrder(request);
+
+        verify(orderDeductionDomainService, times(2)).insertOrder(anyString(), any());
     }
 
     private CreateOrderRequest request(OrderStrategy strategy) {

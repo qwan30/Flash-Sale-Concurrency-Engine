@@ -131,10 +131,11 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
 
     @Override
     public CreateOrderResponse warmupStock(Long ticketItemId) {
-        CreateOrderRequest request = new CreateOrderRequest();
-        request.setTicketItemId(ticketItemId);
-        boolean warmed = stockOrderCacheService.addStockAvailableToCache(ticketItemId);
         int dbStock = ticketItemId == null ? -1 : tickerOrderDomainService.getStockAvailable(ticketItemId);
+        boolean warmed = ticketItemId != null && dbStock >= 0;
+        if (warmed) {
+            stockOrderCacheService.setStockCache(ticketItemId, dbStock);
+        }
         return CreateOrderResponse.builder()
                 .success(warmed)
                 .code(warmed ? "SUCCESS" : "WARMUP_FAILED")
@@ -160,6 +161,7 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
         orderDeductionDomainService.ensureMonthlyOrderTable(yearMonth);
         orderDeductionDomainService.clearOrders(yearMonth);
         stockOrderCacheService.setStockCache(request.getTicketItemId(), request.getStock());
+        idempotencyCache.clear();
 
         return BenchmarkResetResponse.builder()
                 .success(true)

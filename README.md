@@ -6,7 +6,8 @@ This repository is a Spring Boot backend lab for comparing inventory deduction s
 
 ```bash
 docker compose -f environment/docker-compose-dev.yml up -d
-mvn spring-boot:run -pl xxxx-start
+mvn -q -DskipTests install
+mvn -pl xxxx-start spring-boot:run -DskipTests
 ```
 
 Default local services:
@@ -91,7 +92,17 @@ Result table format:
 
 | Date | Machine | Strategy | Total Requests | Concurrency | Throughput req/s | Avg ms | P95 ms | P99 ms | Success Orders | Failed Orders | Oversold Count | Redis Stock After | DB Stock After | DB Order Count | Redis-DB Inconsistency Count |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| 2026-04-27 | ACER | `CONDITIONAL_DB` | 5000 | 100 | 38.64 | 2501.58 | 20590 | 30025 | 1000 | 4000 | 0 | 1000 | 0 | 1000 | 1 |
+| 2026-04-27 | ACER | `REDIS_LUA` | 5000 | 100 | 288.33 | 275.13 | 598 | 654 | 1000 | 4000 | 0 | 0 | 0 | 1000 | 0 |
+| 2026-04-27 | ACER | `REDIS_LUA_WITH_COMPENSATION` | 5000 | 100 | 354.33 | 219.35 | 477 | 516 | 1000 | 4000 | 0 | 0 | 0 | 1000 | 0 |
+
+Notes:
+
+| Observation | Explanation |
+|---|---|
+| `CONDITIONAL_DB` shows Redis-DB inconsistency | This strategy intentionally updates DB only. Redis was warmed for measurement, but it is not the deduction gate for this strategy. |
+| `REDIS_LUA_WITH_COMPENSATION` was fastest in this local run | Treat local numbers as directional. Rerun benchmarks on the target machine before making claims. |
+| Failed orders are expected | Each run starts with stock 1,000 and sends 5,000 order attempts. The safe strategies should accept 1,000 and reject 4,000 without overselling. |
 
 ## Portfolio Framing
 
