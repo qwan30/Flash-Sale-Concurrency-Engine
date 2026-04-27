@@ -1,0 +1,62 @@
+{
+  "name": "flash-sale-stock-deduction-matrix",
+  "version": 1,
+  "baseUrl": "http://localhost:1122",
+  "fixture": {
+    "ticketItemId": 4,
+    "stock": 1000,
+    "yearMonth": "current"
+  },
+  "workload": {
+    "totalRequests": 5000,
+    "concurrency": 100,
+    "quantityPerOrder": 1
+  },
+  "workflow": [
+    "POST /admin/benchmarks/reset",
+    "POST /admin/tickets/{ticketItemId}/stock/warmup",
+    "Run benchmark/flash-sale-order.jmx",
+    "GET /admin/benchmarks/consistency"
+  ],
+  "strategies": [
+    {
+      "strategy": "UNSAFE_DB",
+      "expectedAcceptedOrders": "not-guaranteed",
+      "expectedRejectedOrders": "not-guaranteed",
+      "expectedOversoldCount": "may-be-positive",
+      "expectedRedisDbInconsistencyCount": "not-applicable",
+      "purpose": "Unsafe baseline that demonstrates why unconditional stock updates are unsafe under concurrency."
+    },
+    {
+      "strategy": "CONDITIONAL_DB",
+      "expectedAcceptedOrders": 1000,
+      "expectedRejectedOrders": 4000,
+      "expectedOversoldCount": 0,
+      "expectedRedisDbInconsistencyCount": "may-be-1-when-redis-is-warmed-but-not-used-as-gate",
+      "purpose": "Simple safe baseline using database conditional update."
+    },
+    {
+      "strategy": "REDIS_LUA",
+      "expectedAcceptedOrders": 1000,
+      "expectedRejectedOrders": 4000,
+      "expectedOversoldCount": 0,
+      "expectedRedisDbInconsistencyCount": "0-on-happy-path-may-drift-on-db-order-failure",
+      "purpose": "Fast Redis pre-deduction gate without compensation."
+    },
+    {
+      "strategy": "REDIS_LUA_WITH_COMPENSATION",
+      "expectedAcceptedOrders": 1000,
+      "expectedRejectedOrders": 4000,
+      "expectedOversoldCount": 0,
+      "expectedRedisDbInconsistencyCount": 0,
+      "purpose": "Redis pre-deduction with restore on database or order-write failure."
+    }
+  ],
+  "runOutput": {
+    "directoryPattern": "benchmark/results/{strategy}-{yyyyMMdd-HHmmss}",
+    "manifest": "run.json",
+    "rawSamples": "results.jtl",
+    "htmlReport": "html/index.html",
+    "summaryRow": "summary-row.md"
+  }
+}

@@ -10,7 +10,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$resultsDir = ".\benchmark\results\$Strategy-$(Get-Date -Format yyyyMMdd-HHmmss)"
+$runId = "$Strategy-$(Get-Date -Format yyyyMMdd-HHmmss)"
+$resultsDir = ".\benchmark\results\$runId"
 New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
 $uri = [Uri]$BaseUrl
 $headers = @{ "Content-Type" = "application/json" }
@@ -64,8 +65,51 @@ $successOrders = [int]$consistency.result.dbOrderCount
 $failedOrders = [Math]::Max(0, $actualRequests - $successOrders)
 $machine = $env:COMPUTERNAME
 $date = Get-Date -Format "yyyy-MM-dd"
+$oversoldCount = [int]$consistency.result.oversoldCount
+$redisStockAfter = [int]$consistency.result.redisStockAfter
+$dbStockAfter = [int]$consistency.result.dbStockAfter
+$dbOrderCount = [long]$consistency.result.dbOrderCount
+$redisDbInconsistencyCount = [int]$consistency.result.redisDbInconsistencyCount
+$status = if ($oversoldCount -eq 0 -and ($Strategy -ne "REDIS_LUA_WITH_COMPENSATION" -or $redisDbInconsistencyCount -eq 0)) { "PASS" } else { "CHECK" }
+
+$summary = [ordered]@{
+  runId = $runId
+  date = $date
+  machine = $machine
+  strategy = $Strategy
+  totalRequests = $actualRequests
+  concurrency = $Threads
+  throughput = $throughput
+  averageMs = $avgMs
+  p95Ms = $p95
+  p99Ms = $p99
+  successOrders = $successOrders
+  failedOrders = $failedOrders
+  oversoldCount = $oversoldCount
+  redisStockAfter = $redisStockAfter
+  dbStockAfter = $dbStockAfter
+  dbOrderCount = $dbOrderCount
+  redisDbInconsistencyCount = $redisDbInconsistencyCount
+  status = $status
+}
+
+$run = [ordered]@{
+  summary = $summary
+  reset = Get-Content "$resultsDir\reset.json" -Raw | ConvertFrom-Json
+  warmup = Get-Content "$resultsDir\warmup.json" -Raw | ConvertFrom-Json
+  consistency = $consistency
+  artifacts = [ordered]@{
+    jtl = "results.jtl"
+    html = "html/index.html"
+    summary = "summary-row.md"
+  }
+}
+
+$run | ConvertTo-Json -Depth 10 | Out-File "$resultsDir\run.json" -Encoding utf8
+
 $row = "| $date | $machine | ``$Strategy`` | $actualRequests | $Threads | $throughput | $avgMs | $p95 | $p99 | $successOrders | $failedOrders | $($consistency.result.oversoldCount) | $($consistency.result.redisStockAfter) | $($consistency.result.dbStockAfter) | $($consistency.result.dbOrderCount) | $($consistency.result.redisDbInconsistencyCount) |"
 $row | Out-File "$resultsDir\summary-row.md"
 
 Write-Host "Raw results: $resultsDir"
+Write-Host "API run manifest: $resultsDir\run.json"
 Write-Host $row

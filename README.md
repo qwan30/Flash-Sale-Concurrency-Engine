@@ -24,8 +24,8 @@ The ticket domain is only the test fixture. The project is not positioned as a c
 
 | Path | Purpose |
 |---|---|
-| `xxxx-domain`, `xxxx-application`, `xxxx-infrastructure`, `xxxx-controller`, `xxxx-start` | Spring Boot backend modules |
-| `frontend` | Optional operator dashboard for lab controls and result inspection |
+| `app/backend/xxxx-domain`, `app/backend/xxxx-application`, `app/backend/xxxx-infrastructure`, `app/backend/xxxx-controller`, `app/backend/xxxx-start` | Spring Boot backend modules |
+| `app/frontend` | Optional operator dashboard for lab controls and result inspection |
 | `benchmark` | JMeter plans, smoke scripts, and reproducibility assets |
 | `environment` | Local Docker dependencies and database bootstrap |
 | `docs` | Supporting design notes and dashboard screenshots |
@@ -36,7 +36,13 @@ The ticket domain is only the test fixture. The project is not positioned as a c
 ```bash
 docker compose -f environment/docker-compose-dev.yml up -d
 mvn -q -DskipTests install
-mvn -pl xxxx-start spring-boot:run -DskipTests
+mvn -pl app/backend/xxxx-start -am spring-boot:run -DskipTests
+```
+
+Docker-gated integration test:
+
+```bash
+mvn -pl app/backend/xxxx-start -am "-Dflashsale.integration=true" test
 ```
 
 Default local services:
@@ -116,6 +122,8 @@ curl "http://localhost:1122/admin/benchmarks/consistency?ticketItemId=4&yearMont
 ```
 
 ## Benchmark Scenarios
+
+The machine-readable experiment contract is [benchmark/experiment-spec.json](benchmark/experiment-spec.json). Each `benchmark/run-jmeter.ps1` execution writes a run folder under `benchmark/results/` with raw samples, JMeter HTML, a markdown summary row, and `run.json`. The admin benchmark dashboard reads saved runs through `GET /admin/benchmarks/runs`.
 
 Run each scenario with the same initial DB stock and warmed Redis stock.
 
