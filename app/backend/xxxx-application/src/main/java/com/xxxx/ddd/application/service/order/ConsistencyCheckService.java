@@ -29,6 +29,13 @@ public class ConsistencyCheckService {
         int redisStock = ticketItemId == null ? -1 : stockOrderCacheService.getStockCache(ticketItemId);
         int dbStock = ticketItemId == null ? -1 : tickerOrderDomainService.getStockAvailable(ticketItemId);
         long orderCount = orderDeductionDomainService.countOrders(normalizedYearMonth);
+
+        // Mathematical consistency: initialStock = current DB stock + orders already placed
+        // expectedRedisStock = initialStock - orderCount  (i.e. dbStock, in a perfect world)
+        int initialStock = (int) (dbStock + orderCount);
+        int expectedRedisStock = (int) (initialStock - orderCount); // equals dbStock
+        int driftAmount = redisStock - expectedRedisStock;
+
         return ConsistencySnapshot.builder()
                 .ticketItemId(ticketItemId)
                 .yearMonth(normalizedYearMonth)
@@ -36,7 +43,10 @@ public class ConsistencyCheckService {
                 .dbStockAfter(dbStock)
                 .dbOrderCount(orderCount)
                 .oversoldCount(Math.max(0, -dbStock))
-                .redisDbInconsistencyCount(redisStock == dbStock ? 0 : 1)
+                .initialStock(initialStock)
+                .expectedRedisStock(expectedRedisStock)
+                .driftAmount(driftAmount)
+                .redisDbInconsistencyCount(driftAmount != 0 ? 1 : 0)
                 .build();
     }
 }

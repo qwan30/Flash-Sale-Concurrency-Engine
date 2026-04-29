@@ -1,6 +1,7 @@
 package com.xxxx.ddd.integration;
 
 import com.xxxx.StartApplication;
+import com.xxxx.ddd.application.service.order.cache.StockOrderCacheService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +72,9 @@ class FlashSaleConcurrencyIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private StockOrderCacheService stockOrderCacheService;
+
     @DynamicPropertySource
     static void containerProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -130,6 +134,91 @@ class FlashSaleConcurrencyIntegrationTest {
         assertThat(((Number) result.get("dbStockAfter")).intValue()).isZero();
     }
 
+    /**
+     * Proves the reconciliation mechanism detects and repairs Redis drift.
+     *
+     * <p>Scenario: After a normal run, we manually decrement Redis by 3 units
+     * (simulating 3 "lost stock" events from JVM crashes or compensation failures).
+     * The consistency endpoint should detect a drift of -3.
+     * After calling the reconcile endpoint, Redis should match DB again.
+     */
+    @Test
+    void reconciliationRepairsRedisDriftAfterCompensationFailure() throws Exception {
+        loadSchema();
+
+        // Reset to a known state: stock = 10, no orders
+        int initialStock = 10;
+        post("/admin/benchmarks/reset", Map.of(
+                "ticketItemId", TICKET_ITEM_ID,
+                "stock", initialStock,
+                "yearMonth", YEAR_MONTH
+        ));
+        post("/admin/tickets/" + TICKET_ITEM_ID + "/stock/warmup", null);
+
+        // Place 5 orders normally
+        int ordersToPlace = 5;
+        for (int i = 0; i < ordersToPlace; i++) {
+            ResponseEntity<Map> orderResp = post("/orders", Map.of(
+                    "ticketItemId", TICKET_ITEM_ID,
+                    "userId", 20_000 + i,
+                    "quantity", 1,
+                    "strategy", "REDIS_LUA_WITH_COMPENSATION",
+                    "idempotencyKey", "recon-" + i
+            ));
+            assertThat(orderResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        }
+
+        // Verify: Redis=5, DB=5, no drift
+        Map<?, ?> beforeDrift = getConsistencyResult();
+        assertThat(((Number) beforeDrift.get("redisStockAfter")).intValue()).isEqualTo(initialStock - ordersToPlace);
+        assertThat(((Number) beforeDrift.get("dbStockAfter")).intValue()).isEqualTo(initialStock - ordersToPlace);
+        assertThat(((Number) beforeDrift.get("driftAmount")).intValue()).isZero();
+
+        // Simulate "Lost Stock" drift: directly set Redis 3 units below what it should be.
+        // This mimics JVM crashes or compensation failures where Redis was decremented
+        // but the corresponding DB order was never committed.
+        int simulatedLostUnits = 3;
+        int currentRedis = ((Number) beforeDrift.get("redisStockAfter")).intValue();
+        int corruptedRedis = currentRedis - simulatedLostUnits; // 5 - 3 = 2
+        stockOrderCacheService.setStockCache(TICKET_ITEM_ID, corruptedRedis);
+
+        // Verify drift is detected
+        Map<?, ?> driftedState = getConsistencyResult();
+        assertThat(((Number) driftedState.get("redisStockAfter")).intValue()).isEqualTo(corruptedRedis);
+        assertThat(((Number) driftedState.get("dbStockAfter")).intValue()).isEqualTo(initialStock - ordersToPlace);
+        assertThat(((Number) driftedState.get("driftAmount")).intValue()).isEqualTo(-simulatedLostUnits);
+        assertThat(((Number) driftedState.get("redisDbInconsistencyCount")).intValue()).isEqualTo(1);
+
+        // Trigger reconciliation
+        ResponseEntity<Map> reconcileResp = post(
+                "/admin/benchmarks/reconcile?ticketItemId=" + TICKET_ITEM_ID + "&yearMonth=" + YEAR_MONTH,
+                null
+        );
+        assertThat(reconcileResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> reconcileResult = (Map<?, ?>) reconcileResp.getBody().get("result");
+        assertThat(((Boolean) reconcileResult.get("driftDetected"))).isTrue();
+        assertThat(((Boolean) reconcileResult.get("repaired"))).isTrue();
+        assertThat(((Number) reconcileResult.get("driftAmount")).intValue()).isEqualTo(-simulatedLostUnits);
+
+        // Verify: after reconciliation, drift should be zero
+        Map<?, ?> healedState = getConsistencyResult();
+        assertThat(((Number) healedState.get("redisStockAfter")).intValue())
+                .isEqualTo(initialStock - ordersToPlace);
+        assertThat(((Number) healedState.get("driftAmount")).intValue()).isZero();
+        assertThat(((Number) healedState.get("redisDbInconsistencyCount")).intValue()).isZero();
+    }
+
+    private Map<?, ?> getConsistencyResult() {
+        ResponseEntity<Map> consistency = restTemplate.getForEntity(
+                "/admin/benchmarks/consistency?ticketItemId={ticketItemId}&yearMonth={yearMonth}",
+                Map.class,
+                TICKET_ITEM_ID,
+                YEAR_MONTH
+        );
+        assertThat(consistency.getStatusCode()).isEqualTo(HttpStatus.OK);
+        return (Map<?, ?>) consistency.getBody().get("result");
+    }
+
     private ResponseEntity<Map> post(String url, Object body) {
         return restTemplate.postForEntity(url, body, Map.class);
     }
@@ -146,3 +235,4 @@ class FlashSaleConcurrencyIntegrationTest {
         return Boolean.parseBoolean(System.getProperty("flashsale.integration", "false"));
     }
 }
+

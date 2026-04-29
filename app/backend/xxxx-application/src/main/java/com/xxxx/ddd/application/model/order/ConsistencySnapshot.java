@@ -17,4 +17,10 @@ public class ConsistencySnapshot {
     private Long dbOrderCount;
     private Integer oversoldCount;
     private Integer redisDbInconsistencyCount;
+    /** The initial stock configured for this ticket item (from DB stock_available + orders sold). */
+    private Integer initialStock;
+    /** The stock Redis *should* have: initialStock - dbOrderCount. */
+    private Integer expectedRedisStock;
+    /** Signed drift: redisStockAfter - expectedRedisStock. Positive = Redis over-counted, negative = Redis lost stock. */
+    private Integer driftAmount;
 }

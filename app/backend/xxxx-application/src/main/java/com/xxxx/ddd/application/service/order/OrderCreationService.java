@@ -96,7 +96,16 @@ public class OrderCreationService {
         } catch (Exception e) {
             markRollbackOnly();
             if (deductionResult != null && deductionResult.isCompensateOnOrderFailure()) {
-                stockOrderCacheService.restoreStockCache(request.getTicketItemId(), request.getQuantity());
+                try {
+                    stockOrderCacheService.restoreStockCache(request.getTicketItemId(), request.getQuantity());
+                } catch (Exception compensationEx) {
+                    // CRITICAL: Redis compensation failed — "Double Fault" scenario.
+                    // Redis remains decremented but no DB order exists.
+                    // The scheduled OrderReconciliationService will detect and repair this drift.
+                    log.error("COMPENSATION_FAILURE: Redis stock restore failed for ticketItemId={}. " +
+                                    "Redis is {} unit(s) lower than it should be. Reconciliation will repair.",
+                            request.getTicketItemId(), request.getQuantity(), compensationEx);
+                }
             }
             log.error("createOrder failed ticketItemId={} strategy={}", request.getTicketItemId(), request.getStrategy(), e);
             CreateOrderResponse response = failureWithCurrentStock(request, "ORDER_CREATE_FAILED", "Order creation failed");

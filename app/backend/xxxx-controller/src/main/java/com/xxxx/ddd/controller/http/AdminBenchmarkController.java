@@ -7,6 +7,7 @@ import com.xxxx.ddd.application.model.order.BenchmarkResetResponse;
 import com.xxxx.ddd.application.model.order.ConsistencySnapshot;
 import com.xxxx.ddd.application.model.order.CreateOrderResponse;
 import com.xxxx.ddd.application.service.benchmark.BenchmarkRunService;
+import com.xxxx.ddd.application.service.order.OrderReconciliationService;
 import com.xxxx.ddd.application.service.order.TicketOrderAppService;
 import com.xxxx.ddd.controller.model.enums.ResultUtil;
 import com.xxxx.ddd.controller.model.vo.ResultMessage;
@@ -29,6 +30,9 @@ public class AdminBenchmarkController {
     @Autowired
     private BenchmarkRunService benchmarkRunService;
 
+    @Autowired
+    private OrderReconciliationService orderReconciliationService;
+
     @PostMapping("/admin/tickets/{ticketItemId}/stock/warmup")
     public ResultMessage<CreateOrderResponse> warmupStock(@PathVariable("ticketItemId") Long ticketItemId) {
         return ResultUtil.data(ticketOrderAppService.warmupStock(ticketItemId));
@@ -45,6 +49,14 @@ public class AdminBenchmarkController {
             @RequestParam(value = "yearMonth", required = false) String yearMonth
     ) {
         return ResultUtil.data(ticketOrderAppService.getConsistency(ticketItemId, yearMonth));
+    }
+
+    @PostMapping("/admin/benchmarks/reconcile")
+    public ResultMessage<OrderReconciliationService.ReconciliationResult> reconcile(
+            @RequestParam("ticketItemId") Long ticketItemId,
+            @RequestParam(value = "yearMonth", required = false) String yearMonth
+    ) {
+        return ResultUtil.data(orderReconciliationService.reconcile(ticketItemId, yearMonth));
     }
 
     @GetMapping("/admin/benchmarks/runs")
