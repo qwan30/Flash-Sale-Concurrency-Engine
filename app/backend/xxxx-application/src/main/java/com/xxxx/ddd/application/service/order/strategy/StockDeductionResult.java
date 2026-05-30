@@ -1,5 +1,11 @@
 package com.xxxx.ddd.application.service.order.strategy;
 
+/**
+ * Result of the stock reservation phase before the order row is inserted.
+ *
+ * <p>The compensation flag is intentionally separate from success. Redis-first strategies can
+ * reserve stock successfully, then require a later restore if the database order write fails.
+ */
 public class StockDeductionResult {
 
     private final boolean success;

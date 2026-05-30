@@ -5,6 +5,12 @@ import com.xxxx.ddd.application.model.order.OrderStrategy;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import org.springframework.stereotype.Component;
 
+/**
+ * Lab baseline that decrements database stock without an availability predicate.
+ *
+ * <p>This strategy is intentionally unsafe. It exists to make overselling visible under concurrent
+ * load, so benchmark failures here are part of the demonstration rather than regressions.
+ */
 @Component
 public class UnsafeDbStockDeductionStrategy implements StockDeductionStrategy {
 

@@ -6,6 +6,12 @@ import com.xxxx.ddd.application.service.order.cache.StockOrderCacheService;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import org.springframework.stereotype.Component;
 
+/**
+ * Redis-first strategy that gates demand with Lua before touching the database.
+ *
+ * <p>This version intentionally does not restore Redis after a later database failure. It is useful
+ * for measuring fast rejection behavior and observing Redis-DB drift during reconciliation.
+ */
 @Component
 public class RedisLuaStockDeductionStrategy implements StockDeductionStrategy {
 
@@ -27,6 +33,7 @@ public class RedisLuaStockDeductionStrategy implements StockDeductionStrategy {
 
     @Override
     public StockDeductionResult decrease(CreateOrderRequest request) {
+        // Redis decides capacity first; the DB conditional update remains the source-of-truth guard.
         long remainingStock = stockOrderCacheService.decreaseStockCacheByLuaReturningRemaining(
                 request.getTicketItemId(), request.getQuantity());
         if (remainingStock < 0) {

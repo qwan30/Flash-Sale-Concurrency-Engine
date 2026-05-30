@@ -6,6 +6,12 @@ import com.xxxx.ddd.application.service.order.cache.StockOrderCacheService;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import org.springframework.stereotype.Component;
 
+/**
+ * Redis-first strategy that restores Redis when the database or order-write phase cannot complete.
+ *
+ * <p>A successful reservation returns a compensation requirement so {@code OrderCreationService}
+ * can undo Redis if the later order insert fails outside Redis' transaction boundary.
+ */
 @Component
 public class RedisLuaCompensatingStockDeductionStrategy implements StockDeductionStrategy {
 
@@ -40,6 +46,7 @@ public class RedisLuaCompensatingStockDeductionStrategy implements StockDeductio
                 return StockDeductionResult.success(true);
             }
 
+            // Redis was decremented, but the DB source of truth rejected the reservation.
             stockOrderCacheService.restoreStockCache(request.getTicketItemId(), request.getQuantity());
             return StockDeductionResult.failure("DB_STOCK_DECREMENT_FAILED", "Database stock was not decremented");
         } catch (RuntimeException e) {

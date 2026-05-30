@@ -5,6 +5,12 @@ import com.xxxx.ddd.application.model.order.OrderStrategy;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import org.springframework.stereotype.Component;
 
+/**
+ * Database-only safe baseline using a conditional stock update.
+ *
+ * <p>The database row is the contention point: one statement checks available stock and decrements
+ * it, then a zero affected-row result is treated as a clean rejection.
+ */
 @Component
 public class ConditionalDbStockDeductionStrategy implements StockDeductionStrategy {
 
