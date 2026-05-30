@@ -6,6 +6,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * MySQL stock adapter for the ticket fixture table.
+ *
+ * <p>The method names preserve the original benchmark levels: level 0 is unsafe, level 1 is the
+ * conditional-update baseline, and level 3 is the older compare-and-swap experiment.
+ */
 @Service
 @Slf4j
 public class TickerOrderRepositoryImpl implements TickerOrderRepository {

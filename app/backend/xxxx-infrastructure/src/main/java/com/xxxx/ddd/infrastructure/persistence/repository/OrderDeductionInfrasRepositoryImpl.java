@@ -12,6 +12,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Native SQL repository for monthly order tables.
+ *
+ * <p>The lab stores orders in {@code ticket_order_yyyyMM} tables so benchmark runs can reset and
+ * inspect one month without touching unrelated rows.
+ */
 @Service
 @Slf4j
 public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionRepository {
@@ -61,7 +67,7 @@ public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionReposit
         String sql = "INSERT INTO " + tableName + " (order_number, user_id, total_amount, terminal_id, order_date, order_notes, updated_at, created_at) " +
                 "VALUES (:orderNumber, :userId, :totalAmount, :terminalId, :orderDate, :orderNotes, :updatedAt, :createdAt)";
 
-        // pls: rememeber that: add log by time
+        // Keep all order timestamps identical so benchmark rows are easy to compare and sort.
         LocalDateTime now = LocalDateTime.now();
         order.setOrderDate(now);
         order.setUpdatedAt(now);
