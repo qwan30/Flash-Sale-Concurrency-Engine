@@ -12,15 +12,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * Reads ticket fixture details through the cache-backed query path used by stock warmup.
+ */
 @Service
 @Slf4j
 public class TicketDetailAppServiceImpl implements TicketDetailAppService {
 
-    // CALL Service Domain Module
     @Autowired
     private TicketDetailDomainService ticketDetailDomainService;
 
-    // CALL CACHE
     @Autowired
     private TicketDetailCacheService ticketDetailCacheService;
 
@@ -31,7 +32,7 @@ public class TicketDetailAppServiceImpl implements TicketDetailAppService {
     public TicketDetailDTO getTicketDetailById(Long ticketId, Long version) {
 //        log.info("Implement Application : {}, {}: ", ticketId, version);
         TicketDetailCache ticketDetailCache = ticketDetailCacheServiceRefactor.getTicketDetail(ticketId, version);
-        // mapper to DTO
+        // Return the cache version with the DTO so callers can reason about stale reads.
         TicketDetailDTO ticketDetailDTO = TicketDetailMapper.mapperToTicketDetailDTO(ticketDetailCache.getTicketDetail());
         ticketDetailDTO.setVersion(ticketDetailCache.getVersion());
         return ticketDetailDTO;

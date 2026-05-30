@@ -13,6 +13,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Reads persisted benchmark run manifests from the local results directory.
+ *
+ * <p>The JMeter script owns writing {@code run.json}; this service only validates path input and
+ * presents the saved evidence to the operator dashboard.
+ */
 @Service
 public class BenchmarkRunService {
 
@@ -47,6 +53,7 @@ public class BenchmarkRunService {
     }
 
     public BenchmarkRunDetail getRun(String runId) {
+        // Keep runId as a directory name only; never allow path traversal through the API.
         if (runId == null || !runId.matches("[A-Za-z0-9_.-]+")) {
             return null;
         }

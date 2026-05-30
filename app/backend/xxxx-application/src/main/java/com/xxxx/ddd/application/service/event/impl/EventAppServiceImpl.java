@@ -6,9 +6,11 @@ import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * Minimal sample application service retained from the original scaffold.
+ */
 @Service
 public class EventAppServiceImpl implements EventAppService {
-    // Call Domain Service
 
     @Resource
     private HiDomainService hiDomainService;
