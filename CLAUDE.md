@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+# GitNexus - Code Intelligence
 
-This project is indexed by GitNexus as **xxxx.com-27-04-25** (1147 symbols, 2802 relationships, 89 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Flash-Sale-Concurrency-Engine** (1148 symbols, 2802 relationships, 89 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -11,18 +11,18 @@ This project is indexed by GitNexus as **xxxx.com-27-04-25** (1147 symbols, 2802
 - **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
 - When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+- When you need full context on a specific symbol - callers, callees, which execution flows it participates in - use `gitnexus_context({name: "symbolName"})`.
 
 ## When Debugging
 
-1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
-2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ gitnexus://repo/xxxx.com-27-04-25/process/{processName}` — trace the full execution flow step by step
-4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
+1. `gitnexus_query({query: "<error or symptom>"})` - find execution flows related to the issue
+2. `gitnexus_context({name: "<suspect function>"})` - see all callers, callees, and process participation
+3. `READ gitnexus://repo/Flash-Sale-Concurrency-Engine/process/{processName}` - trace the full execution flow step by step
+4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` - see what your branch changed
 
 ## When Refactoring
 
-- **Renaming**: MUST use `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` first. Review the preview — graph edits are safe, text_search edits need manual review. Then run with `dry_run: false`.
+- **Renaming**: MUST use `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` first. Review the preview - graph edits are safe, text_search edits need manual review. Then run with `dry_run: false`.
 - **Extracting/Splitting**: MUST run `gitnexus_context({name: "target"})` to see all incoming/outgoing refs, then `gitnexus_impact({target: "target", direction: "upstream"})` to find all external callers before moving code.
 - After any refactor: run `gitnexus_detect_changes({scope: "all"})` to verify only expected files changed.
 
@@ -30,7 +30,7 @@ This project is indexed by GitNexus as **xxxx.com-27-04-25** (1147 symbols, 2802
 
 - NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER rename symbols with find-and-replace - use `gitnexus_rename` which understands the call graph.
 - NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
 
 ## Tools Quick Reference
@@ -48,18 +48,18 @@ This project is indexed by GitNexus as **xxxx.com-27-04-25** (1147 symbols, 2802
 
 | Depth | Meaning | Action |
 |-------|---------|--------|
-| d=1 | WILL BREAK — direct callers/importers | MUST update these |
-| d=2 | LIKELY AFFECTED — indirect deps | Should test |
-| d=3 | MAY NEED TESTING — transitive | Test if critical path |
+| d=1 | WILL BREAK - direct callers/importers | MUST update these |
+| d=2 | LIKELY AFFECTED - indirect deps | Should test |
+| d=3 | MAY NEED TESTING - transitive | Test if critical path |
 
 ## Resources
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/xxxx.com-27-04-25/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/xxxx.com-27-04-25/clusters` | All functional areas |
-| `gitnexus://repo/xxxx.com-27-04-25/processes` | All execution flows |
-| `gitnexus://repo/xxxx.com-27-04-25/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/Flash-Sale-Concurrency-Engine/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/Flash-Sale-Concurrency-Engine/clusters` | All functional areas |
+| `gitnexus://repo/Flash-Sale-Concurrency-Engine/processes` | All execution flows |
+| `gitnexus://repo/Flash-Sale-Concurrency-Engine/process/{name}` | Step-by-step execution trace |
 
 ## Self-Check Before Finishing
 
@@ -83,7 +83,7 @@ If the index previously included embeddings, preserve them by adding `--embeddin
 npx gitnexus analyze --embeddings
 ```
 
-To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
+To check whether embeddings exist, inspect `.gitnexus/meta.json` - the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
 
 > Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
 
@@ -99,3 +99,29 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+<!-- project-docs:start -->
+# Project Documentation Surface
+
+This repo is a flash-sale concurrency backend lab, not a full ticket-sales product. Keep docs, examples, and release language centered on stock correctness, Redis/MySQL consistency, benchmark reproducibility, and the optional operator dashboard.
+
+Current local API documentation:
+
+| Surface | URL |
+|---|---|
+| Swagger UI | `http://localhost:1122/swagger-ui.html` |
+| OpenAPI JSON | `http://localhost:1122/v3/api-docs` |
+| Lab API OpenAPI JSON | `http://localhost:1122/v3/api-docs/lab-api` |
+
+Release docs live in `docs/`:
+
+| File | Purpose |
+|---|---|
+| `docs/README.md` | documentation index |
+| `docs/API_REFERENCE.md` | HTTP API and Swagger/OpenAPI contract |
+| `docs/LAB_OPERATIONS.md` | run, smoke, benchmark, and troubleshooting commands |
+| `docs/STOCK_STRATEGIES.md` | strategy behavior and benchmark interpretation |
+| `docs/RELEASE_CHECKLIST.md` | release verification checklist |
+
+When refreshing docs, treat Java source, Maven files, scripts, and runtime config as canonical. Use evergreen current-state wording; avoid changelog phrasing such as "newly added" or "recently updated".
+<!-- project-docs:end -->

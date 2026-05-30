@@ -7,7 +7,7 @@ This project is a flash-sale concurrency backend lab. The goal is to demonstrate
 ## Main Learning Goals
 
 - Prevent overselling under concurrent order requests.
-- Compare MySQL conditional update, Redis pre-deduction, Redis Lua, and Redisson lock.
+- Compare MySQL conditional update, Redis Lua pre-deduction, and Redis Lua compensation strategies.
 - Measure throughput, latency, success rate, and consistency.
 - Document trade-offs between correctness, performance, and complexity.
 
@@ -43,6 +43,15 @@ This project is a flash-sale concurrency backend lab. The goal is to demonstrate
 - Run app:
   mvn -pl app/backend/xxxx-start -am spring-boot:run
 
+- Swagger UI:
+  http://localhost:1122/swagger-ui.html
+
+- OpenAPI JSON:
+  http://localhost:1122/v3/api-docs
+
+- Lab API OpenAPI JSON:
+  http://localhost:1122/v3/api-docs/lab-api
+
 - Smoke test:
   powershell -ExecutionPolicy Bypass -File benchmark/smoke-local.ps1
 
@@ -58,6 +67,7 @@ This project is a flash-sale concurrency backend lab. The goal is to demonstrate
 - POST /admin/tickets/{ticketItemId}/stock/warmup
 - POST /admin/benchmarks/reset
 - GET /admin/benchmarks/consistency?ticketItemId=&yearMonth=
+- POST /admin/benchmarks/reconcile?ticketItemId=&yearMonth=
 - GET /admin/benchmarks/runs
 - GET /admin/benchmarks/runs/{runId}
 
@@ -75,3 +85,4 @@ This project is a flash-sale concurrency backend lab. The goal is to demonstrate
 - Keep benchmark results reproducible.
 - Prefer small phases over large rewrites.
 - Keep `benchmark/experiment-spec.json` aligned with JMeter defaults and dashboard expectations.
+- Keep Swagger/OpenAPI URLs and docs in `docs/` aligned with controller routes and Springdoc config.

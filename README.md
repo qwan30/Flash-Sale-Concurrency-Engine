@@ -28,8 +28,18 @@ The ticket domain is only the test fixture. The project is not positioned as a c
 | `app/frontend` | Optional operator dashboard for lab controls and result inspection |
 | `benchmark` | JMeter plans, smoke scripts, and reproducibility assets |
 | `environment` | Local Docker dependencies and database bootstrap |
-| `docs` | Supporting design notes and dashboard screenshots |
+| `docs` | Release documentation, API reference, lab operations, design notes, and dashboard screenshots |
 | `uml` | Lightweight process diagrams |
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [docs/README.md](docs/README.md) | Documentation index and release documentation rules |
+| [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | HTTP API contract, Swagger/OpenAPI URLs, and request examples |
+| [docs/LAB_OPERATIONS.md](docs/LAB_OPERATIONS.md) | Local run, smoke test, benchmark, and troubleshooting commands |
+| [docs/STOCK_STRATEGIES.md](docs/STOCK_STRATEGIES.md) | Strategy behavior and benchmark interpretation |
+| [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) | Release verification checklist |
 
 ## Run Locally
 
@@ -50,6 +60,9 @@ Default local services:
 | Service | URL |
 |---|---|
 | App | `http://localhost:1122` |
+| Swagger UI | `http://localhost:1122/swagger-ui.html` |
+| OpenAPI JSON | `http://localhost:1122/v3/api-docs` |
+| Lab API OpenAPI JSON | `http://localhost:1122/v3/api-docs/lab-api` |
 | MySQL | `localhost:3316`, database `vetautet` |
 | Redis | `localhost:6319` |
 | Actuator Prometheus | `http://localhost:1122/actuator/prometheus` |
@@ -72,6 +85,8 @@ docker compose -f environment/docker-compose-dev.yml --profile observability up 
 
 ## Lab API Contract
 
+When the backend is running, the same REST contract is available as an OpenAPI document at `http://localhost:1122/v3/api-docs`, as the grouped `lab-api` document at `http://localhost:1122/v3/api-docs/lab-api`, and through Swagger UI at `http://localhost:1122/swagger-ui.html`.
+
 | API | Purpose |
 |---|---|
 | `POST /orders` | Place order with selected strategy |
@@ -81,6 +96,9 @@ docker compose -f environment/docker-compose-dev.yml --profile observability up 
 | `POST /admin/tickets/{ticketItemId}/stock/warmup` | Warm Redis stock from DB |
 | `POST /admin/benchmarks/reset` | Reset DB stock, Redis stock, and monthly orders |
 | `GET /admin/benchmarks/consistency?ticketItemId=&yearMonth=` | Compare Redis stock, DB stock, and order count |
+| `POST /admin/benchmarks/reconcile?ticketItemId=&yearMonth=` | Force Redis stock reconciliation from DB truth |
+| `GET /admin/benchmarks/runs` | List saved benchmark run summaries |
+| `GET /admin/benchmarks/runs/{runId}` | Read one saved benchmark run |
 
 Admin benchmark endpoints are lab controls for local and benchmark runs only. Do not expose reset, warmup, or consistency endpoints in a public production deployment.
 

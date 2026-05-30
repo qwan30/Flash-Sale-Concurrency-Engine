@@ -38,3 +38,4 @@ This frontend is a secondary operator surface for the backend reliability lab. I
 - Benchmark views should keep correctness columns visible beside throughput and latency.
 - Empty/error states should name the backend operation that failed.
 - All default IDs and months should match the benchmark fixtures in `PROJECT_CONTEXT.md`.
+- API links should point to `http://localhost:1122/swagger-ui.html`, `http://localhost:1122/v3/api-docs`, or `http://localhost:1122/v3/api-docs/lab-api` when the backend is running locally.
