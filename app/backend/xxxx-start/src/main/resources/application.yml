@@ -41,6 +41,14 @@ spring:
     virtual:
       enabled: true
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
 app:
   redisson:
     mode: ${REDISSON_MODE:single}
