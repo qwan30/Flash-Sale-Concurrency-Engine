@@ -15,6 +15,12 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Reads order rows from the monthly sharded order tables used by the lab.
+ *
+ * <p>Order numbers include their creation timestamp, so single-order lookups can route to the
+ * correct monthly table without scanning every shard.
+ */
 @Service
 @Slf4j
 public class OrderQueryService {
@@ -47,6 +53,7 @@ public class OrderQueryService {
     }
 
     public TicketOrderDTO findByOrderNumber(String yearMonth, String orderNumber) {
+        // Prefer the timestamp embedded in the order number over caller input to avoid shard drift.
         String orderTableMonth = extractYearMonthFromOrderNumber(orderNumber);
         orderDeductionDomainService.ensureMonthlyOrderTable(orderTableMonth);
         log.info("findByOrderNumber yearMonth={}", orderTableMonth);

@@ -7,6 +7,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+/**
+ * Redis stock helper for the order benchmark flow.
+ *
+ * <p>The service owns stock cache keys, warmup from MySQL, Lua-based decrements, and Redis restores
+ * used by compensation paths.
+ */
 @Service
 @Slf4j
 public class StockOrderCacheService {
@@ -23,11 +29,10 @@ public class StockOrderCacheService {
     }
 
     public boolean addStockAvailableToCache(Long ticketId) {
-        // That's remember check validation(*)
         if(ticketId == null) {
             return false;
         }
-        // get stock_available from mysql
+        // Warm Redis from the durable MySQL stock value before a Redis-first benchmark run.
         TicketDetailCache ticketDetailCache = ticketDetailCacheServiceRefactor.getTicketDetail(ticketId, null);
         if(ticketDetailCache == null) {
             return false;
@@ -35,7 +40,6 @@ public class StockOrderCacheService {
         String keyStockItemCache = getKeyStockItemCache(ticketId);
         log.info("get->getKeyStockItemCache() | {}, {}, {}", ticketId, keyStockItemCache,
                 ticketDetailCache.getTicketDetail().getStockAvailable());
-        // stockAvailable = ticketDetailCache.getTicketDetail().getStockAvailable();
         cacheStore.setInt(keyStockItemCache, ticketDetailCache.getTicketDetail().getStockAvailable());
         return true;
     }
@@ -53,20 +57,17 @@ public class StockOrderCacheService {
         cacheStore.increment(getKeyStockItemCache(ticketId), quantity);
     }
 
-    // decreaseStockCache
     public int decreaseStockCache(Long ticketId, Integer quantity) {
-        // 1. Get Stock Available
         String keyStockNormal = getKeyStockItemCache(ticketId);
-        int stockAvailable = cacheStore.getInt(keyStockNormal); // 100
+        int stockAvailable = cacheStore.getInt(keyStockNormal);
         log.info("stockAvailable Normal: {}, {}, {} ", keyStockNormal, stockAvailable, String.valueOf(stockAvailable - quantity));
-        // 2. Decrease Stock
 
-        if(stockAvailable >= quantity){ // 100 > 1 = 99
-            cacheStore.setInt(keyStockNormal, stockAvailable - quantity); // 99
+        if(stockAvailable >= quantity){
+            cacheStore.setInt(keyStockNormal, stockAvailable - quantity);
             log.info("stockAvailable racing...: {}", stockAvailable - quantity);
             return 1;
         }
-        return 0; // stockAvailable = 0 , quantity = 1
+        return 0;
     }
 
     public int decreaseStockCacheByLUA(Long ticketId, Integer quantity) {
@@ -74,7 +75,7 @@ public class StockOrderCacheService {
     }
 
     public long decreaseStockCacheByLuaReturningRemaining(Long ticketId, Integer quantity) {
-        // 1. Get Stock Available
+        // Lua keeps the stock check and decrement atomic inside Redis.
         String keyStockLUA = getKeyStockItemCache(ticketId);
         return cacheStore.decreaseIntByLuaReturningRemaining(keyStockLUA, quantity);
     }

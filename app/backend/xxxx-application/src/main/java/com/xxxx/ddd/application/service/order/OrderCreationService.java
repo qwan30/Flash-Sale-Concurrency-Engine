@@ -20,6 +20,12 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 
+/**
+ * Coordinates request validation, idempotency, stock reservation, and order persistence.
+ *
+ * <p>The database work is transaction-scoped. Redis stock changes are compensated explicitly because
+ * they are outside the database transaction and must be restored on selected failure paths.
+ */
 @Service
 @Slf4j
 public class OrderCreationService {
@@ -50,6 +56,12 @@ public class OrderCreationService {
         this.idempotencyService = idempotencyService;
     }
 
+    /**
+     * Creates an order through the requested stock deduction strategy.
+     *
+     * <p>Idempotency wraps the business operation so a repeated client request reuses the same
+     * response instead of reserving stock twice.
+     */
     @Transactional(rollbackFor = Exception.class)
     public CreateOrderResponse createOrder(CreateOrderRequest request) {
         String validationError = validateCreateOrderRequest(request);
@@ -74,6 +86,7 @@ public class OrderCreationService {
             String orderNumber = buildOrderNumber(request.getUserId(), nowMillis);
             String yearMonth = OrderDateSupport.formatYearMonth(nowMillis);
 
+            // Reserve stock before inserting the order row so every persisted order has stock.
             deductionResult = stockDeductionStrategyRegistry.get(request.getStrategy()).decrease(request);
             if (!deductionResult.isSuccess()) {
                 CreateOrderResponse response = failureWithCurrentStock(
@@ -99,7 +112,7 @@ public class OrderCreationService {
                 try {
                     stockOrderCacheService.restoreStockCache(request.getTicketItemId(), request.getQuantity());
                 } catch (Exception compensationEx) {
-                    // CRITICAL: Redis compensation failed — "Double Fault" scenario.
+                    // CRITICAL: Redis compensation failed ("double fault").
                     // Redis remains decremented but no DB order exists.
                     // The scheduled OrderReconciliationService will detect and repair this drift.
                     log.error("COMPENSATION_FAILURE: Redis stock restore failed for ticketItemId={}. " +
