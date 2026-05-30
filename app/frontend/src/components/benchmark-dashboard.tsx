@@ -19,6 +19,12 @@ import { strategyDetails } from "@/lib/strategy";
 import type { BenchmarkRunSummary } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
 
+/**
+ * Benchmark evidence page.
+ *
+ * Recorded JMeter runs are preferred, while static rows stay as a fallback so the dashboard remains
+ * explainable before the first local run is saved.
+ */
 export function BenchmarkDashboard() {
   const [runs, setRuns] = useState<BenchmarkRunSummary[]>([]);
   const [loading, setLoading] = useState(true);

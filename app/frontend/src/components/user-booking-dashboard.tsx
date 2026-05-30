@@ -44,6 +44,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+/**
+ * Customer-facing probe for a single ticket fixture.
+ *
+ * It deliberately exposes the strategy selector so the lab can compare how each backend stock
+ * deduction strategy behaves under the same order form.
+ */
 export function UserBookingDashboard({
   ticketItemId = DEFAULT_TICKET_ID,
   event = getEventSummary(ticketItemId),
@@ -96,6 +102,7 @@ export function UserBookingDashboard({
         userId,
         quantity,
         strategy,
+        // Use a fresh key per click so deliberate repeated probes still hit the backend.
         idempotencyKey: nextIdempotencyKey(userId),
       });
 

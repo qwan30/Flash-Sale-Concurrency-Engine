@@ -21,6 +21,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+/**
+ * Reads one persisted order row by order number.
+ *
+ * The page proves order traces survive refreshes, which is important when explaining benchmark
+ * accepts and rejects after a run.
+ */
 export function OrderDetailDashboard({ orderNumber }: { orderNumber: string }) {
   const [order, setOrder] = useState<TicketOrder | null>(null);
   const [isLoading, setIsLoading] = useState(false);

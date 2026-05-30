@@ -23,6 +23,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+/**
+ * Monthly order-table browser for the benchmark fixture user.
+ *
+ * The backend stores rows in month-specific tables, so the month input is part of the lookup
+ * contract rather than a cosmetic filter.
+ */
 export function MyOrdersDashboard() {
   const [userId, setUserId] = useState(DEFAULT_USER_ID);
   const [yearMonth, setYearMonth] = useState(DEFAULT_YEAR_MONTH);

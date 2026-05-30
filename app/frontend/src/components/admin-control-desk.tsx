@@ -45,6 +45,12 @@ import { Input } from "@/components/ui/input";
 
 const DEFAULT_STOCK = 1000;
 
+/**
+ * Operator control surface for deterministic benchmark setup.
+ *
+ * Reset, warmup, and consistency actions are grouped here because benchmark evidence is only useful
+ * when Redis, MySQL, and order rows start from a known state.
+ */
 export function AdminControlDesk() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [ticket, setTicket] = useState<TicketDetail | null>(null);
@@ -90,6 +96,7 @@ export function AdminControlDesk() {
     setErrorMessage(null);
 
     try {
+      // Reset is intentionally followed by a full refresh so all cards reflect the same run state.
       const envelope = await resetBenchmark({ ticketItemId, stock, yearMonth });
       setLastReset(envelope.result);
       await refreshControlDesk();

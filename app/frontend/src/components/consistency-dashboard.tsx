@@ -30,6 +30,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+/**
+ * Focused Redis-vs-MySQL view for explaining post-run stock drift.
+ */
 export function ConsistencyDashboard() {
   const [ticketItemId, setTicketItemId] = useState(DEFAULT_TICKET_ID);
   const [yearMonth, setYearMonth] = useState(DEFAULT_YEAR_MONTH);

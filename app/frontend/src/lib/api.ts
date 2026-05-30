@@ -12,6 +12,12 @@ import type {
   TicketOrder,
 } from "@/lib/types";
 
+/**
+ * Central API client for the operator dashboard.
+ *
+ * Requests go through the Next.js backend proxy so browser code never needs to know the Spring
+ * Boot origin, and every caller receives the same JSON-envelope error handling.
+ */
 async function readJson<T>(response: Response): Promise<T> {
   const text = await response.text();
 
@@ -23,6 +29,7 @@ async function readJson<T>(response: Response): Promise<T> {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  // All dashboard API calls use the proxy route to avoid duplicating backend URL logic.
   const response = await fetch(`/api/backend${path}`, {
     ...init,
     headers: {
