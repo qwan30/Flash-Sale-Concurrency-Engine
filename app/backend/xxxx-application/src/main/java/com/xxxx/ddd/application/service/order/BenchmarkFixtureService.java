@@ -9,6 +9,12 @@ import com.xxxx.ddd.domain.service.OrderDeductionDomainService;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import org.springframework.stereotype.Service;
 
+/**
+ * Prepares deterministic data for local smoke tests and JMeter benchmark runs.
+ *
+ * <p>Reset touches all mutable stores used by the lab: DB stock, monthly order rows, Redis stock,
+ * and the in-memory idempotency cache.
+ */
 @Service
 public class BenchmarkFixtureService {
 
@@ -58,6 +64,7 @@ public class BenchmarkFixtureService {
         tickerOrderDomainService.resetStock(request.getTicketItemId(), request.getStock());
         orderDeductionDomainService.ensureMonthlyOrderTable(yearMonth);
         orderDeductionDomainService.clearOrders(yearMonth);
+        // Redis must start from the same stock as MySQL, otherwise benchmark drift is meaningless.
         stockOrderCacheService.setStockCache(request.getTicketItemId(), request.getStock());
         idempotencyService.clear();
 

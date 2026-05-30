@@ -7,6 +7,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+/**
+ * In-memory idempotency cache for local lab requests.
+ *
+ * <p>This prevents one client retry from reserving stock twice during a running process. It is not a
+ * distributed or durable idempotency store.
+ */
 @Service
 public class IdempotencyService {
 

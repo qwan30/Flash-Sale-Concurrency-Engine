@@ -18,6 +18,13 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Application facade kept stable for controllers while order responsibilities are split into
+ * focused services.
+ *
+ * <p>Legacy stock endpoints are delegated through the same order-creation path as {@code POST
+ * /orders} so benchmark compatibility does not bypass current stock rules.
+ */
 @Service
 public class TicketOrderAppServiceImpl implements TicketOrderAppService {
 

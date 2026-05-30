@@ -7,6 +7,12 @@ import com.xxxx.ddd.domain.service.OrderDeductionDomainService;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import org.springframework.stereotype.Service;
 
+/**
+ * Builds the stock consistency snapshot shown after benchmark and smoke runs.
+ *
+ * <p>The database is the source of truth for durable stock. Redis is expected to match the DB after
+ * healthy compensated runs, and any difference is reported as drift.
+ */
 @Service
 public class ConsistencyCheckService {
 
@@ -30,8 +36,7 @@ public class ConsistencyCheckService {
         int dbStock = ticketItemId == null ? -1 : tickerOrderDomainService.getStockAvailable(ticketItemId);
         long orderCount = orderDeductionDomainService.countOrders(normalizedYearMonth);
 
-        // Mathematical consistency: initialStock = current DB stock + orders already placed
-        // expectedRedisStock = initialStock - orderCount  (i.e. dbStock, in a perfect world)
+        // Reconstruct initial stock from durable state so the snapshot can explain the run result.
         int initialStock = (int) (dbStock + orderCount);
         int expectedRedisStock = (int) (initialStock - orderCount); // equals dbStock
         int driftAmount = redisStock - expectedRedisStock;
