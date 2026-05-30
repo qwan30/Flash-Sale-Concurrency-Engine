@@ -19,6 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Public order API used by the lab dashboard and benchmark clients.
+ *
+ * <p>The modern flow is {@code POST /orders}. Deprecated GET endpoints stay available only for
+ * older benchmark plans that still call the original demo routes.
+ */
 @RestController
 @Slf4j
 public class TicketOrderController {
@@ -94,6 +100,7 @@ public class TicketOrderController {
     }
 
     private HttpStatus statusFor(CreateOrderResponse response) {
+        // Business rejections use 409 so benchmark clients can distinguish validation from sell-out.
         if ("INVALID_REQUEST".equals(response.getCode())) {
             return HttpStatus.BAD_REQUEST;
         }

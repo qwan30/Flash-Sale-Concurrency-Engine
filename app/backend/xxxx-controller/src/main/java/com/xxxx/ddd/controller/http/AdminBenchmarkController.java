@@ -21,6 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Local operator endpoints for preparing benchmark data, checking stock drift, and reading saved
+ * JMeter runs.
+ *
+ * <p>These endpoints are lab controls. They reset state and expose operational details, so they are
+ * not part of a public buyer-facing API.
+ */
 @RestController
 public class AdminBenchmarkController {
 
