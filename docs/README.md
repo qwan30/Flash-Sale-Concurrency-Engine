@@ -1,19 +1,51 @@
-# Project Documentation
+# Documentation Hub
 
-This folder documents the current Flash-Sale Concurrency Engine release surface. The code and configuration are canonical; these pages summarize the runtime contract, lab workflows, and operating limits in present-state language.
+This folder documents the current Flash-Sale Concurrency Engine as a focused backend reliability lab. The ticket domain is a fixture; the core project value is proving stock correctness under concurrent order load, explaining Redis/MySQL consistency, and making benchmark evidence reproducible.
 
-## Documentation Map
+## Reading Paths
+
+| Reader | Start here | Then read |
+|---|---|---|
+| Reviewer, interviewer, CV evaluator | [REVIEWER_GUIDE.md](./REVIEWER_GUIDE.md) | [CONCURRENCY_AND_CONSISTENCY.md](./CONCURRENCY_AND_CONSISTENCY.md), [BENCHMARKING.md](./BENCHMARKING.md) |
+| Backend developer | [ARCHITECTURE.md](./ARCHITECTURE.md) | [API_REFERENCE.md](./API_REFERENCE.md), [CONCURRENCY_AND_CONSISTENCY.md](./CONCURRENCY_AND_CONSISTENCY.md) |
+| Lab operator | [BENCHMARKING.md](./BENCHMARKING.md) | [DASHBOARD_GUIDE.md](./DASHBOARD_GUIDE.md), [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) |
+
+## Primary Documentation
 
 | Document | Use for |
 |---|---|
-| [API_REFERENCE.md](./API_REFERENCE.md) | HTTP endpoints, response envelope, Swagger/OpenAPI URLs, and curl examples |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Backend modules, request flow, storage, cache, and dashboard integration |
-| [BUSINESS_FLOW.md](./BUSINESS_FLOW.md) | End-to-end lab workflow from reset to benchmark consistency checks |
-| [STOCK_STRATEGIES.md](./STOCK_STRATEGIES.md) | Strategy behavior, safety trade-offs, and expected benchmark interpretation |
-| [LAB_OPERATIONS.md](./LAB_OPERATIONS.md) | Local setup, smoke test, JMeter runner, and troubleshooting commands |
-| [ERRORS_AND_EDGE_CASES.md](./ERRORS_AND_EDGE_CASES.md) | Failure modes, recovery actions, and consistency diagnostics |
-| [DESIGN.md](./DESIGN.md) | Operator dashboard design notes and UI copy rules |
-| [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) | Release verification checklist for docs, build, tests, and API visibility |
+| [REVIEWER_GUIDE.md](./REVIEWER_GUIDE.md) | Concise project story, proof points, reviewer walkthrough, and CV-safe framing |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Backend modules, request flow, storage/cache boundaries, reconciliation, and dashboard integration |
+| [API_REFERENCE.md](./API_REFERENCE.md) | Current HTTP endpoints, envelope semantics, request/response examples, and Swagger/OpenAPI URLs |
+| [CONCURRENCY_AND_CONSISTENCY.md](./CONCURRENCY_AND_CONSISTENCY.md) | Stock strategies, oversell prevention, Redis drift, compensation, reconciliation, and failure semantics |
+| [BENCHMARKING.md](./BENCHMARKING.md) | Local setup, smoke tests, JMeter runs, benchmark artifacts, result-table interpretation, and publish rules |
+| [DASHBOARD_GUIDE.md](./DASHBOARD_GUIDE.md) | Optional Next.js operator dashboard, screens, screenshots, and API proxy behavior |
+| [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) | Final verification checklist before presenting or publishing the project |
+
+## Supplemental Notes
+
+These files are useful for learning or deeper tracing, but they are not the primary release documentation.
+
+| Document | Use for |
+|---|---|
+| [REQUEST_RESPONSE_TRACING.md](./REQUEST_RESPONSE_TRACING.md) | Detailed request-to-response walkthroughs |
+| [SEQUENCE_DIAGRAMS.md](./SEQUENCE_DIAGRAMS.md) | Expanded sequence diagrams |
+| [REDIS_COMPREHENSIVE_GUIDE.md](./REDIS_COMPREHENSIVE_GUIDE.md) | Redis learning notes |
+| [LEARNING_JOURNEY.md](./LEARNING_JOURNEY.md) | Session-style learning recap |
+| [screenshots/](./screenshots/) | Dashboard screenshots linked from the dashboard guide |
+| [learn/](./learn/) | Generated learning images and visual notes |
+
+## Compatibility Pages
+
+The old documentation names still exist as short redirect pages so external or older local links keep working:
+
+| Old page | Replacement |
+|---|---|
+| [BUSINESS_FLOW.md](./BUSINESS_FLOW.md) | [REVIEWER_GUIDE.md](./REVIEWER_GUIDE.md), [BENCHMARKING.md](./BENCHMARKING.md) |
+| [STOCK_STRATEGIES.md](./STOCK_STRATEGIES.md) | [CONCURRENCY_AND_CONSISTENCY.md](./CONCURRENCY_AND_CONSISTENCY.md) |
+| [LAB_OPERATIONS.md](./LAB_OPERATIONS.md) | [BENCHMARKING.md](./BENCHMARKING.md) |
+| [ERRORS_AND_EDGE_CASES.md](./ERRORS_AND_EDGE_CASES.md) | [CONCURRENCY_AND_CONSISTENCY.md](./CONCURRENCY_AND_CONSISTENCY.md) |
+| [DESIGN.md](./DESIGN.md) | [DASHBOARD_GUIDE.md](./DASHBOARD_GUIDE.md) |
 
 ## Current Runtime Surface
 
@@ -23,70 +55,14 @@ This folder documents the current Flash-Sale Concurrency Engine release surface.
 | Swagger UI | `http://localhost:1122/swagger-ui.html` |
 | OpenAPI JSON | `http://localhost:1122/v3/api-docs` |
 | Grouped lab API JSON | `http://localhost:1122/v3/api-docs/lab-api` |
-| Prometheus metrics | `http://localhost:1122/actuator/prometheus` |
 | Health check | `http://localhost:1122/actuator/health` |
+| Prometheus metrics | `http://localhost:1122/actuator/prometheus` |
 | Frontend dashboard | `http://localhost:3000` |
 
-The Swagger/OpenAPI surface is generated by Springdoc in `app/backend/xxxx-start` and scans `com.xxxx.ddd.controller.http` as the `lab-api` group.
+## Source Of Truth Rules
 
-## Quick Start
-
-```bash
-docker compose -f environment/docker-compose-dev.yml up -d
-mvn -q -DskipTests install
-mvn -pl app/backend/xxxx-start -am spring-boot:run -DskipTests
-```
-
-Smoke test:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File benchmark/smoke-local.ps1
-```
-
-Run one benchmark:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File benchmark/run-jmeter.ps1 -Strategy REDIS_LUA_WITH_COMPENSATION
-```
-
-Run normal tests:
-
-```bash
-mvn -pl app/backend/xxxx-start -am test
-```
-
-Docker-gated integration test:
-
-```bash
-mvn -pl app/backend/xxxx-start -am "-Dflashsale.integration=true" test
-```
-
-## Core Lab Contract
-
-The lab is centered on a reproducible cycle:
-
-1. Reset fixture state with `POST /admin/benchmarks/reset`.
-2. Warm Redis stock from MySQL with `POST /admin/tickets/{ticketItemId}/stock/warmup`.
-3. Submit `POST /orders` requests using one selected `OrderStrategy`.
-4. Read correctness evidence from `GET /admin/benchmarks/consistency`.
-5. Save benchmark artifacts through `benchmark/run-jmeter.ps1`.
-6. Review saved runs through `GET /admin/benchmarks/runs` or the operator dashboard.
-
-Default benchmark fixture values:
-
-| Field | Default |
-|---|---|
-| `ticketItemId` | `4` |
-| `stock` | `1000` |
-| `yearMonth` | current `yyyyMM` |
-| `strategy` | `REDIS_LUA_WITH_COMPENSATION` |
-| `threads` | `100` |
-| `totalRequests` | `5000` |
-
-## Release Documentation Rules
-
-- Keep docs evergreen; describe current behavior rather than change history.
-- Treat Java source, Maven files, scripts, and runtime config as the source of truth.
-- Keep `README.md`, `PROJECT_CONTEXT.md`, `docs/`, and frontend docs synchronized when API paths or commands change.
+- Java source, Maven files, benchmark scripts, frontend API client code, and runtime config are canonical.
+- Keep docs present-state and evergreen; avoid changelog wording.
 - Keep admin endpoints framed as local lab controls, not public production APIs.
-- Refresh Swagger/OpenAPI references when Springdoc config changes.
+- Keep the project framed as a backend reliability lab, not a complete ticket-sales product.
+- Rerun benchmarks on the target machine before publishing performance numbers.

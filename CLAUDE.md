@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **Flash-Sale-Concurrency-Engine** (1251 symbols, 2941 relationships, 98 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Flash-Sale-Concurrency-Engine** (1284 symbols, 2973 relationships, 98 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -117,10 +117,12 @@ Release docs live in `docs/`:
 
 | File | Purpose |
 |---|---|
-| `docs/README.md` | documentation index |
+| `docs/README.md` | documentation hub and reading paths |
+| `docs/REVIEWER_GUIDE.md` | reviewer/CV-safe project story and proof points |
 | `docs/API_REFERENCE.md` | HTTP API and Swagger/OpenAPI contract |
-| `docs/LAB_OPERATIONS.md` | run, smoke, benchmark, and troubleshooting commands |
-| `docs/STOCK_STRATEGIES.md` | strategy behavior and benchmark interpretation |
+| `docs/CONCURRENCY_AND_CONSISTENCY.md` | strategy behavior, Redis/MySQL drift, compensation, and reconciliation |
+| `docs/BENCHMARKING.md` | run, smoke, benchmark, and troubleshooting commands |
+| `docs/DASHBOARD_GUIDE.md` | optional operator dashboard guide |
 | `docs/RELEASE_CHECKLIST.md` | release verification checklist |
 
 When refreshing docs, treat Java source, Maven files, scripts, and runtime config as canonical. Use evergreen current-state wording; avoid changelog phrasing such as "newly added" or "recently updated".

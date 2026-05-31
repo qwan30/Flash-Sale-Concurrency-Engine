@@ -35,10 +35,13 @@ The ticket domain is only the test fixture. The project is not positioned as a c
 
 | Document | Purpose |
 |---|---|
-| [docs/README.md](docs/README.md) | Documentation index and release documentation rules |
-| [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | HTTP API contract, Swagger/OpenAPI URLs, and request examples |
-| [docs/LAB_OPERATIONS.md](docs/LAB_OPERATIONS.md) | Local run, smoke test, benchmark, and troubleshooting commands |
-| [docs/STOCK_STRATEGIES.md](docs/STOCK_STRATEGIES.md) | Strategy behavior and benchmark interpretation |
+| [docs/README.md](docs/README.md) | Documentation hub and reading paths |
+| [docs/REVIEWER_GUIDE.md](docs/REVIEWER_GUIDE.md) | Reviewer/CV-safe project story and proof points |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Backend modules, request flow, storage/cache, reconciliation, and dashboard integration |
+| [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | HTTP API contract, Swagger/OpenAPI URLs, response envelope, and request examples |
+| [docs/CONCURRENCY_AND_CONSISTENCY.md](docs/CONCURRENCY_AND_CONSISTENCY.md) | Strategy behavior, oversell prevention, Redis drift, compensation, and reconciliation |
+| [docs/BENCHMARKING.md](docs/BENCHMARKING.md) | Local run, smoke test, benchmark artifacts, result interpretation, and troubleshooting commands |
+| [docs/DASHBOARD_GUIDE.md](docs/DASHBOARD_GUIDE.md) | Optional operator dashboard routes, screenshots, and API proxy behavior |
 | [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) | Release verification checklist |
 
 ## Run Locally
@@ -75,7 +78,7 @@ docker compose -f environment/docker-compose-dev.yml --profile observability up 
 
 ## Operator Dashboard Artifacts
 
-- [Design notes](docs/DESIGN.md)
+- [Dashboard guide](docs/DASHBOARD_GUIDE.md)
 - [Lab overview](docs/screenshots/home.png)
 - [Fixture board](docs/screenshots/events.png)
 - [Order traces](docs/screenshots/order-traces.png)
