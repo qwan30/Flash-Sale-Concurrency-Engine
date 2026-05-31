@@ -10,11 +10,11 @@ Interactive documentation:
 | OpenAPI JSON | `http://localhost:1122/v3/api-docs` |
 | Grouped lab API JSON | `http://localhost:1122/v3/api-docs/lab-api` |
 
-The generated OpenAPI group scans `com.xxxx.ddd.controller.http`.
+The grouped OpenAPI surface scans `com.xxxx.ddd.controller.http`.
 
 ## Response Envelope
 
-Most lab APIs return `ResultMessage<T>`:
+Most APIs return `ResultMessage<T>`:
 
 ```json
 {
@@ -26,7 +26,15 @@ Most lab APIs return `ResultMessage<T>`:
 }
 ```
 
-`POST /orders` returns the same envelope through `ResponseEntity`. Invalid request bodies return HTTP `400`; stock and persistence business failures are represented by `success=false` and envelope code `409`.
+`POST /orders` returns `ResponseEntity<ResultMessage<CreateOrderResponse>>`.
+
+| Case | HTTP status | Envelope code | Notes |
+|---|---:|---:|---|
+| Valid request and order created | `200` | `200` | `result.success=true` |
+| Invalid request body or field | `400` | `400` | `result.code=INVALID_REQUEST` |
+| Business rejection or persistence failure | `200` | `409` | `result.success=false` |
+
+Business rejections keep HTTP `200` so benchmark clients can count application-level sell-out or stock failures separately from HTTP transport failures.
 
 ## Supported Strategies
 
@@ -62,10 +70,10 @@ Validation:
 | `ticketItemId` | yes | positive number |
 | `userId` | yes | positive number |
 | `quantity` | yes | positive number |
-| `strategy` | yes | one supported strategy |
+| `strategy` | yes | supported `OrderStrategy` |
 | `idempotencyKey` | yes | non-empty string; combined with `userId` |
 
-Success result:
+Success:
 
 ```json
 {
@@ -87,7 +95,7 @@ Success result:
 }
 ```
 
-Business failure result:
+Business rejection:
 
 ```json
 {
@@ -98,6 +106,7 @@ Business failure result:
     "success": false,
     "code": "REDIS_STOCK_UNAVAILABLE",
     "message": "Redis stock is missing or not enough",
+    "strategy": "REDIS_LUA_WITH_COMPENSATION",
     "ticketItemId": 4,
     "userId": 42,
     "quantity": 1,
@@ -119,7 +128,7 @@ curl -X POST http://localhost:1122/orders ^
 
 `GET /orders?userId={userId}&yearMonth={yyyyMM}`
 
-Returns orders for one user in the monthly table `ticket_order_{yyyyMM}`.
+Reads orders for one user from `ticket_order_{yyyyMM}`.
 
 ```bash
 curl "http://localhost:1122/orders?userId=42&yearMonth=202604"
@@ -129,7 +138,7 @@ curl "http://localhost:1122/orders?userId=42&yearMonth=202604"
 
 `GET /orders/{orderNumber}`
 
-Looks up an order number in the normalized/current monthly order table used by the query service.
+Looks up one order number in the normalized/current monthly order table used by the query service.
 
 ```bash
 curl "http://localhost:1122/orders/OKX-SGN-42-1777280000000"
@@ -141,27 +150,45 @@ curl "http://localhost:1122/orders/OKX-SGN-42-1777280000000"
 
 `GET /tickets/{ticketItemId}`
 
-Returns `TicketDetailDTO` with fields such as `id`, `name`, `stockInitial`, `stockAvailable`, `priceOriginal`, `priceFlash`, sale windows, status, activity id, and version.
+Returns `TicketDetailDTO` for a fixture ticket item.
 
 ```bash
 curl "http://localhost:1122/tickets/4"
 ```
 
-### Ticket Detail By Parent Ticket
+### Legacy Ticket Detail
 
 `GET /ticket/{ticketId}/detail/{detailId}?version={version}`
 
-This controller path is part of the legacy ticket-detail surface. `version` is optional.
+This legacy fixture endpoint reads ticket detail data. `version` is optional.
 
 ### Ping
 
 `GET /ticket/ping/java`
 
-Returns `{ "status": "OK" }` after the intentional one-second delay.
+Returns:
+
+```json
+{
+  "status": "OK"
+}
+```
+
+The endpoint intentionally waits one second for local latency experiments.
 
 ## Admin Benchmark APIs
 
-Admin endpoints are local lab controls. They reset data, warm cache, reconcile state, and read benchmark artifacts.
+Admin endpoints are local lab controls. Do not expose them as public buyer-facing APIs.
+
+### Warm Redis Stock
+
+`POST /admin/tickets/{ticketItemId}/stock/warmup`
+
+Copies current DB stock for the ticket item into Redis.
+
+```bash
+curl -X POST http://localhost:1122/admin/tickets/4/stock/warmup
+```
 
 ### Reset Benchmark
 
@@ -177,22 +204,14 @@ Request:
 }
 ```
 
-`yearMonth` is normalized by the backend; missing or blank values use the current month. `stock` must be non-negative.
+Behavior:
 
-Result:
-
-```json
-{
-  "success": true,
-  "message": "Benchmark data reset",
-  "ticketItemId": 4,
-  "stock": 1000,
-  "yearMonth": "202604",
-  "redisStockAfter": 1000,
-  "dbStockAfter": 1000,
-  "dbOrderCount": 0
-}
-```
+- Sets DB `stock_initial` and `stock_available` to `stock`.
+- Creates `ticket_order_{yearMonth}` if needed.
+- Clears rows from the monthly order table.
+- Sets Redis stock to the same value.
+- Clears the in-memory idempotency cache.
+- Normalizes missing or blank `yearMonth` to the current month.
 
 Example:
 
@@ -200,16 +219,6 @@ Example:
 curl -X POST http://localhost:1122/admin/benchmarks/reset ^
   -H "Content-Type: application/json" ^
   -d "{\"ticketItemId\":4,\"stock\":1000,\"yearMonth\":\"202604\"}"
-```
-
-### Warm Redis Stock
-
-`POST /admin/tickets/{ticketItemId}/stock/warmup`
-
-Copies current DB stock for the ticket item into Redis.
-
-```bash
-curl -X POST http://localhost:1122/admin/tickets/4/stock/warmup
 ```
 
 ### Check Consistency
@@ -220,66 +229,61 @@ Result fields:
 
 | Field | Meaning |
 |---|---|
-| `redisStockAfter` | Redis stock value |
-| `dbStockAfter` | MySQL `ticket_item.stock_available` |
-| `dbOrderCount` | rows in `ticket_order_{yyyyMM}` |
-| `initialStock` | calculated as DB stock plus order count |
-| `expectedRedisStock` | stock Redis should have |
+| `ticketItemId` | fixture ticket item |
+| `yearMonth` | normalized monthly order table suffix |
+| `redisStockAfter` | current Redis stock, or `-1` when missing |
+| `dbStockAfter` | current DB stock |
+| `dbOrderCount` | row count in `ticket_order_{yearMonth}` |
+| `oversoldCount` | `max(0, -dbStockAfter)` |
+| `initialStock` | reconstructed as `dbStockAfter + dbOrderCount` |
+| `expectedRedisStock` | expected Redis stock after the run |
 | `driftAmount` | `redisStockAfter - expectedRedisStock` |
-| `oversoldCount` | positive value when DB stock is below zero |
-| `redisDbInconsistencyCount` | `1` when Redis and DB are inconsistent, otherwise `0` |
+| `redisDbInconsistencyCount` | `1` when drift exists, otherwise `0` |
 
 ```bash
 curl "http://localhost:1122/admin/benchmarks/consistency?ticketItemId=4&yearMonth=202604"
 ```
 
-### Reconcile Stock
+### Force Reconciliation
 
 `POST /admin/benchmarks/reconcile?ticketItemId={id}&yearMonth={yyyyMM}`
 
-Sets Redis stock to the DB source-of-truth value when drift exists.
+Reads Redis stock and DB stock, then sets Redis to DB stock when drift exists.
 
 ```bash
 curl -X POST "http://localhost:1122/admin/benchmarks/reconcile?ticketItemId=4&yearMonth=202604"
 ```
 
-### List Benchmark Runs
+### List Saved Benchmark Runs
 
 `GET /admin/benchmarks/runs`
 
-Reads saved `benchmark/results/*/run.json` files from `benchmark.results-dir`.
+Reads saved `run.json` manifests from `${BENCHMARK_RESULTS_DIR:benchmark/results}` and returns newest run IDs first.
 
 ```bash
-curl "http://localhost:1122/admin/benchmarks/runs"
+curl http://localhost:1122/admin/benchmarks/runs
 ```
 
-### Get Benchmark Run Detail
+### Get Saved Benchmark Run
 
 `GET /admin/benchmarks/runs/{runId}`
 
-`runId` must match `[A-Za-z0-9_.-]+`.
+`runId` must match `[A-Za-z0-9_.-]+`; path traversal is rejected.
 
 ```bash
-curl "http://localhost:1122/admin/benchmarks/runs/REDIS_LUA_WITH_COMPENSATION-20260427-095614"
+curl http://localhost:1122/admin/benchmarks/runs/REDIS_LUA_WITH_COMPENSATION-20260427-120000
 ```
 
-## Demo And Legacy Endpoints
+## Deprecated Compatibility APIs
 
-| Endpoint | Notes |
+These routes remain for old benchmark plans and demo screens:
+
+| Route | Replacement |
 |---|---|
-| `GET /hello/hi` | Resilience4j rate-limited demo endpoint |
-| `GET /hello/hi/v1` | Resilience4j rate-limited demo endpoint |
-| `GET /hello/circuit/breaker` | Circuit breaker demo calling `fakestoreapi.com` |
-| `GET /order/{ticketId}/{quantity}/order` | Deprecated legacy order endpoint mapped to `CONDITIONAL_DB` |
-| `GET /order/{ticketId}/{quantity}/cas` | Deprecated legacy order endpoint mapped to `REDIS_LUA_WITH_COMPENSATION` |
-| `GET /order/{userId}/list?ntable={yyyyMM}` | Deprecated order list endpoint |
-| `GET /order/{userId}/{orderNumber}` | Deprecated order lookup endpoint |
+| `GET /order/{ticketId}/{quantity}/order` | `POST /orders` with `UNSAFE_DB` |
+| `GET /order/{ticketId}/{quantity}/cas` | `POST /orders` with a current strategy |
+| `GET /order/{userId}/list?ntable={yyyyMM}` | `GET /orders?userId=&yearMonth=` |
+| `GET /order/{userId}/{orderNumber}` | `GET /orders/{orderNumber}` |
+| `GET /ticket/{ticketId}/detail/{detailId}/order` | `POST /orders` |
 
-## Actuator And Observability
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /actuator/health` | runtime health |
-| `GET /actuator/prometheus` | Prometheus scrape output |
-
-The app exposes all actuator web endpoints in local configuration.
+Keep new docs, tests, and dashboards on the modern `/orders`, `/tickets`, and `/admin/benchmarks/*` routes.
