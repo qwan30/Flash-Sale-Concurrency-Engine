@@ -48,8 +48,8 @@ The ticket domain is only the test fixture. The project is not positioned as a c
 
 ```bash
 docker compose -f environment/docker-compose-dev.yml up -d
-mvn -q -DskipTests install
-mvn -pl app/backend/xxxx-start -am spring-boot:run -DskipTests
+mvn -pl app/backend/xxxx-start -am -DskipTests package
+java -jar app/backend/xxxx-start/target/xxxx-start-1.0-SNAPSHOT.jar
 ```
 
 Docker-gated integration test:

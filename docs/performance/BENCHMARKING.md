@@ -39,13 +39,13 @@ docker compose -f environment/docker-compose-dev.yml --profile observability up 
 Build:
 
 ```bash
-mvn -q -DskipTests install
+mvn -pl app/backend/xxxx-start -am -DskipTests package
 ```
 
 Run:
 
 ```bash
-mvn -pl app/backend/xxxx-start -am spring-boot:run -DskipTests
+java -jar app/backend/xxxx-start/target/xxxx-start-1.0-SNAPSHOT.jar
 ```
 
 Normal tests:
@@ -162,6 +162,36 @@ Use this table shape when publishing local benchmark evidence:
 | Date | Machine | Strategy | Total Requests | Concurrency | Throughput req/s | Avg ms | P95 ms | P99 ms | Success Orders | Failed Orders | Oversold Count | Redis Stock After | DB Stock After | DB Order Count | Redis-DB Inconsistency Count |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 2026-04-27 | ACER | `REDIS_LUA_WITH_COMPENSATION` | 5000 | 100 | 354.33 | 219.35 | 477 | 516 | 1000 | 4000 | 0 | 0 | 0 | 1000 | 0 |
+
+## Latest Local Benchmark Evidence
+
+Environment for the latest local run:
+
+| Field | Value |
+|---|---|
+| Date | 2026-05-31 |
+| Machine | ACER |
+| Backend start path | `mvn -pl app/backend/xxxx-start -am -DskipTests package`, then `java -jar app/backend/xxxx-start/target/xxxx-start-1.0-SNAPSHOT.jar` |
+| Dependencies | `docker compose -f environment/docker-compose-dev.yml up -d mysql redis` |
+| Fixture | `ticketItemId=4`, `stock=1000`, `yearMonth=202605` |
+| Workload | `TotalRequests=5000`, `Threads=100`, `quantityPerOrder=1` |
+
+Required artifacts exist for each run: `reset.json`, `warmup.json`, `results.jtl`, `html/index.html`, `consistency.json`, `run.json`, and `summary-row.md`.
+
+| Run ID | Strategy | Total Requests | Concurrency | Throughput req/s | Avg ms | P95 ms | P99 ms | Success Orders | Failed Orders | Oversold Count | Redis Stock After | DB Stock After | DB Order Count | Redis-DB Inconsistency Count |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `UNSAFE_DB-20260531-185255` | `UNSAFE_DB` | 5000 | 100 | 84.71 | 1084.86 | 1778 | 2165 | 5000 | 0 | 4000 | -2278 | -4000 | 5000 | 1 |
+| `CONDITIONAL_DB-20260531-185409` | `CONDITIONAL_DB` | 5000 | 100 | 173.08 | 494.35 | 741 | 1049 | 1000 | 4000 | 0 | 0 | 0 | 1000 | 0 |
+| `REDIS_LUA-20260531-185452` | `REDIS_LUA` | 5000 | 100 | 226.25 | 361.33 | 829 | 1092 | 1000 | 4000 | 0 | 0 | 0 | 1000 | 0 |
+| `REDIS_LUA_WITH_COMPENSATION-20260531-185527` | `REDIS_LUA_WITH_COMPENSATION` | 5000 | 100 | 443.03 | 165.95 | 492 | 715 | 1000 | 4000 | 0 | 0 | 0 | 1000 | 0 |
+
+Interpretation for the latest run:
+
+- `UNSAFE_DB` confirms the Phase 2 race-condition baseline: all 5000 requests created orders against stock 1000, producing `oversoldCount = 4000`.
+- `CONDITIONAL_DB` confirms the atomic database check-and-deduct pattern: 1000 orders succeeded, 4000 were rejected, and `oversoldCount = 0`.
+- `REDIS_LUA` completed without drift on this healthy path, but it still lacks compensation for DB/order failures.
+- `REDIS_LUA_WITH_COMPENSATION` is the fastest measured strategy in this local run and finished with both `oversoldCount = 0` and `redisDbInconsistencyCount = 0`.
+- Treat these as local-machine benchmark results. Re-run the matrix before publishing current performance claims for another machine or environment.
 
 Interpretation rules:
 
