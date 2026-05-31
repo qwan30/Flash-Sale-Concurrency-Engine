@@ -107,7 +107,7 @@ CLIENT              CONTROLLER          APPLICATION         DOMAIN              
   │                    │                    │ ─────────────────────────────────────→ │
   │                    │                    │                  │   SELECT from Redis │
   │                    │                    │                  │   key:              │
-  │                    │                    │                  │   "ticket:stock:4" │
+  │                    │                    │                  │   "TICKET:4:STOCK" │
   │                    │                    │ ←──────────────────────────────────── │
   │                    │                    │ redisStockAfter: 999                   │
   │                    │                    │                  │                      │
@@ -719,7 +719,7 @@ STEP 6: Infrastructure - Create Order Table & Insert Row
   SQL: COMMIT TRANSACTION
 
 STEP 7: Read Current State
-  Query Redis: GET "ticket:stock:4" → 999
+  Query Redis: GET "TICKET:4:STOCK" -> 999
   Query DB: SELECT stock_available FROM ticket_item WHERE id = 4 → 999
 
 ┌─────────────────────────────────────────────────────────────────────────────┐

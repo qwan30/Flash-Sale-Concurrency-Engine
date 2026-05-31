@@ -201,7 +201,7 @@ private CreateOrderResponse doCreateOrder(CreateOrderRequest request) {
         
         // 5f: Read current stock values
         long redisStock = stockOrderCacheService.getStockCache(request.getTicketItemId());
-        // Redis GET "ticket:stock:4" → 999
+        // Redis GET "TICKET:4:STOCK" -> 999
         
         long dbStock = tickerOrderDomainService.getStockAvailable(request.getTicketItemId());
         // SQL: SELECT stock_available FROM ticket_item WHERE id = 4 → 999
@@ -240,7 +240,7 @@ private CreateOrderResponse doCreateOrder(CreateOrderRequest request) {
                     request.getTicketItemId(),
                     request.getQuantity()
                 );
-                // Redis INCR "ticket:stock:4" by 1 → stock back to 1000
+                // Redis INCR "TICKET:4:STOCK" by 1 -> stock back to 1000
             } catch (Exception compensationEx) {
                 // CRITICAL: Double fault
                 // Redis is decremented but no order in DB
@@ -539,7 +539,7 @@ public BenchmarkResetResponse resetBenchmark(BenchmarkResetRequest request) {
     orderDeductionDomainService.clearMonthlyOrders(tableName);
     
     // Step 3: Update Redis cache
-    // Redis: SET "ticket:stock:4" 1000
+    // Redis: SET "TICKET:4:STOCK" 1000
     stockOrderCacheService.resetStockCache(ticketItemId, stock);
     
     // Step 4: Build response
@@ -607,7 +607,7 @@ public CreateOrderResponse warmupStock(Long ticketItemId) {
     long dbStock = tickerOrderDomainService.getStockAvailable(ticketItemId);  // 1000
     
     // Step 2: Write to Redis
-    // Redis: SET "ticket:stock:4" 1000
+    // Redis: SET "TICKET:4:STOCK" 1000
     stockOrderCacheService.resetStockCache(ticketItemId, (int) dbStock);
     
     // Step 3: Build response
@@ -669,7 +669,7 @@ public ConsistencySnapshot getConsistency(Long ticketItemId, String yearMonth) {
 // ConsistencyCheckService.java
 public ConsistencySnapshot getConsistency(Long ticketItemId, String yearMonth) {
     // Step 1: Read Redis stock
-    // Redis: GET "ticket:stock:4"
+    // Redis: GET "TICKET:4:STOCK"
     long redisStock = stockOrderCacheService.getStockCache(ticketItemId);  // 999
     
     // Step 2: Read DB stock
@@ -752,7 +752,7 @@ public ResultMessage<ConsistencySnapshot> reconcileStock(
         long dbStockTruth = beforeReconcile.getDbStockAfter();  // 999
         
         // Redis SET to match DB (source of truth)
-        // Redis: SET "ticket:stock:4" 999
+        // Redis: SET "TICKET:4:STOCK" 999
         stockOrderCacheService.resetStockCache(ticketItemId, (int) dbStockTruth);
     }
     

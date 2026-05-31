@@ -72,7 +72,7 @@ Layer 5: Data Access
 | UNSAFE_DB | ⚡⚡⚡ | ❌ Overselling | None | Baseline testing |
 | CONDITIONAL_DB | ⚡⚡ | ✅ Atomic | None | Safe but slow |
 | REDIS_LUA | ⚡⚡⚡ | ❓ Drift possible | None | Redis-DB gap testing |
-| REDIS_LUA_WITH_COMPENSATION | ⚡⚡⚡ | ✅ Atomic | ✅ Auto-INCR | **Production Ready** |
+| REDIS_LUA_WITH_COMPENSATION | ⚡⚡⚡ | ✅ Atomic | ✅ Auto-INCR | **Preferred lab strategy** |
 
 **Understanding Level:** ⭐⭐⭐⭐⭐ (100%)
 - Understand race conditions
