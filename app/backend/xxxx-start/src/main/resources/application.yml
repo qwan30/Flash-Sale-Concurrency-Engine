@@ -40,6 +40,16 @@ spring:
   threads:
     virtual:
       enabled: true
+  task:
+    scheduling:
+      pool:
+        size: 5
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
 
 springdoc:
   api-docs:
@@ -57,6 +67,12 @@ app:
     sentinel:
       master: ${REDIS_SENTINEL_MASTER:mymaster}
       nodes: ${REDIS_SENTINEL_NODES:redis://localhost:26379,redis://localhost:26380,redis://localhost:26381}
+  kafka:
+    topic: ${KAFKA_TOPIC:flashsale.orders}
+  outbox:
+    publish-batch-size: 50
+    retry-delay: 10s
+    max-attempts: 5
 
 benchmark:
   results-dir: ${BENCHMARK_RESULTS_DIR:benchmark/results}
@@ -93,9 +109,10 @@ management:
     web:
       exposure:
         include:
-          - '*'
+          - health
+          - prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: never
     prometheus:
       enabled: true

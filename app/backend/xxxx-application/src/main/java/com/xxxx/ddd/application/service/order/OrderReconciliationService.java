@@ -1,8 +1,10 @@
 package com.xxxx.ddd.application.service.order;
 
+import com.xxxx.ddd.application.MQ.OutboxService;
 import com.xxxx.ddd.application.model.order.ConsistencySnapshot;
 import com.xxxx.ddd.application.service.order.cache.StockOrderCacheService;
 import com.xxxx.ddd.application.service.order.support.OrderDateSupport;
+import com.xxxx.ddd.domain.event.ReconciliationEvent;
 import com.xxxx.ddd.domain.service.OrderDeductionDomainService;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -40,6 +42,7 @@ public class OrderReconciliationService {
     private final OrderDeductionDomainService orderDeductionDomainService;
     private final StockOrderCacheService stockOrderCacheService;
     private final ConsistencyCheckService consistencyCheckService;
+    private final OutboxService outboxService;
 
     @Autowired(required = false)
     private MeterRegistry meterRegistry;
@@ -48,12 +51,14 @@ public class OrderReconciliationService {
             TickerOrderDomainService tickerOrderDomainService,
             OrderDeductionDomainService orderDeductionDomainService,
             StockOrderCacheService stockOrderCacheService,
-            ConsistencyCheckService consistencyCheckService
+            ConsistencyCheckService consistencyCheckService,
+            OutboxService outboxService
     ) {
         this.tickerOrderDomainService = tickerOrderDomainService;
         this.orderDeductionDomainService = orderDeductionDomainService;
         this.stockOrderCacheService = stockOrderCacheService;
         this.consistencyCheckService = consistencyCheckService;
+        this.outboxService = outboxService;
     }
 
     /**
@@ -111,6 +116,9 @@ public class OrderReconciliationService {
             recordReconciliationMetric(drift);
             log.info("RECONCILIATION: ticketItemId={} drift={} redisWas={} redisCorrectedTo={}",
                     ticketItemId, drift, redisStock, expectedRedisStock);
+
+            // Record DRIFT_REPAIRED event in outbox
+            recordReconciliationOutboxEvent(ticketItemId, redisStock, dbStock, drift, expectedRedisStock);
         } else {
             result.setRedisStockAfter(redisStock);
             result.setDriftDetected(false);
@@ -136,6 +144,25 @@ public class OrderReconciliationService {
                 "action", "repair",
                 "direction", drift > 0 ? "redis_over" : "redis_under"
         ).increment();
+    }
+
+    private void recordReconciliationOutboxEvent(Long ticketItemId, int redisStockBefore,
+                                                  int dbStockBefore, int driftAmount, int redisStockAfter) {
+        ReconciliationEvent event = ReconciliationEvent.builder()
+                .ticketItemId(ticketItemId)
+                .eventType(ReconciliationEvent.DRIFT_REPAIRED)
+                .redisStockBefore(redisStockBefore)
+                .dbStockBefore(dbStockBefore)
+                .driftAmount(driftAmount)
+                .redisStockAfter(redisStockAfter)
+                .repaired(true)
+                .build();
+        outboxService.record(
+                ReconciliationEvent.AGGREGATE_TYPE,
+                String.valueOf(ticketItemId),
+                ReconciliationEvent.DRIFT_REPAIRED,
+                event
+        );
     }
 
     // --- Inner result class ---

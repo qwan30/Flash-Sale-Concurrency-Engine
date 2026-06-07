@@ -1,5 +1,6 @@
 package com.xxxx.ddd.application.service.order;
 
+import com.xxxx.ddd.application.MQ.OutboxService;
 import com.xxxx.ddd.application.model.order.CreateOrderRequest;
 import com.xxxx.ddd.application.model.order.CreateOrderResponse;
 import com.xxxx.ddd.application.model.order.OrderStrategy;
@@ -7,6 +8,7 @@ import com.xxxx.ddd.application.service.order.cache.StockOrderCacheService;
 import com.xxxx.ddd.application.service.order.strategy.StockDeductionResult;
 import com.xxxx.ddd.application.service.order.strategy.StockDeductionStrategyRegistry;
 import com.xxxx.ddd.application.service.order.support.OrderDateSupport;
+import com.xxxx.ddd.domain.event.OrderEvent;
 import com.xxxx.ddd.domain.model.entity.TickerOrder;
 import com.xxxx.ddd.domain.service.OrderDeductionDomainService;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
@@ -38,6 +40,7 @@ public class OrderCreationService {
     private final StockOrderCacheService stockOrderCacheService;
     private final StockDeductionStrategyRegistry stockDeductionStrategyRegistry;
     private final IdempotencyService idempotencyService;
+    private final OutboxService outboxService;
 
     @Autowired(required = false)
     private MeterRegistry meterRegistry;
@@ -47,13 +50,15 @@ public class OrderCreationService {
             OrderDeductionDomainService orderDeductionDomainService,
             StockOrderCacheService stockOrderCacheService,
             StockDeductionStrategyRegistry stockDeductionStrategyRegistry,
-            IdempotencyService idempotencyService
+            IdempotencyService idempotencyService,
+            OutboxService outboxService
     ) {
         this.tickerOrderDomainService = tickerOrderDomainService;
         this.orderDeductionDomainService = orderDeductionDomainService;
         this.stockOrderCacheService = stockOrderCacheService;
         this.stockDeductionStrategyRegistry = stockDeductionStrategyRegistry;
         this.idempotencyService = idempotencyService;
+        this.outboxService = outboxService;
     }
 
     /**
@@ -104,6 +109,10 @@ public class OrderCreationService {
                     stockOrderCacheService.getStockCache(request.getTicketItemId()),
                     tickerOrderDomainService.getStockAvailable(request.getTicketItemId())
             );
+
+            // Record ORDER_CREATED event in outbox (same transaction as order insert)
+            recordOutboxEvent(request, orderNumber, OrderEvent.ORDER_CREATED, response);
+
             recordOrderMetric(request.getStrategy(), true);
             return response;
         } catch (Exception e) {
@@ -178,6 +187,21 @@ public class OrderCreationService {
         request.setStrategy(strategy);
         request.setIdempotencyKey("legacy-" + tickerId + "-" + quantity + "-" + System.nanoTime());
         return request;
+    }
+
+    private void recordOutboxEvent(CreateOrderRequest request, String orderNumber,
+                                    String eventType, CreateOrderResponse response) {
+        OrderEvent event = OrderEvent.builder()
+                .orderNumber(orderNumber)
+                .ticketItemId(request.getTicketItemId())
+                .userId(request.getUserId())
+                .quantity(request.getQuantity())
+                .strategy(request.getStrategy() != null ? request.getStrategy().name() : null)
+                .eventType(eventType)
+                .redisStockAfter(response.getRedisStockAfter())
+                .dbStockAfter(response.getDbStockAfter())
+                .build();
+        outboxService.record(OrderEvent.AGGREGATE_TYPE, orderNumber, eventType, event);
     }
 
     private void recordOrderMetric(OrderStrategy strategy, boolean success) {

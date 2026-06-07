@@ -4,6 +4,7 @@ import com.xxxx.ddd.application.model.order.BenchmarkResetRequest;
 import com.xxxx.ddd.application.model.order.CreateOrderRequest;
 import com.xxxx.ddd.application.model.order.CreateOrderResponse;
 import com.xxxx.ddd.application.model.order.OrderStrategy;
+import com.xxxx.ddd.application.MQ.OutboxService;
 import com.xxxx.ddd.application.service.order.BenchmarkFixtureService;
 import com.xxxx.ddd.application.service.order.ConsistencyCheckService;
 import com.xxxx.ddd.application.service.order.IdempotencyService;
@@ -48,6 +49,9 @@ class TicketOrderAppServiceImplTest {
     @Mock
     private StockOrderCacheService stockOrderCacheService;
 
+    @Mock
+    private OutboxService outboxService;
+
     private TicketOrderAppServiceImpl service;
 
     @BeforeEach
@@ -64,7 +68,8 @@ class TicketOrderAppServiceImplTest {
                 orderDeductionDomainService,
                 stockOrderCacheService,
                 stockDeductionStrategyRegistry,
-                idempotencyService
+                idempotencyService,
+                outboxService
         );
         BenchmarkFixtureService benchmarkFixtureService = new BenchmarkFixtureService(
                 tickerOrderDomainService,
