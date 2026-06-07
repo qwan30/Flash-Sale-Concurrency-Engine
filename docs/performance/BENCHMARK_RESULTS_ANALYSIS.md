@@ -231,10 +231,10 @@ All results stored in `benchmark/results/`:
 
 | Run | Strategy | Date | Throughput | Status | File |
 |-----|----------|------|-----------|--------|------|
-| UNSAFE_DB-20260531-185255 | UNSAFE_DB | 2026-05-31 | 84.71 | ❌ FAIL | [run.json](../results/UNSAFE_DB-20260531-185255/run.json) |
-| CONDITIONAL_DB-20260531-185409 | CONDITIONAL_DB | 2026-05-31 | 173.08 | ✅ PASS | [run.json](../results/CONDITIONAL_DB-20260531-185409/run.json) |
-| REDIS_LUA-20260531-185452 | REDIS_LUA | 2026-05-31 | 226.25 | ✅ PASS | [run.json](../results/REDIS_LUA-20260531-185452/run.json) |
-| REDIS_LUA_WITH_COMPENSATION-20260531-185527 | REDIS_LUA_WITH_COMPENSATION | 2026-05-31 | **443.03** | ✅ PASS | [run.json](../results/REDIS_LUA_WITH_COMPENSATION-20260531-185527/run.json) |
+| UNSAFE_DB-20260531-185255 | UNSAFE_DB | 2026-05-31 | 84.71 | ❌ FAIL | [run.json](../../benchmark/results/UNSAFE_DB-20260531-185255/run.json) |
+| CONDITIONAL_DB-20260531-185409 | CONDITIONAL_DB | 2026-05-31 | 173.08 | ✅ PASS | [run.json](../../benchmark/results/CONDITIONAL_DB-20260531-185409/run.json) |
+| REDIS_LUA-20260531-185452 | REDIS_LUA | 2026-05-31 | 226.25 | ✅ PASS | [run.json](../../benchmark/results/REDIS_LUA-20260531-185452/run.json) |
+| REDIS_LUA_WITH_COMPENSATION-20260531-185527 | REDIS_LUA_WITH_COMPENSATION | 2026-05-31 | **443.03** | ✅ PASS | [run.json](../../benchmark/results/REDIS_LUA_WITH_COMPENSATION-20260531-185527/run.json) |
 
 ### How to Review Results
 

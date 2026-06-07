@@ -2,7 +2,7 @@
 
 This page is kept for compatibility with older links.
 
-Use [BENCHMARKING.md](./BENCHMARKING.md) for current setup, smoke, benchmark, dashboard, troubleshooting, and result-artifact guidance.
+Use [BENCHMARKING.md](../performance/BENCHMARKING.md) for current setup, smoke, benchmark, dashboard, troubleshooting, and result-artifact guidance.
 
 Core commands:
 

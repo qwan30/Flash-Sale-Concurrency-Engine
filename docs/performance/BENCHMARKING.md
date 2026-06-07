@@ -62,7 +62,7 @@ mvn -pl app/backend/xxxx-start -am "-Dflashsale.integration=true" test
 
 ## Default Experiment Contract
 
-The machine-readable contract is [../benchmark/experiment-spec.json](../benchmark/experiment-spec.json).
+The machine-readable contract is [../../benchmark/experiment-spec.json](../../benchmark/experiment-spec.json).
 
 | Field | Default |
 |---|---|

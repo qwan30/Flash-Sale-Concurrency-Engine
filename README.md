@@ -36,6 +36,7 @@ The ticket domain is only the test fixture. The project is not positioned as a c
 | Document | Purpose |
 |---|---|
 | [docs/README.md](docs/README.md) | Documentation hub and reading paths |
+| [docs/SOURCE_STATUS.md](docs/SOURCE_STATUS.md) | Current source, config, dashboard, benchmark, and verification status |
 | [docs/REVIEWER_GUIDE.md](docs/REVIEWER_GUIDE.md) | Reviewer/CV-safe project story and proof points |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Backend modules, request flow, storage/cache, reconciliation, and dashboard integration |
 | [docs/API_REFERENCE.md](docs/API_REFERENCE.md) | HTTP API contract, Swagger/OpenAPI URLs, response envelope, and request examples |
@@ -66,9 +67,12 @@ Default local services:
 | Swagger UI | `http://localhost:1122/swagger-ui.html` |
 | OpenAPI JSON | `http://localhost:1122/v3/api-docs` |
 | Lab API OpenAPI JSON | `http://localhost:1122/v3/api-docs/lab-api` |
+| Actuator Health | `http://localhost:1122/actuator/health` |
+| Actuator Prometheus | `http://localhost:1122/actuator/prometheus` |
 | MySQL | `localhost:3316`, database `vetautet` |
 | Redis | `localhost:6319` |
-| Actuator Prometheus | `http://localhost:1122/actuator/prometheus` |
+
+Default actuator web exposure is limited to `health` and `prometheus`; health details are hidden by default.
 
 Optional observability stack:
 

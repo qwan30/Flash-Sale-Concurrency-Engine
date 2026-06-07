@@ -1,0 +1,188 @@
+%-------------------------
+% Resume in Latex
+% Author : Jake Gutierrez template, customized for Tran Thanh Quan
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage[utf8]{inputenc}
+\usepackage{fontawesome5}
+\usepackage{graphicx}
+\input{glyphtounicode}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\newcommand{\evidence}{\href{https://drive.google.com/drive/u/0/folders/1LMZj8joTEEtuXSfDAe9V3OUMThsBQ6qx}{\textcolor{ForestGreen}{\underline{Evidence}}}}
+
+% GitHub link with colored logo + visible clickable text
+\newcommand{\githubicon}[1]{\href{#1}{\textcolor{RoyalBlue}{\faGithub\ \underline{GitHub}}}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%----------HEADING----------
+\begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}c}
+    \raisebox{-0.72\height}{\includegraphics[height=0.92in]{z7871688554129_e4e343bb8ee407f4c0833dd2c510795d.jpg}} &
+    \begin{minipage}{0.88\textwidth}
+        \begin{center}
+            \textbf{\Huge \scshape Tran Thanh Quan} \\ \vspace{1pt}
+            \small Ho Chi Minh City, Vietnam $|$ 0974426058 $|$
+            \href{mailto:tranthanhquan09@gmail.com}{\textcolor{MidnightBlue}{\underline{tranthanhquan09@gmail.com}}} $|$
+            \href{https://www.facebook.com/tran.quan.182591/?locale=vi_VN}{\textcolor{RoyalBlue}{\faFacebook\ \underline{FB}}} $|$
+            \href{https://www.linkedin.com/in/tran-thanh-quan-eric-78842b326/}{\textcolor{RoyalBlue}{\faLinkedin\ \underline{LinkedIn}}}
+        \end{center}
+    \end{minipage}
+\end{tabular*}
+
+%-----------SUMMARY-----------
+\section{Summary}
+\small{
+Backend-focused Software Engineering student at FPT University (GPA: \textbf{8.0/10}) who built a Redis-backed flash sale backend achieving \textbf{9.2x throughput}, \textbf{zero oversell}, and \textbf{516ms P99 latency}; a Java/Spring Boot hospital platform with \textbf{117 controller operations}, \textbf{145 backend tests}, and \textbf{80.08\% branch coverage}; and a permission-aware RAG chatbot for healthcare workflows with \textbf{26+ integration test files}. Strong in REST APIs, transactional workflows, RBAC, concurrency control, performance benchmarking, and backend verification. Seeking a \textbf{backend engineering internship}.
+}
+
+%-----------EDUCATION-----------
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {FPT University}{Ho Chi Minh City, Vietnam}
+      {Bachelor of Engineering in Software Engineering -- GPA: \textbf{8.0/10}}{Aug. 2023 -- Aug. 2027}
+  \resumeSubHeadingListEnd
+
+%-----------PROJECTS-----------
+\section{Projects}
+    \resumeSubHeadingListStart
+
+      \resumeProjectHeading
+          {\textbf{Flash Sale System \& Reliability Lab} \githubicon{https://github.com/qwan30/Flash-Sale-Concurrency-Engine} $|$ \emph{Java, Spring Boot, Redis, Kafka, JMeter}}{Feb. 2026 -- Present}
+          \resumeItemListStart
+            \resumeItem{Built a concurrency-safe flash sale backend using \textbf{Redis locking, Lua scripting, idempotency keys, and reservation expiry} to prevent overselling under peak demand.}
+            \resumeItem{Benchmarked MySQL conditional updates, Redis Lua gates, and Redis-first compensating transactions; achieved \textbf{9.2x higher throughput} (354 req/s vs. 38.64 req/s) with \textbf{zero oversell} and \textbf{516ms P99 latency}.}
+            \resumeItem{Optimized hot-SKU performance, reducing \textbf{P95 latency by 17\%} (920ms $\rightarrow$ 763ms), and built admin workflows for stock warmup, retry, reconciliation, and consistency checks.}
+          \resumeItemListEnd
+
+      \resumeProjectHeading
+          {\textbf{AI Hospital Knowledge Assistant} \githubicon{https://github.com/qwan30/chat-hospital-system} $|$ \emph{FastAPI, Next.js, PostgreSQL, pgvector, Redis, RAG}}{Feb. 2026 -- Present}
+          \resumeItemListStart
+            \resumeItem{Architected a \textbf{permission-aware RAG chatbot} for hospital workflows, enforcing RBAC/ABAC before vector retrieval across \textbf{... hospital roles} so unauthorized patient context never reaches the LLM.}
+            \resumeItem{Built citation-backed generation with validated retrieved-evidence IDs, confidence/disclaimer fields, and explicit \textbf{safe refusal}; tested retrieval quality on \textbf{... documents / ... chunks}.}
+            \resumeItem{Designed async OCR/embedding ingestion using \textbf{Redis/RQ workers} and document lifecycle states, indexing PDFs into PostgreSQL + pgvector while keeping upload APIs non-blocking at \textbf{...ms average response time}.}
+            \resumeItem{Added audit logging and \textbf{26+ integration test files} covering permission denials, RAG correctness, safe refusal, citations, and retrieval boundaries for regulated-data workflows.}
+          \resumeItemListEnd
+
+      \resumeProjectHeading
+          {\textbf{Hospital Management System} \githubicon{https://github.com/qwan30/hospital-management-system} $|$ \emph{Java 17, Spring Boot, Next.js, PostgreSQL, Docker}}{July. 2025 -- Present}
+          \resumeItemListStart
+            \resumeItem{Engineered \textbf{117 controller operations} and \textbf{18 Flyway migrations} with a standard API envelope, PostgreSQL persistence, release-demo seed data, and Docker Compose deployment.}
+            \resumeItem{Implemented transactional appointment booking with \textbf{pessimistic slot locking}, contiguous-slot validation, duplicate-booking conflict tests, and role-aware access for \textbf{7 hospital roles}.}
+            \resumeItem{Built the canonical \textbf{Next.js 16/React 19} frontend with \textbf{71 page routes}; verified release readiness with \textbf{145 backend tests}, \textbf{24 Playwright specs}, \textbf{80.08\% branch coverage}, and \textbf{0 npm audit vulnerabilities}.}
+          \resumeItemListEnd
+
+    \resumeSubHeadingListEnd
+
+%-----------LEADERSHIP & ACTIVITIES-----------
+\section{Leadership \& Activities}
+  \resumeSubHeadingListStart
+    \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{@{}p{0.80\textwidth}@{\extracolsep{\fill}}r@{}}
+      \small\textbf{Tet Luon Vui -- Community Fundraising Project} \href{https://www.facebook.com/profile.php?id=61586679196527}{\textcolor{RoyalBlue}{\faFacebook}} $|$ \emph{Communications \& Logistics, SSG104} & \small\evidence{} $|$ 2026 \\
+    \end{tabular*}\vspace{-7pt}
+        \resumeItemListStart
+          \resumeItem{Owned communications and logistics for a \textbf{9-member} student-led social impact project, coordinating visual content, online promotion, sales operations, and event execution; grew the Facebook page from \textbf{0 to 900+ followers} and drove \textbf{254.5\% net fundraising growth}.}
+        \resumeItemListEnd
+
+    \vspace{-2pt}\item
+      \small{\textbf{Competitions}: Participated in \textbf{FPT Student Mathematics Olympic} (Feb.2025) and \textbf{SEAL Hackathon} (2025).}\vspace{-5pt}
+
+  \resumeSubHeadingListEnd
+
+%-----------TECHNICAL SKILLS-----------
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{
+    \textbf{Languages}{: Java, SQL, TypeScript, JavaScript, Python} \\
+    \textbf{Backend}{: Spring Boot, FastAPI, REST APIs, NestJS, Fastify, JPA/Hibernate, Maven, Prisma, Modular Backend Design} \\
+    \textbf{Frontend}{: React, Next.js} \quad
+    \textbf{Databases}{: PostgreSQL, MySQL, Redis, pgvector, Flyway} \\
+    \textbf{Infrastructure \& Tools}{: Docker, Docker Compose, Kafka, Git, GitHub Actions, JMeter} \\
+    \textbf{Testing \& Observability}{: Playwright, Vitest, Integration Tests, Load Testing, Benchmarking, Consistency Checks} \\
+    \textbf{AI \& System Design}{: RAG, Graph RAG, LLM Workflows, Permission-Aware Retrieval, RBAC, Idempotency, Concurrency Control} \\
+    \textbf{Certifications}{: \textbf{Architecting Solutions on AWS} (2026), \textbf{Retrieval Augmented Generation (RAG)} (2026)}
+  }}
+\end{itemize}
+
+%-------------------------------------------
+\end{document}

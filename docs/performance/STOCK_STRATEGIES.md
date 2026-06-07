@@ -5,7 +5,7 @@ This page is kept for compatibility with older links.
 The current strategy and consistency documentation lives in:
 
 - [CONCURRENCY_AND_CONSISTENCY.md](./CONCURRENCY_AND_CONSISTENCY.md)
-- [REVIEWER_GUIDE.md](./REVIEWER_GUIDE.md)
+- [REVIEWER_GUIDE.md](../reference/REVIEWER_GUIDE.md)
 - [BENCHMARKING.md](./BENCHMARKING.md)
 
 Current strategies:

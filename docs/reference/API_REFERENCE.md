@@ -12,6 +12,27 @@ Interactive documentation:
 
 The grouped OpenAPI surface scans `com.xxxx.ddd.controller.http`.
 
+## Actuator APIs
+
+The default lab configuration exposes only the non-admin actuator surfaces needed by local checks:
+
+| Route | Purpose |
+|---|---|
+| `GET /actuator/health` | Liveness/readiness status without component details |
+| `GET /actuator/prometheus` | Prometheus scrape endpoint |
+
+Other actuator endpoints are not exposed by default.
+
+## Local Utility APIs
+
+These routes exist for local experiments and framework checks. They are not part of the benchmark contract.
+
+| Route | Purpose |
+|---|---|
+| `GET /hello/hi` | Local hello endpoint |
+| `GET /hello/hi/v1` | Rate-limited hello variant |
+| `GET /hello/circuit/breaker` | Circuit-breaker experiment endpoint |
+
 ## Response Envelope
 
 Most APIs return `ResultMessage<T>`:
@@ -178,7 +199,7 @@ The endpoint intentionally waits one second for local latency experiments.
 
 ## Admin Benchmark APIs
 
-Admin endpoints are local lab controls. Do not expose them as public buyer-facing APIs.
+Admin endpoints are local lab controls. They are not app-auth protected and should not be exposed as public buyer-facing APIs.
 
 ### Warm Redis Stock
 

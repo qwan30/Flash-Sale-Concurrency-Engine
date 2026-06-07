@@ -1,0 +1,253 @@
+%-------------------------
+% Resume in LaTeX
+% Author: Jake Gutierrez template, customized for Tran Thanh Quan
+% ATS-first revision based on verified project evidence
+%-------------------------
+
+\documentclass[a4paper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage[utf8]{inputenc}
+\input{glyphtounicode}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-0.55in}
+\addtolength{\textheight}{1.05in}
+
+\urlstyle{same}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-5pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-6pt}]
+
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+  \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & \small#2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{
+  \begin{itemize}[leftmargin=0.15in, label={}]
+}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{
+  \begin{itemize}[leftmargin=0.22in]
+}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\newcommand{\githublink}[1]{
+  \href{#1}{\underline{GitHub}}
+}
+
+\newcommand{\evidence}{
+  \href{https://drive.google.com/drive/u/0/folders/1LMZj8joTEEtuXSfDAe9V3OUMThsBQ6qx}
+  {\underline{Evidence}}
+}
+
+%-------------------------------------------
+%%%%%% RESUME STARTS HERE %%%%%%%%%%%%%%%%%%
+%-------------------------------------------
+
+\begin{document}
+
+%----------HEADING----------
+
+\begin{center}
+  \textbf{\Huge \scshape Tran Thanh Quan} \\ \vspace{3pt}
+  \small
+  Ho Chi Minh City, Vietnam $|$
+  0974426058 $|$
+  \href{mailto:tranthanhquan09@gmail.com}{\underline{tranthanhquan09@gmail.com}} $|$
+  \href{https://github.com/qwan30}{\underline{GitHub}} $|$
+  \href{https://www.linkedin.com/in/tran-thanh-quan-eric-78842b326/}
+  {\underline{LinkedIn}}
+\end{center}
+
+%-----------SUMMARY-----------
+
+\section{Summary}
+\small{
+Backend-focused Software Engineering student at FPT University (GPA: \textbf{8.0/10}) building Java/Spring Boot and Python/FastAPI systems involving concurrency control, transactional workflows, event-driven integration, RBAC, and permission-aware RAG. Developed evidence-backed projects validated through K6 load scenarios, \textbf{245 backend tests}, \textbf{148 Java tests}, and Playwright/Vitest quality gates. Seeking a \textbf{Backend Engineering Internship/OJT}.
+}
+
+%-----------EDUCATION-----------
+
+\section{Education}
+\resumeSubHeadingListStart
+  \resumeSubheading
+    {FPT University}{Ho Chi Minh City, Vietnam}
+    {Bachelor of Engineering in Software Engineering -- GPA: \textbf{8.0/10}}
+    {Aug. 2023 -- Expected Aug. 2027}
+\resumeSubHeadingListEnd
+
+%-----------PROJECTS-----------
+
+\section{Projects}
+\resumeSubHeadingListStart
+
+  \resumeProjectHeading
+    {\textbf{Inventory Flash Sale System}
+    \githublink{https://github.com/qwan30/inventory-flashsale-system}
+    $|$ \emph{Java 21, Spring Boot, Redis, Kafka, MySQL, K6}}
+    {Mar. 2026 -- Present}
+  \resumeItemListStart
+    \resumeItem{
+      Built a modular Spring Boot inventory platform using \textbf{Redis SKU locks},
+      JPA optimistic locking, and idempotency guards to coordinate reservation
+      workflows under flash-sale contention.
+    }
+    \resumeItem{
+      Implemented a \textbf{transactional outbox} with Kafka publishing and retry
+      states, plus scheduled Shopee and TikTok Shop inventory synchronization and
+      drift reconciliation.
+    }
+    \resumeItem{
+      Designed a \textbf{15-table MySQL/Flyway schema} and validated five K6 load
+      scenarios---including hot-SKU contention, reservation expiry, outbox recovery,
+      and reconciliation---with a \textbf{0\% request-failure rate} in a local benchmark.
+    }
+  \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{AI Hospital Knowledge Assistant}
+    \githublink{https://github.com/qwan30/chat-hospital-system}
+    $|$ \emph{FastAPI, Next.js, PostgreSQL, pgvector, Redis, RAG}}
+    {Feb. 2026 -- Present}
+  \resumeItemListStart
+    \resumeItem{
+      Built a FastAPI and Next.js hospital knowledge assistant with
+      \textbf{permission-filtered RAG} that excludes unauthorized patient data
+      before constructing LLM context.
+    }
+    \resumeItem{
+      Implemented buffered streaming and \textbf{citation validation} to reject
+      answers containing unsupported evidence, validated through a backend suite
+      of \textbf{245 tests}.
+    }
+    \resumeItem{
+      Developed a Redis/RQ document-ingestion pipeline with multi-format loaders,
+      chunking, embeddings, hybrid BM25/vector retrieval, failure tracking, and
+      hospital-record synchronization.
+    }
+  \resumeItemListEnd
+
+  \resumeProjectHeading
+    {\textbf{Hospital Management System}
+    \githublink{https://github.com/qwan30/hospital-management-system}
+    $|$ \emph{Java 17, Spring Boot, Next.js, PostgreSQL, Docker}}
+    {Jul. 2025 -- Present}
+  \resumeItemListStart
+    \resumeItem{
+      Developed a full-stack hospital platform supporting booking, clinical,
+      pharmacy, inventory, finance, and patient-portal workflows for
+      \textbf{7 roles} across \textbf{118 REST mappings} and \textbf{72 Next.js pages}.
+    }
+    \resumeItem{
+      Structured the backend into \textbf{5 DDD-style Maven modules} and
+      \textbf{20 Flyway migrations}, enforcing \textbf{66 method-level authorization
+      checks} and protecting patient identifiers with AES-GCM encryption.
+    }
+    \resumeItem{
+      Maintained quality gates with \textbf{148 backend tests},
+      \textbf{80.48\% frontend branch coverage}, and \textbf{25 Playwright
+      specifications} covering RBAC, booking, queue, clinical, and visual-regression
+      workflows.
+    }
+  \resumeItemListEnd
+
+\resumeSubHeadingListEnd
+
+%-----------LEADERSHIP & ACTIVITIES-----------
+
+\section{Leadership \& Activities}
+\resumeSubHeadingListStart
+
+  \vspace{-2pt}\item
+  \begin{tabular*}{0.97\textwidth}[t]
+    {@{}p{0.80\textwidth}@{\extracolsep{\fill}}r@{}}
+    \small\textbf{Tet Luon Vui -- Community Fundraising Project}
+    $|$ \emph{Communications \& Logistics, SSG104}
+    & \small\evidence{} $|$ 2026 \\
+  \end{tabular*}\vspace{-7pt}
+
+  \resumeItemListStart
+    \resumeItem{
+      Coordinated communications and logistics for a \textbf{9-member}
+      student-led fundraising project, managing visual content, online promotion,
+      sales operations, and event execution; grew its Facebook page from
+      \textbf{0 to 900+ followers} and increased net funds raised by
+      \textbf{254.5\%}.
+    }
+  \resumeItemListEnd
+
+  \vspace{-2pt}\item
+  \small{
+    \textbf{Competitions}: FPT Student Mathematics Olympic (Feb. 2025);
+    SEAL Hackathon (2025).
+  }\vspace{-5pt}
+
+\resumeSubHeadingListEnd
+
+%-----------TECHNICAL SKILLS-----------
+
+\section{Technical Skills}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{
+    \textbf{Languages}{: Java, Python, TypeScript, JavaScript, SQL} \\
+    \textbf{Backend \& Architecture}{: Spring Boot, FastAPI, REST APIs,
+      JPA/Hibernate, Maven, RBAC, Idempotency, Concurrency Control,
+      Transactional Outbox} \\
+    \textbf{Frontend}{: React, Next.js} \\
+    \textbf{Data \& Messaging}{: PostgreSQL, MySQL, Redis, pgvector, Kafka, Flyway} \\
+    \textbf{DevOps \& Testing}{: Docker, Docker Compose, GitHub Actions,
+      JUnit, Pytest, Playwright, Vitest, K6} \\
+    \textbf{AI}{: RAG, Permission-Aware Retrieval, Hybrid Retrieval,
+      Citation Validation, LLM Workflows} \\
+    \textbf{Certifications}{: \textbf{Architecting Solutions on AWS} (2026),
+      \textbf{Retrieval Augmented Generation (RAG)} (2026)}
+  }}
+\end{itemize}
+
+%-------------------------------------------
+\end{document}

@@ -4,9 +4,9 @@ This page is kept for compatibility with older links.
 
 Use the current docs instead:
 
-- [REVIEWER_GUIDE.md](./REVIEWER_GUIDE.md) for the project story and reviewer walkthrough.
-- [BENCHMARKING.md](./BENCHMARKING.md) for the reset, warmup, benchmark, and consistency workflow.
-- [CONCURRENCY_AND_CONSISTENCY.md](./CONCURRENCY_AND_CONSISTENCY.md) for stock strategy behavior and correctness interpretation.
+- [REVIEWER_GUIDE.md](../reference/REVIEWER_GUIDE.md) for the project story and reviewer walkthrough.
+- [BENCHMARKING.md](../performance/BENCHMARKING.md) for the reset, warmup, benchmark, and consistency workflow.
+- [CONCURRENCY_AND_CONSISTENCY.md](../performance/CONCURRENCY_AND_CONSISTENCY.md) for stock strategy behavior and correctness interpretation.
 
 Current core cycle:
 

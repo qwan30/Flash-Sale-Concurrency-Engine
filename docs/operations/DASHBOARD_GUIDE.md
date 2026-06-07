@@ -13,6 +13,10 @@ Default users:
 
 The UI should stay focused on lab controls, strategy comparison, stock snapshots, benchmark results, and reproducibility.
 
+## Source Status
+
+The dashboard is a Next.js 16.2.4 and React 19.2.4 app under `app/frontend`. It uses `BACKEND_BASE_URL` to target the Spring Boot backend and defaults to `http://localhost:1122`. Keep dashboard source claims synchronized with [SOURCE_STATUS.md](../reference/SOURCE_STATUS.md).
+
 ## Routes
 
 | Route | Purpose |
@@ -37,6 +41,23 @@ browser -> /api/backend/* -> BACKEND_BASE_URL -> Spring Boot backend
 
 `BACKEND_BASE_URL` defaults to `http://localhost:1122`. The central frontend API client is `app/frontend/src/lib/api.ts`.
 
+The proxy is intentionally allowlisted. It forwards only the backend paths used by the dashboard:
+
+- `GET /actuator/health`
+- `GET /tickets/{ticketItemId}`
+- `POST /admin/benchmarks/reset`
+- `POST /admin/tickets/{ticketItemId}/stock/warmup`
+- `GET /admin/benchmarks/consistency`
+- `GET /admin/benchmarks/runs`
+- `GET /admin/benchmarks/runs/{runId}`
+- `POST /orders`
+- `GET /orders`
+- `GET /orders/{orderNumber}`
+
+Add new dashboard backend calls to the allowlist before using them from browser code.
+
+The backend route `POST /admin/benchmarks/reconcile` exists for direct API use, but it is not currently forwarded by the dashboard proxy because no dashboard screen calls it.
+
 ## Screen Priorities
 
 1. Control desk: reset stock, warm Redis, refresh health, submit controlled order probes, and run consistency checks.
@@ -49,13 +70,13 @@ browser -> /api/backend/* -> BACKEND_BASE_URL -> Spring Boot backend
 
 | Screenshot | What it shows |
 |---|---|
-| [home.png](./screenshots/home.png) | Lab entry |
-| [events.png](./screenshots/events.png) | Fixture catalog |
-| [order-traces.png](./screenshots/order-traces.png) | Stored order trace view |
-| [admin-control-desk.png](./screenshots/admin-control-desk.png) | Operator control desk |
-| [admin-benchmark.png](./screenshots/admin-benchmark.png) | Benchmark run review |
-| [admin-consistency.png](./screenshots/admin-consistency.png) | Consistency dashboard |
-| [admin-redirect.png](./screenshots/admin-redirect.png) | Admin navigation/redirect state |
+| [home.png](../screenshots/home.png) | Lab entry |
+| [events.png](../screenshots/events.png) | Fixture catalog |
+| [order-traces.png](../screenshots/order-traces.png) | Stored order trace view |
+| [admin-control-desk.png](../screenshots/admin-control-desk.png) | Operator control desk |
+| [admin-benchmark.png](../screenshots/admin-benchmark.png) | Benchmark run review |
+| [admin-consistency.png](../screenshots/admin-consistency.png) | Consistency dashboard |
+| [admin-redirect.png](../screenshots/admin-redirect.png) | Admin navigation/redirect state |
 
 ## Copy Rules
 
@@ -81,7 +102,7 @@ Avoid consumer-sales language. Do not frame the UI as a buyer checkout, a market
 - Benchmark pages should keep correctness columns visible beside latency and throughput.
 - Empty states should tell the user which backend operation did not return data.
 - Error states should name the failing operation.
-- Default IDs and months should match the benchmark fixture in [BENCHMARKING.md](./BENCHMARKING.md).
+- Default IDs and months should match the benchmark fixture in [BENCHMARKING.md](../performance/BENCHMARKING.md).
 - API links should point to Swagger/OpenAPI surfaces when the backend is running locally.
 
 ## Run And Verify

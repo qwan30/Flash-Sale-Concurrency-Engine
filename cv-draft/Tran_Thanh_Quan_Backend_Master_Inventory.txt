@@ -1,0 +1,50 @@
+TRAN THANH QUAN
+Ho Chi Minh City, Vietnam | 0974426058 | tranthanhquan09@gmail.com | GitHub: https://github.com/qwan30 | LinkedIn: https://www.linkedin.com/in/tran-thanh-quan-eric-78842b326/
+
+SUMMARY
+Backend-focused Software Engineering student at FPT University (GPA: 8.0/10) building Java/Spring Boot and Python/FastAPI systems involving concurrency control, transactional workflows, event-driven integration, RBAC, and permission-aware RAG. Developed evidence-backed projects validated through K6 load scenarios, 245 backend tests, 148 Java tests, and Playwright/Vitest quality gates. Seeking a Backend Engineering Internship/OJT.
+
+EDUCATION
+FPT University (Ho Chi Minh City, Vietnam)
+Bachelor of Engineering in Software Engineering -- GPA: 8.0/10
+Aug. 2023 -- Expected Aug. 2027
+
+PROJECTS
+
+Inventory Flash Sale System (Java 21, Spring Boot, Redis, Kafka, MySQL, K6)
+Mar. 2026 -- Present
+GitHub: https://github.com/qwan30/inventory-flashsale-system
+* Built a modular Spring Boot inventory platform using Redis SKU locks, JPA optimistic locking, and idempotency guards to coordinate reservation workflows under flash-sale contention.
+* Implemented a transactional outbox with Kafka publishing and retry states, plus scheduled Shopee and TikTok Shop inventory synchronization and drift reconciliation.
+* Designed a 15-table MySQL/Flyway schema and validated five K6 load scenarios---including hot-SKU contention, reservation expiry, outbox recovery, and reconciliation---with a 0% request-failure rate in a local benchmark.
+
+AI Hospital Knowledge Assistant (FastAPI, Next.js, PostgreSQL, pgvector, Redis, RAG)
+Feb. 2026 -- Present
+GitHub: https://github.com/qwan30/chat-hospital-system
+* Built a FastAPI and Next.js hospital knowledge assistant with permission-filtered RAG that excludes unauthorized patient data before constructing LLM context.
+* Implemented buffered streaming and citation validation to reject answers containing unsupported evidence, validated through a backend suite of 245 tests.
+* Developed a Redis/RQ document-ingestion pipeline with multi-format loaders, chunking, embeddings, hybrid BM25/vector retrieval, failure tracking, and hospital-record synchronization.
+
+Hospital Management System (Java 17, Spring Boot, Next.js, PostgreSQL, Docker)
+Jul. 2025 -- Present
+GitHub: https://github.com/qwan30/hospital-management-system
+* Developed a full-stack hospital platform supporting booking, clinical, pharmacy, inventory, finance, and patient-portal workflows for 7 roles across 118 REST mappings and 72 Next.js pages.
+* Structured the backend into 5 DDD-style Maven modules and 20 Flyway migrations, enforcing 66 method-level authorization checks and protecting patient identifiers with AES-GCM encryption.
+* Maintained quality gates with 148 backend tests, 80.48% frontend branch coverage, and 25 Playwright specifications covering RBAC, booking, queue, clinical, and visual-regression workflows.
+
+LEADERSHIP & ACTIVITIES
+
+Tet Luon Vui -- Community Fundraising Project | Communications & Logistics, SSG104
+2026
+* Coordinated communications and logistics for a 9-member student-led fundraising project, managing visual content, online promotion, sales operations, and event execution; grew its Facebook page from 0 to 900+ followers and increased net funds raised by 254.5%.
+
+Competitions: FPT Student Mathematics Olympic (Feb. 2025); SEAL Hackathon (2025).
+
+TECHNICAL SKILLS
+* Languages: Java, Python, TypeScript, JavaScript, SQL
+* Backend & Architecture: Spring Boot, FastAPI, REST APIs, JPA/Hibernate, Maven, RBAC, Idempotency, Concurrency Control, Transactional Outbox
+* Frontend: React, Next.js
+* Data & Messaging: PostgreSQL, MySQL, Redis, pgvector, Kafka, Flyway
+* DevOps & Testing: Docker, Docker Compose, GitHub Actions, JUnit, Pytest, Playwright, Vitest, K6
+* AI: RAG, Permission-Aware Retrieval, Hybrid Retrieval, Citation Validation, LLM Workflows
+* Certifications: Architecting Solutions on AWS (2026), Retrieval Augmented Generation (RAG) (2026)

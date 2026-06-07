@@ -12,6 +12,7 @@ This project is a Spring Boot flash-sale concurrency lab. It uses a ticket-order
 | Compensation rule | `REDIS_LUA_WITH_COMPENSATION` restores Redis if the DB or order-write phase fails after Redis decrement |
 | Consistency visibility | `GET /admin/benchmarks/consistency` reports Redis stock, DB stock, order count, oversold rows, expected Redis stock, and drift |
 | Reproducible benchmark flow | `benchmark/run-jmeter.ps1` writes raw JMeter samples, HTML report, consistency snapshot, `run.json`, and `summary-row.md` |
+| Source status | [SOURCE_STATUS.md](SOURCE_STATUS.md) maps current backend, frontend, config, benchmark, and verification surfaces |
 
 ## Scope Boundaries
 
@@ -71,13 +72,14 @@ MySQL is the durable source of truth. Redis is a fast gate/cache. The reconcilia
 
 ## Reviewer Walkthrough
 
-1. Read [ARCHITECTURE.md](./ARCHITECTURE.md) for module boundaries and the order path.
-2. Read [CONCURRENCY_AND_CONSISTENCY.md](./CONCURRENCY_AND_CONSISTENCY.md) for the stock invariants and strategy behavior.
-3. Read [BENCHMARKING.md](./BENCHMARKING.md) for how evidence is produced and interpreted.
-4. Open Swagger locally at `http://localhost:1122/swagger-ui.html`.
-5. Run `benchmark/smoke-local.ps1` to prove the reset, warmup, order, and consistency cycle.
-6. Run `benchmark/run-jmeter.ps1` to generate benchmark evidence for one strategy.
-7. Use the dashboard at `http://localhost:3000` only as an operator view over the backend proof.
+1. Read [SOURCE_STATUS.md](SOURCE_STATUS.md) for the current backend, frontend, config, benchmark, and verification status.
+2. Read [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for module boundaries and the order path.
+3. Read [CONCURRENCY_AND_CONSISTENCY.md](../performance/CONCURRENCY_AND_CONSISTENCY.md) for the stock invariants and strategy behavior.
+4. Read [BENCHMARKING.md](../performance/BENCHMARKING.md) for how evidence is produced and interpreted.
+5. Open Swagger locally at `http://localhost:1122/swagger-ui.html`.
+6. Run `benchmark/smoke-local.ps1` to prove the reset, warmup, order, and consistency cycle.
+7. Run `benchmark/run-jmeter.ps1` to generate benchmark evidence for one strategy.
+8. Use the dashboard at `http://localhost:3000` only as an operator view over the backend proof.
 
 ## CV-Safe Framing
 
