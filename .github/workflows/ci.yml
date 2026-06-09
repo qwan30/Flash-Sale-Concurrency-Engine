@@ -231,11 +231,6 @@ jobs:
       - name: Cleanup containers
         if: always()
         run: docker compose -f environment/docker-compose-dev.yml down -v 2>/dev/null || true
-        with:
-          name: smoke-test-startup-logs
-          path: |
-            /tmp/backend-stdout.log
-            /tmp/backend-stderr.log
 
   # ═══════════════════════════════════════════════════════════
   # BLOCK 2: FRONTEND — Lint → Typecheck → Build
