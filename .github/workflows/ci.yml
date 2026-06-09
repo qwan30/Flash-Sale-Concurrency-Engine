@@ -7,8 +7,11 @@ on:
     branches: [main]
 
 jobs:
+  # ═══════════════════════════════════════════════════════════
+  # BLOCK 1: BACKEND — Unit → Integration / Build → Observability
+  # ═══════════════════════════════════════════════════════════
   backend-unit-test:
-    name: Backend Unit Tests
+    name: Backend — Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +33,7 @@ jobs:
           path: "**/target/surefire-reports/"
 
   backend-integration-test:
-    name: Backend Integration Tests (Docker)
+    name: Backend — Integration Tests (Docker)
     runs-on: ubuntu-latest
     needs: backend-unit-test
     steps:
@@ -40,6 +43,13 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: maven
+      - name: Cache Testcontainers Docker layers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/testcontainers
+          key: testcontainers-${{ runner.os }}-${{ hashFiles('app/backend/**/pom.xml') }}
+          restore-keys: |
+            testcontainers-${{ runner.os }}-
       - name: Run integration tests (Testcontainers)
         run: >
           mvn -B -q
@@ -53,7 +63,7 @@ jobs:
           path: "**/target/surefire-reports/"
 
   backend-build:
-    name: Backend Package
+    name: Backend — Package JAR
     runs-on: ubuntu-latest
     needs: backend-unit-test
     steps:
@@ -74,33 +84,16 @@ jobs:
           name: backend-jar
           path: app/backend/xxxx-start/target/*.jar
 
-  frontend-checks:
-    name: Frontend Lint & Typecheck & Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app/frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: app/frontend/package-lock.json
-      - run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Build
-        run: npm run build
-
   observability-smoke:
-    name: Observability Smoke Test
+    name: Backend — Observability Smoke Test
     runs-on: ubuntu-latest
     needs: backend-build
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-jar
+          path: app/backend/xxxx-start/target
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -109,10 +102,7 @@ jobs:
       - name: Start backend and verify observability endpoints
         run: |
           JAR=$(find app/backend/xxxx-start/target -name "*.jar" -not -name "*-sources.jar" | head -1)
-          if [ -z "$JAR" ]; then
-            echo "No JAR found — downloading from build artifact"
-            JAR="app/backend/xxxx-start/target/xxxx-start-1.0-SNAPSHOT.jar"
-          fi
+          echo "Starting backend with JAR: $JAR"
           java -jar "$JAR" &
           PID=$!
           echo "Backend PID=$PID, waiting for startup..."
@@ -133,15 +123,12 @@ jobs:
 
           echo ""
           echo "=== Verify log format includes traceId ==="
-          # Make a request to generate log output
           curl -s http://localhost:1122/actuator/health > /dev/null
           sleep 1
-          # Check application log for traceId in pipe-delimited format
           LOG_DIR="$HOME/MyEventApplication/logs"
           if [ -f "$LOG_DIR/application.log" ]; then
             LOG_LINE=$(tail -1 "$LOG_DIR/application.log")
             echo "Last log line: $LOG_LINE"
-            # Verify pipe-delimited format with 6 fields (date|thread|traceId|level|logger|msg)
             FIELD_COUNT=$(echo "$LOG_LINE" | awk -F'|' '{print NF}')
             if [ "$FIELD_COUNT" -ge 5 ]; then
               echo "PASS: Log format has $FIELD_COUNT pipe-delimited fields"
@@ -155,3 +142,69 @@ jobs:
           fi
 
           kill $PID 2>/dev/null || true
+
+  # ═══════════════════════════════════════════════════════════
+  # BLOCK 2: FRONTEND — Lint → Typecheck → Build
+  # ═══════════════════════════════════════════════════════════
+  frontend-checks:
+    name: Frontend — Lint, Typecheck & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+
+  # ═══════════════════════════════════════════════════════════
+  # BLOCK 3: INFRA — Validate configs (docker-compose, ELK, Prometheus, Nginx, Redis)
+  # ═══════════════════════════════════════════════════════════
+  infra-validate:
+    name: Infra — Config Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose-dev.yml
+        run: docker compose -f environment/docker-compose-dev.yml config --quiet
+
+      - name: Validate docker-compose-nginx.yml
+        run: docker compose -f environment/docker-compose-nginx.yml config --quiet
+
+      - name: Validate docker-compose-cluster.yml
+        run: docker compose -f environment/cluster-redis/docker-compose-cluster.yml config --quiet
+
+      - name: Validate Prometheus config
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/environment/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro \
+            prom/prometheus:latest promtool check config /etc/prometheus/prometheus.yml
+
+      - name: Validate ELK configs
+        run: |
+          python3 -c "import yaml; yaml.safe_load(open('environment/elk/elasticsearch.yml'))" && echo "elasticsearch.yml OK"
+          python3 -c "import yaml; yaml.safe_load(open('environment/elk/logstash.yml'))" && echo "logstash.yml OK"
+          python3 -c "import yaml; yaml.safe_load(open('environment/elk/kibana.yml'))" && echo "kibana.yml OK"
+          test -f environment/elk/pipeline/logstash.conf && echo "logstash.conf present"
+
+      - name: Validate Nginx config structure
+        run: |
+          grep -q "listen" environment/nginx/conf.d/app.conf && echo "listen directive OK" || echo "WARN: listen directive missing"
+          grep -q "server_name\|location" environment/nginx/conf.d/app.conf && echo "server/location directives present"
+          echo "Nginx config file: $(wc -l < environment/nginx/conf.d/app.conf) lines"
+
+      - name: Validate Redis Sentinel config
+        run: |
+          grep -q "sentinel monitor" environment/cluster-redis/sentinel.conf && echo "sentinel monitor OK" || echo "WARN: sentinel monitor missing"
+          grep -q "sentinel down-after-milliseconds" environment/cluster-redis/sentinel.conf && echo "sentinel timeout OK"
