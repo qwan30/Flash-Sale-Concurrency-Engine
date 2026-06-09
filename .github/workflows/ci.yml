@@ -187,9 +187,9 @@ jobs:
 
       - name: Validate Prometheus config
         run: |
-          docker run --rm \
+          docker run --rm --entrypoint promtool \
             -v ${{ github.workspace }}/environment/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro \
-            prom/prometheus:latest promtool check config /etc/prometheus/prometheus.yml
+            prom/prometheus:latest check config /etc/prometheus/prometheus.yml
 
       - name: Validate ELK configs
         run: |
