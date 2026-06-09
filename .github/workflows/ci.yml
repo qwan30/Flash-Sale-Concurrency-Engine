@@ -110,8 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: backend-build
     env:
-      KAFKA_BOOTSTRAP_SERVERS: ""
-      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      KAFKA_BOOTSTRAP_SERVERS: localhost:9094
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -166,7 +165,11 @@ jobs:
           set -e
           JAR=$(find app/backend/xxxx-start/target -name "*.jar" -not -name "*-sources.jar" | head -1)
           echo "Starting backend with JAR: $JAR"
-          java -jar "$JAR" > /tmp/backend-stdout.log 2> /tmp/backend-stderr.log &
+          echo "=== MySQL table check ==="
+          docker exec pre-event-mysql mysql -uroot -proot1234 -e "SHOW TABLES;" vetautet 2>&1 || true
+          java -jar "$JAR" \
+            --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration \
+            > /tmp/backend-stdout.log 2> /tmp/backend-stderr.log &
           PID=$!
           echo "Backend PID=$PID, waiting for startup..."
 
