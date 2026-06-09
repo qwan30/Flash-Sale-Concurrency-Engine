@@ -194,16 +194,16 @@ services:
     depends_on:
       - elasticsearch
 
-#  logstash-exporter:
-#    image: alxrem/prometheus-logstash-exporter
-#    container_name: pre-event-logstash-exporter
-#    command: ["-logstash.host", "logstash"]
-#    platform: linux/arm64/v8
-#    environment:
-#      LOGSTASH_URI: "http://logstash:9600" # Kết nối tới Logstash API
-#    ports:
-#      - "9304:9304" # Cổng Logstash Exporter cho Prometheus
-#    networks:
-#      - pre-event-network
-#    depends_on:
-#      - logstash
+  logstash-exporter:
+    image: alxrem/prometheus-logstash-exporter
+    container_name: pre-event-logstash-exporter
+    command: ["-logstash.host", "logstash"]
+    profiles: ["observability"]
+    environment:
+      LOGSTASH_URI: "http://logstash:9600"
+    ports:
+      - "9304:9304"
+    networks:
+      - pre-event-network
+    depends_on:
+      - logstash

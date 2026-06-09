@@ -31,8 +31,8 @@ scrape_configs:
       - targets: [ "host.docker.internal:9121" ]
     metrics_path: "/metrics"
 
-#  - job_name: "banvetau-logstash-exporter"
-#    scrape_interval: 5s
-#    static_configs:
-#      - targets: [ "host.docker.internal:9304" ]
-#    metrics_path: "/metrics"
+  - job_name: "banvetau-logstash-exporter"
+    scrape_interval: 5s
+    static_configs:
+      - targets: [ "host.docker.internal:9304" ]
+    metrics_path: "/metrics"

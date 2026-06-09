@@ -8,6 +8,7 @@ import com.xxxx.ddd.domain.event.ReconciliationEvent;
 import com.xxxx.ddd.domain.service.OrderDeductionDomainService;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.annotation.Observed;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -86,6 +87,7 @@ public class OrderReconciliationService {
      * @param yearMonth    optional year-month for order counting (null = current month)
      * @return the reconciliation result with before/after state
      */
+    @Observed(name = "reconciliation.run", contextualName = "run-reconciliation")
     public ReconciliationResult reconcile(Long ticketItemId, String yearMonth) {
         String normalizedYearMonth = OrderDateSupport.normalizeYearMonth(yearMonth);
 

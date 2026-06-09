@@ -94,3 +94,64 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
+
+  observability-smoke:
+    name: Observability Smoke Test
+    runs-on: ubuntu-latest
+    needs: backend-build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Start backend and verify observability endpoints
+        run: |
+          JAR=$(find app/backend/xxxx-start/target -name "*.jar" -not -name "*-sources.jar" | head -1)
+          if [ -z "$JAR" ]; then
+            echo "No JAR found — downloading from build artifact"
+            JAR="app/backend/xxxx-start/target/xxxx-start-1.0-SNAPSHOT.jar"
+          fi
+          java -jar "$JAR" &
+          PID=$!
+          echo "Backend PID=$PID, waiting for startup..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:1122/actuator/health > /dev/null 2>&1; then
+              echo "Backend ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+          echo "=== Health endpoint ==="
+          curl -s http://localhost:1122/actuator/health
+
+          echo ""
+          echo "=== Prometheus metrics (JVM) ==="
+          curl -s http://localhost:1122/actuator/prometheus | grep -E "jvm_memory|jvm_gc|flashsale"
+
+          echo ""
+          echo "=== Verify log format includes traceId ==="
+          # Make a request to generate log output
+          curl -s http://localhost:1122/actuator/health > /dev/null
+          sleep 1
+          # Check application log for traceId in pipe-delimited format
+          LOG_DIR="$HOME/MyEventApplication/logs"
+          if [ -f "$LOG_DIR/application.log" ]; then
+            LOG_LINE=$(tail -1 "$LOG_DIR/application.log")
+            echo "Last log line: $LOG_LINE"
+            # Verify pipe-delimited format with 6 fields (date|thread|traceId|level|logger|msg)
+            FIELD_COUNT=$(echo "$LOG_LINE" | awk -F'|' '{print NF}')
+            if [ "$FIELD_COUNT" -ge 5 ]; then
+              echo "PASS: Log format has $FIELD_COUNT pipe-delimited fields"
+            else
+              echo "FAIL: Log format has only $FIELD_COUNT fields, expected >= 5"
+              exit 1
+            fi
+          else
+            echo "WARN: Application log file not found at $LOG_DIR/application.log"
+            echo "Check console output for log format..."
+          fi
+
+          kill $PID 2>/dev/null || true

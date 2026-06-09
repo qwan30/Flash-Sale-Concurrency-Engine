@@ -14,6 +14,7 @@ import com.xxxx.ddd.application.service.order.OrderQueryService;
 import com.xxxx.ddd.application.service.order.TicketOrderAppService;
 import com.xxxx.ddd.domain.model.entity.TickerOrder;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
+import io.micrometer.observation.annotation.Observed;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -49,21 +50,25 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
     }
 
     @Override
+    @Observed(name = "order.create", contextualName = "create-order")
     public CreateOrderResponse createOrder(CreateOrderRequest request) {
         return orderCreationService.createOrder(request);
     }
 
     @Override
+    @Observed(name = "stock.warmup", contextualName = "warmup-stock")
     public CreateOrderResponse warmupStock(Long ticketItemId) {
         return benchmarkFixtureService.warmupStock(ticketItemId);
     }
 
     @Override
+    @Observed(name = "benchmark.reset", contextualName = "reset-benchmark")
     public BenchmarkResetResponse resetBenchmark(BenchmarkResetRequest request) {
         return benchmarkFixtureService.resetBenchmark(request);
     }
 
     @Override
+    @Observed(name = "consistency.check", contextualName = "check-consistency")
     public ConsistencySnapshot getConsistency(Long ticketItemId, String yearMonth) {
         return consistencyCheckService.getConsistency(ticketItemId, yearMonth);
     }

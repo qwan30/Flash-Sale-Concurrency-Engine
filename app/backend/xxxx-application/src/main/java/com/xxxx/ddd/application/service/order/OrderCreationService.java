@@ -13,6 +13,8 @@ import com.xxxx.ddd.domain.model.entity.TickerOrder;
 import com.xxxx.ddd.domain.service.OrderDeductionDomainService;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.observation.annotation.Observed;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Coordinates request validation, idempotency, stock reservation, and order persistence.
@@ -67,6 +70,7 @@ public class OrderCreationService {
      * <p>Idempotency wraps the business operation so a repeated client request reuses the same
      * response instead of reserving stock twice.
      */
+    @Observed(name = "order.creation", contextualName = "order-creation")
     @Transactional(rollbackFor = Exception.class)
     public CreateOrderResponse createOrder(CreateOrderRequest request) {
         String validationError = validateCreateOrderRequest(request);
@@ -85,6 +89,7 @@ public class OrderCreationService {
     }
 
     private CreateOrderResponse doCreateOrder(CreateOrderRequest request) {
+        Timer.Sample sample = meterRegistry != null ? Timer.start(meterRegistry) : null;
         StockDeductionResult deductionResult = null;
         try {
             long nowMillis = System.currentTimeMillis();
@@ -97,6 +102,7 @@ public class OrderCreationService {
                 CreateOrderResponse response = failureWithCurrentStock(
                         request, deductionResult.getCode(), deductionResult.getMessage());
                 recordOrderMetric(request.getStrategy(), false);
+                stopTimer(sample, request.getStrategy(), false);
                 return response;
             }
 
@@ -114,13 +120,16 @@ public class OrderCreationService {
             recordOutboxEvent(request, orderNumber, OrderEvent.ORDER_CREATED, response);
 
             recordOrderMetric(request.getStrategy(), true);
+            stopTimer(sample, request.getStrategy(), true);
             return response;
         } catch (Exception e) {
             markRollbackOnly();
             if (deductionResult != null && deductionResult.isCompensateOnOrderFailure()) {
+                recordCompensationMetric(request.getStrategy());
                 try {
                     stockOrderCacheService.restoreStockCache(request.getTicketItemId(), request.getQuantity());
                 } catch (Exception compensationEx) {
+                    recordCompensationFailureMetric(request.getStrategy());
                     // CRITICAL: Redis compensation failed ("double fault").
                     // Redis remains decremented but no DB order exists.
                     // The scheduled OrderReconciliationService will detect and repair this drift.
@@ -132,6 +141,7 @@ public class OrderCreationService {
             log.error("createOrder failed ticketItemId={} strategy={}", request.getTicketItemId(), request.getStrategy(), e);
             CreateOrderResponse response = failureWithCurrentStock(request, "ORDER_CREATE_FAILED", "Order creation failed");
             recordOrderMetric(request.getStrategy(), false);
+            stopTimer(sample, request.getStrategy(), false);
             return response;
         }
     }
@@ -204,6 +214,18 @@ public class OrderCreationService {
         outboxService.record(OrderEvent.AGGREGATE_TYPE, orderNumber, eventType, event);
     }
 
+    private void stopTimer(Timer.Sample sample, OrderStrategy strategy, boolean success) {
+        if (meterRegistry == null || sample == null || strategy == null) {
+            return;
+        }
+        sample.stop(Timer.builder("flashsale.orders.latency")
+                .description("Order creation latency by strategy and result")
+                .tag("strategy", strategy.name())
+                .tag("result", success ? "success" : "failed")
+                .publishPercentileHistogram(true)
+                .register(meterRegistry));
+    }
+
     private void recordOrderMetric(OrderStrategy strategy, boolean success) {
         if (meterRegistry == null || strategy == null) {
             return;
@@ -212,6 +234,28 @@ public class OrderCreationService {
                 "flashsale.orders",
                 "strategy", strategy.name(),
                 "result", success ? "success" : "failed"
+        ).increment();
+    }
+
+    private void recordCompensationMetric(OrderStrategy strategy) {
+        if (meterRegistry == null || strategy == null) {
+            return;
+        }
+        meterRegistry.counter(
+                "flashsale.compensation",
+                "strategy", strategy.name(),
+                "outcome", "attempted"
+        ).increment();
+    }
+
+    private void recordCompensationFailureMetric(OrderStrategy strategy) {
+        if (meterRegistry == null || strategy == null) {
+            return;
+        }
+        meterRegistry.counter(
+                "flashsale.compensation",
+                "strategy", strategy.name(),
+                "outcome", "double_fault"
         ).increment();
     }
 
