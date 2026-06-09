@@ -1,0 +1,23 @@
+# Maven build output (rebuilt inside Docker)
+**/target/
+
+# Node (rebuilt inside Docker)
+**/node_modules/
+
+# Benchmark reports (heavy, not needed for builds)
+benchmark/
+
+# Git
+.git/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Environment data volumes
+environment/data/
+
+# Docker
+.dockerignore
+**/Dockerfile
