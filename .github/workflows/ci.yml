@@ -225,6 +225,26 @@ jobs:
           fi
 
           kill $PID 2>/dev/null || true
+      - name: Dump logs to run summary (public)
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: |
+          echo '## Smoke Test Failure Logs' >> $GITHUB_STEP_SUMMARY
+          echo '### Backend stdout' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -100 /tmp/backend-stdout.log 2>/dev/null || echo "(no stdout)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo '### Backend stderr' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -100 /tmp/backend-stderr.log 2>/dev/null || echo "(no stderr)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo '### MySQL logs' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          docker logs pre-event-mysql 2>/dev/null | tail -50 >> $GITHUB_STEP_SUMMARY || echo "(no mysql logs)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo '### Running containers' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          docker ps -a >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "(docker not available)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
       - name: Upload startup logs on failure
         if: failure() && steps.smoke.outcome == 'failure'
         uses: actions/upload-artifact@v4
