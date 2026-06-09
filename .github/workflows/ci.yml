@@ -119,7 +119,7 @@ jobs:
           path: app/backend/xxxx-start/target
       - name: Start MySQL + Redis with init SQL
         run: |
-          docker compose -f environment/docker-compose-dev.yml up -d mysql redis
+          docker compose -f environment/docker-compose-dev.yml up -d mysql redis kafka
           echo "Waiting for MySQL to accept connections..."
           for i in $(seq 1 60); do
             if docker logs pre-event-mysql 2>&1 | grep -q "ready for connections"; then
@@ -141,8 +141,16 @@ jobs:
             fi
             sleep 1
           done
+          echo "Waiting for Kafka..."
+          for i in $(seq 1 30); do
+            if docker logs pre-event-kafka 2>&1 | grep -q "started"; then
+              echo "Kafka ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
           echo "=== MySQL tables ==="
-          docker exec pre-event-mysql mysql -uroot -proot1234 -e "SHOW TABLES;" vetautet || true
+          docker exec pre-event-mysql mysql -h 127.0.0.1 -uroot -proot1234 -e "SHOW TABLES;" vetautet || true
       - name: Verify JAR artifact
         run: |
           echo "=== Downloaded artifact contents ==="
@@ -166,10 +174,8 @@ jobs:
           JAR=$(find app/backend/xxxx-start/target -name "*.jar" -not -name "*-sources.jar" | head -1)
           echo "Starting backend with JAR: $JAR"
           echo "=== MySQL table check ==="
-          docker exec pre-event-mysql mysql -uroot -proot1234 -e "SHOW TABLES;" vetautet 2>&1 || true
-          java -jar "$JAR" \
-            --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration \
-            > /tmp/backend-stdout.log 2> /tmp/backend-stderr.log &
+          docker exec pre-event-mysql mysql -h 127.0.0.1 -uroot -proot1234 -e "SHOW TABLES;" vetautet 2>&1 || true
+          java -jar "$JAR" > /tmp/backend-stdout.log 2> /tmp/backend-stderr.log &
           PID=$!
           echo "Backend PID=$PID, waiting for startup..."
 
