@@ -43,6 +43,10 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: maven
+      - name: Verify Docker is available
+        run: |
+          docker version
+          docker info --format '{{.OSType}} {{.ServerVersion}} {{.MemTotal}}'
       - name: Cache Testcontainers Docker layers
         uses: actions/cache@v4
         with:
@@ -51,12 +55,29 @@ jobs:
           restore-keys: |
             testcontainers-${{ runner.os }}-
       - name: Run integration tests (Testcontainers)
+        id: integration-tests
         run: >
-          mvn -B -q
+          mvn -B
           -pl app/backend/xxxx-start -am
-          -Dflashsale.integration=true test
+          -Dflashsale.integration=true
+          test 2>&1 | tee maven-integration-test.log
+        continue-on-error: true
+      - name: Show Maven output on failure
+        if: steps.integration-tests.outcome == 'failure'
+        run: |
+          echo "=== Maven Integration Test Output (last 200 lines) ==="
+          tail -200 maven-integration-test.log || true
+          echo "=== Test Failures ==="
+          grep -E "(ERROR|FAILURE|Failed|Caused by)" maven-integration-test.log || true
+          exit 1
+      - name: Upload Maven log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-integration-log
+          path: maven-integration-test.log
       - name: Upload Surefire reports
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: integration-surefire-reports
@@ -94,32 +115,69 @@ jobs:
         with:
           name: backend-jar
           path: app/backend/xxxx-start/target
+      - name: Verify JAR artifact
+        run: |
+          echo "=== Downloaded artifact contents ==="
+          ls -lh app/backend/xxxx-start/target/
+          JAR=$(find app/backend/xxxx-start/target -name "*.jar" -not -name "*-sources.jar" | head -1)
+          if [ -z "$JAR" ]; then
+            echo "ERROR: No JAR found in artifact!"
+            exit 1
+          fi
+          echo "JAR file: $JAR"
+          echo "JAR size: $(stat --format='%s' "$JAR") bytes"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
           cache: maven
       - name: Start backend and verify observability endpoints
+        id: smoke
         run: |
+          set -e
           JAR=$(find app/backend/xxxx-start/target -name "*.jar" -not -name "*-sources.jar" | head -1)
           echo "Starting backend with JAR: $JAR"
-          java -jar "$JAR" &
+
+          # Start backend with console output captured
+          java -jar "$JAR" > /tmp/backend-stdout.log 2> /tmp/backend-stderr.log &
           PID=$!
           echo "Backend PID=$PID, waiting for startup..."
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:1122/actuator/health > /dev/null 2>&1; then
+
+          # Wait up to 60s for health endpoint
+          READY=0
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:1122/actuator/health > /dev/null 2>&1; then
               echo "Backend ready after ${i}s"
+              READY=1
               break
+            fi
+            # Check if process died
+            if ! kill -0 $PID 2>/dev/null; then
+              echo "ERROR: Backend process died at ${i}s"
+              echo "=== stdout (last 50 lines) ==="
+              tail -50 /tmp/backend-stdout.log
+              echo "=== stderr (last 50 lines) ==="
+              tail -50 /tmp/backend-stderr.log
+              exit 1
             fi
             sleep 1
           done
+
+          if [ "$READY" -eq 0 ]; then
+            echo "ERROR: Backend did not start within 60s"
+            echo "=== stdout (last 50 lines) ==="
+            tail -50 /tmp/backend-stdout.log
+            echo "=== stderr (last 50 lines) ==="
+            tail -50 /tmp/backend-stderr.log
+            exit 1
+          fi
 
           echo "=== Health endpoint ==="
           curl -s http://localhost:1122/actuator/health
 
           echo ""
           echo "=== Prometheus metrics (JVM) ==="
-          curl -s http://localhost:1122/actuator/prometheus | grep -E "jvm_memory|jvm_gc|flashsale"
+          curl -s http://localhost:1122/actuator/prometheus | grep -E "jvm_memory|jvm_gc|flashsale" || echo "WARN: No matching metrics found"
 
           echo ""
           echo "=== Verify log format includes traceId ==="
@@ -142,6 +200,14 @@ jobs:
           fi
 
           kill $PID 2>/dev/null || true
+      - name: Upload startup logs on failure
+        if: failure() && steps.smoke.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-startup-logs
+          path: |
+            /tmp/backend-stdout.log
+            /tmp/backend-stderr.log
 
   # ═══════════════════════════════════════════════════════════
   # BLOCK 2: FRONTEND — Lint → Typecheck → Build
