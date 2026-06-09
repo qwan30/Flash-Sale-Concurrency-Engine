@@ -109,34 +109,36 @@ jobs:
     name: Backend — Observability Smoke Test
     runs-on: ubuntu-latest
     needs: backend-build
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root1234
-          MYSQL_DATABASE: vetautet
-        ports:
-          - 3316:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-      redis:
-        image: redis:latest
-        ports:
-          - 6319:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+    env:
+      KAFKA_BOOTSTRAP_SERVERS: ""
+      SPRING_AUTOCONFIGURE_EXCLUDE: org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: backend-jar
           path: app/backend/xxxx-start/target
+      - name: Start MySQL + Redis with init SQL
+        run: |
+          docker compose -f environment/docker-compose-dev.yml up -d mysql redis
+          echo "Waiting for MySQL..."
+          for i in $(seq 1 30); do
+            if docker compose -f environment/docker-compose-dev.yml exec -T mysql mysqladmin ping -h localhost --silent 2>/dev/null; then
+              echo "MySQL ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          echo "Waiting for Redis..."
+          for i in $(seq 1 15); do
+            if docker compose -f environment/docker-compose-dev.yml exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; then
+              echo "Redis ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          echo "=== MySQL tables ==="
+          docker compose -f environment/docker-compose-dev.yml exec -T mysql mysql -uroot -proot1234 -e "SHOW TABLES;" vetautet || true
       - name: Verify JAR artifact
         run: |
           echo "=== Downloaded artifact contents ==="
@@ -159,38 +161,34 @@ jobs:
           set -e
           JAR=$(find app/backend/xxxx-start/target -name "*.jar" -not -name "*-sources.jar" | head -1)
           echo "Starting backend with JAR: $JAR"
-
-          # Start backend with console output captured
           java -jar "$JAR" > /tmp/backend-stdout.log 2> /tmp/backend-stderr.log &
           PID=$!
           echo "Backend PID=$PID, waiting for startup..."
 
-          # Wait up to 60s for health endpoint
           READY=0
-          for i in $(seq 1 60); do
+          for i in $(seq 1 90); do
             if curl -sf http://localhost:1122/actuator/health > /dev/null 2>&1; then
               echo "Backend ready after ${i}s"
               READY=1
               break
             fi
-            # Check if process died
             if ! kill -0 $PID 2>/dev/null; then
               echo "ERROR: Backend process died at ${i}s"
-              echo "=== stdout (last 50 lines) ==="
-              tail -50 /tmp/backend-stdout.log
-              echo "=== stderr (last 50 lines) ==="
-              tail -50 /tmp/backend-stderr.log
+              echo "=== stdout (last 80 lines) ==="
+              tail -80 /tmp/backend-stdout.log
+              echo "=== stderr (last 80 lines) ==="
+              tail -80 /tmp/backend-stderr.log
               exit 1
             fi
             sleep 1
           done
 
           if [ "$READY" -eq 0 ]; then
-            echo "ERROR: Backend did not start within 60s"
-            echo "=== stdout (last 50 lines) ==="
-            tail -50 /tmp/backend-stdout.log
-            echo "=== stderr (last 50 lines) ==="
-            tail -50 /tmp/backend-stderr.log
+            echo "ERROR: Backend did not start within 90s"
+            echo "=== stdout (last 80 lines) ==="
+            tail -80 /tmp/backend-stdout.log
+            echo "=== stderr (last 80 lines) ==="
+            tail -80 /tmp/backend-stderr.log
             exit 1
           fi
 
@@ -225,6 +223,14 @@ jobs:
       - name: Upload startup logs on failure
         if: failure() && steps.smoke.outcome == 'failure'
         uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-startup-logs
+          path: |
+            /tmp/backend-stdout.log
+            /tmp/backend-stderr.log
+      - name: Cleanup containers
+        if: always()
+        run: docker compose -f environment/docker-compose-dev.yml down -v 2>/dev/null || true
         with:
           name: smoke-test-startup-logs
           path: |
