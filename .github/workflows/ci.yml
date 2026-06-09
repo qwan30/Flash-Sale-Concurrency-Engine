@@ -109,6 +109,28 @@ jobs:
     name: Backend — Observability Smoke Test
     runs-on: ubuntu-latest
     needs: backend-build
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root1234
+          MYSQL_DATABASE: vetautet
+        ports:
+          - 3316:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:latest
+        ports:
+          - 6319:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
