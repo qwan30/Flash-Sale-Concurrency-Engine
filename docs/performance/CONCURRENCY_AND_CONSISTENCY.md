@@ -137,7 +137,10 @@ Reconciliation steps:
 3. Compute drift = redisStock - dbStock.
 4. If drift != 0, set Redis stock to DB stock.
 5. Emit flashsale.reconciliation metric when repair happens.
+6. Publish RECONCILIATION event through the transactional outbox to Kafka.
 ```
+
+The `RECONCILIATION` outbox event carries the drift amount, direction, and affected ticket item so downstream consumers can react to consistency repairs.
 
 ## Failure Semantics
 

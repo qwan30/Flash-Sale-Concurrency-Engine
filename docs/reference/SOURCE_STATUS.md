@@ -10,7 +10,9 @@ This page records the current source-backed project status. It is grounded in th
 | Backend modules | Five Maven modules: domain, application, infrastructure, controller, start | `pom.xml` |
 | Backend runtime | Java 21, Spring Boot 3.3.5, app port `1122` | `pom.xml`, `app/backend/xxxx-start/src/main/resources/application.yml` |
 | API documentation | Swagger UI and OpenAPI are configured through Springdoc 2.6.0 | `pom.xml`, `OpenApiConfig.java`, `application.yml` |
-| Actuator exposure | Only `health` and `prometheus` are exposed; health details are hidden | `application.yml` |
+| Actuator exposure | `health`, `prometheus`, and `metrics` are exposed; health details are hidden | `application.yml` |
+| Kafka + Outbox | Transactional outbox writes events atomically with domain changes; `OutboxPublishScheduler` relays to Kafka topic `flashsale.orders` | `OutboxService.java`, `application.yml` |
+| CD pipeline | Builds and pushes Docker images to GHCR on push to master; production compose uses pre-built images | `.github/workflows/cd.yml`, `docker-compose.prod.yml` |
 | Order strategies | `UNSAFE_DB`, `CONDITIONAL_DB`, `REDIS_LUA`, `REDIS_LUA_WITH_COMPENSATION` | `OrderStrategy.java` |
 | Frontend dashboard | Optional Next.js 16.2.4 operator dashboard, not a consumer app | `app/frontend/package.json`, `app/frontend/src/app` |
 | Frontend proxy | Browser calls go through `/api/backend/*` and are restricted to known dashboard backend paths | `app/frontend/src/app/api/backend/[...path]/route.ts` |
@@ -25,11 +27,12 @@ The backend is a multi-module Maven project:
 |---|---|
 | `app/backend/xxxx-domain` | Domain services and stock/order invariants |
 | `app/backend/xxxx-application` | Application services, strategy registry, benchmark run service, DTO models |
-| `app/backend/xxxx-infrastructure` | MySQL repositories, Redis adapters, persistence support |
+| `app/backend/xxxx-infrastructure` | MySQL repositories, Redis adapters, Kafka outbox persistence, Redisson config |
+| `app/backend/xxxx-application` (MQ) | Transactional outbox (`OutboxService`, `OutboxRepository`, `OutboxPublishScheduler`) for at-least-once Kafka delivery |
 | `app/backend/xxxx-controller` | HTTP controllers and API DTO boundaries |
 | `app/backend/xxxx-start` | Spring Boot entrypoint, OpenAPI config, runtime config, integration tests |
 
-The backend starts on `http://localhost:1122`. MySQL defaults to `localhost:3316/vetautet`; Redis defaults to `127.0.0.1:6319`. Environment variables in `.env.example` and `application.yml` override the local defaults.
+The backend starts on `http://localhost:1122`. MySQL defaults to `localhost:3316/vetautet`; Redis defaults to `127.0.0.1:6319`; Kafka defaults to `localhost:9094`. Virtual threads are enabled for the Tomcat request pool. Environment variables in `.env.example` and `application.yml` override the local defaults.
 
 ## API Surface
 
@@ -66,16 +69,43 @@ The default actuator web exposure is intentionally narrow:
 |---|---|
 | `GET /actuator/health` | Exposed with hidden component details |
 | `GET /actuator/prometheus` | Exposed for Prometheus scraping |
+| `GET /actuator/metrics` | Exposed for metric registry inspection |
 
 Other actuator endpoints are not exposed by default.
 
-`environment/docker-compose-dev.yml` provides MySQL and Redis for the normal local lab. Optional profiles add observability or ELK components:
+`environment/docker-compose-dev.yml` provides MySQL, Redis, and Kafka for the normal local lab. Optional profiles add observability or ELK components:
 
 | Profile | Services |
 |---|---|
-| default | MySQL, Redis |
+| default | MySQL, Redis, Kafka (KRaft mode) |
 | `observability` | Prometheus, Grafana, node exporter, MySQL exporter, Redis exporter |
 | `elk` | Elasticsearch, Logstash, Kibana |
+
+Production deployment uses `environment/docker-compose.prod.yml` with pre-built GHCR images (`ghcr.io/qwan30/flashsale-backend` and `ghcr.io/qwan30/flashsale-frontend`) pushed by the CD pipeline on every push to master.
+
+## Messaging And Outbox Status
+
+The backend uses the transactional outbox pattern with Kafka for reliable event publishing.
+
+| Component | Status | Source |
+|---|---|---|
+| Broker | Apache Kafka 3.9.0 in KRaft mode (no ZooKeeper) | `docker-compose-dev.yml`, `docker-compose.prod.yml` |
+| Bootstrap servers | `localhost:9094` (dev), `kafka:9092` (prod) | `application.yml` |
+| Topic | `flashsale.orders` (configurable via `KAFKA_TOPIC`) | `application.yml` |
+| Producer | String serializer, `acks=all` | `application.yml` |
+| Outbox pattern | Events written atomically with domain changes; scheduler relays to Kafka | `OutboxService.java`, `OutboxPublishScheduler.java` |
+| Publish batch size | 50 events per batch | `application.yml` (`app.outbox.publish-batch-size`) |
+| Retry | Failed events retried after 10s, up to 5 attempts | `application.yml` (`app.outbox.retry-delay`, `app.outbox.max-attempts`) |
+| Outbox metrics | `outbox.publish.success`, `outbox.publish.failure`, `outbox.retry.scheduled`, `outbox.publish.latency`, `outbox.backlog.pending`, `outbox.backlog.failed` | `OutboxService.java` |
+
+Events published through the outbox:
+
+| Event type | Triggered by |
+|---|---|
+| `ORDER_CREATED` | `OrderCreationService` after successful order persistence |
+| `RECONCILIATION` | `OrderReconciliationService` when drift is detected and repaired |
+
+The `OutboxPublishScheduler` runs on a fixed 1-second delay to drain pending events, and retries failed events whose retry window has elapsed.
 
 ## Frontend Source Status
 

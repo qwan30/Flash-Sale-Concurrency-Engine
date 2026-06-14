@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flash-Sale Concurrency Engine — Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --canvas: #ffffff;
+    --primary: #111111;
+    --surface-card: #f5f5f5;
+    --surface-dark: #101010;
+    --border: #e5e5e5;
+    --text-primary: #111111;
+    --text-secondary: #555555;
+    --text-muted: #888888;
+    --text-inverse: #ffffff;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --danger: #dc2626;
+    --danger-soft: #fef2f2;
+    --success: #16a34a;
+    --success-soft: #f0fdf4;
+    --warning: #d97706;
+    --warning-soft: #fffbeb;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --max-width: 1100px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--canvas); color: var(--text-primary);
+    line-height: 1.6; font-size: 15px;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4 {
+    font-weight: 600; letter-spacing: -0.5px; color: var(--primary); line-height: 1.25;
+  }
+  h1 { font-size: 2.5rem; letter-spacing: -1.5px; }
+  h2 { font-size: 1.75rem; letter-spacing: -0.75px; margin-top: 3rem; margin-bottom: 1rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+  h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+  h3 { font-size: 1.25rem; margin-top: 2rem; margin-bottom: 0.75rem; }
+  h4 { font-size: 1rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  p { margin-bottom: 1rem; color: var(--text-secondary); }
+  strong { color: var(--text-primary); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .nav { position: sticky; top: 0; z-index: 100; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+  .nav-inner { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; display: flex; align-items: center; height: 52px; gap: 24px; }
+  .nav-logo { font-weight: 700; font-size: 0.95rem; letter-spacing: -0.3px; color: var(--primary); white-space: nowrap; }
+  .nav-links { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-links a { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; padding: 5px 10px; border-radius: var(--radius-sm); white-space: nowrap; transition: color 0.15s, background 0.15s; }
+  .nav-links a:hover, .nav-links a:focus { color: var(--primary); background: var(--surface-card); }
+
+  .hero { max-width: var(--max-width); margin: 0 auto; padding: 56px 24px 40px; }
+  .hero h1 { margin-bottom: 8px; }
+  .hero p { font-size: 1.1rem; color: var(--text-muted); max-width: 680px; }
+  .container { max-width: var(--max-width); margin: 0 auto; padding: 0 24px 64px; }
+
+  .card { background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 20px; }
+  .card h3 { margin-top: 0; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin: 16px 0; }
+  .card-grid.cols-4 { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+
+  .stat-row { display: flex; flex-wrap: wrap; gap: 16px; margin: 20px 0; }
+  .stat-card {
+    flex: 1; min-width: 140px; background: var(--surface-card); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 16px 20px; text-align: center;
+  }
+  .stat-card .label { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .stat-card .value { font-size: 1.5rem; font-weight: 700; color: var(--primary); letter-spacing: -0.5px; }
+
+  .table-wrap { overflow-x: auto; margin: 12px 0 20px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  thead { background: var(--surface-card); }
+  th { font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 2px solid var(--border); color: var(--text-primary); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--text-secondary); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafafa; }
+
+  code { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 0.82em; background: var(--surface-card); padding: 2px 6px; border-radius: 4px; color: var(--primary); }
+  pre { background: #1a1a1a; color: #e4e4e7; padding: 16px 20px; border-radius: var(--radius-md); overflow-x: auto; font-size: 0.82rem; line-height: 1.5; margin: 12px 0 20px; }
+  pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+
+  .badge { display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.2px; text-transform: uppercase; }
+  .badge-green { background: var(--success-soft); color: var(--success); }
+  .badge-red { background: var(--danger-soft); color: var(--danger); }
+  .badge-blue { background: var(--accent-soft); color: var(--accent); }
+  .badge-amber { background: var(--warning-soft); color: var(--warning); }
+
+  ul, ol { margin: 8px 0 16px 20px; color: var(--text-secondary); }
+  li { margin-bottom: 4px; }
+
+  .strategy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin: 16px 0; }
+  .strategy-card { background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; }
+  .strategy-card .name { font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; }
+  .strategy-card .desc { font-size: 0.8rem; color: var(--text-muted); }
+
+  .checklist { list-style: none; margin-left: 0; }
+  .checklist li { padding: 6px 0; display: flex; align-items: flex-start; gap: 8px; }
+  .checklist li::before { content: "☐"; color: var(--text-muted); font-size: 1rem; flex-shrink: 0; }
+
+  .footer { background: var(--surface-dark); color: var(--text-inverse); padding: 48px 24px 32px; margin-top: 64px; }
+  .footer-inner { max-width: var(--max-width); margin: 0 auto; }
+  .footer h3 { color: var(--text-inverse); font-size: 1rem; margin-top: 0; margin-bottom: 12px; border: none; padding: 0; }
+  .footer p, .footer .meta { color: #888; font-size: 0.82rem; }
+  .footer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 32px; }
+  .footer a { color: #ccc; text-decoration: none; font-size: 0.82rem; }
+  .footer a:hover { color: #fff; }
+
+  @media (max-width: 768px) {
+    h1 { font-size: 1.75rem; } h2 { font-size: 1.35rem; }
+    .nav-links a { padding: 5px 7px; font-size: 0.72rem; }
+    .stat-card { min-width: 100px; }
+    .card-grid, .strategy-grid { grid-template-columns: 1fr; }
+  }
+  @media print {
+    .nav, .footer { display: none; }
+    body { font-size: 12px; }
+    h2 { break-before: page; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="nav-logo">⚡ Flash-Sale Engine</span>
+    <div class="nav-links">
+      <a href="#overview">Overview</a>
+      <a href="#project-context">Context</a>
+      <a href="#source-status">Source Status</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#adrs">ADRs</a>
+      <a href="#concurrency">Concurrency</a>
+      <a href="#benchmarking">Benchmarking</a>
+      <a href="#state-machines">States</a>
+      <a href="#api-reference">API</a>
+      <a href="#database">Database</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#release-checklist">Release</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="overview">
+  <h1>Flash-Sale Concurrency Engine</h1>
+  <p>A Spring Boot backend reliability lab for stock deduction under concurrent flash-sale load. The ticket domain is the fixture; the project is <strong>not</strong> a full ticket-sales product.</p>
+  <div class="stat-row">
+    <div class="stat-card"><div class="label">Java</div><div class="value">21</div></div>
+    <div class="stat-card"><div class="label">Spring Boot</div><div class="value">3.3.5</div></div>
+    <div class="stat-card"><div class="label">App Port</div><div class="value">1122</div></div>
+    <div class="stat-card"><div class="label">Frontend</div><div class="value">Next.js 16</div></div>
+    <div class="stat-card"><div class="label">Strategies</div><div class="value">4</div></div>
+    <div class="stat-card"><div class="label">Kafka</div><div class="value">3.9.0</div></div>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- ═══ OVERVIEW ═══ -->
+<h2>📋 Project Overview</h2>
+
+<div class="card-grid cols-4">
+  <div class="card"><h3>🔧 Backend</h3><p>Java 21, Spring Boot 3.3.5, five Maven modules, port <code>1122</code>, virtual threads enabled.</p></div>
+  <div class="card"><h3>📡 API Docs</h3><p>Springdoc 2.6.0 — Swagger UI, OpenAPI JSON, grouped lab API.</p></div>
+  <div class="card"><h3>📊 Observability</h3><p>Actuator: <code>health</code>, <code>prometheus</code>, <code>metrics</code>. Details hidden by default.</p></div>
+  <div class="card"><h3>📨 Messaging</h3><p>Kafka 3.9.0 (KRaft) with transactional outbox for at-least-once delivery.</p></div>
+  <div class="card"><h3>🚀 CI/CD</h3><p>CI: unit, integration, smoke, frontend, infra validation. CD: GHCR Docker push.</p></div>
+  <div class="card"><h3>🎛️ Dashboard</h3><p>Next.js 16.2.4 + React 19.2.4 operator dashboard. Proxy-allowlisted backend paths.</p></div>
+  <div class="card"><h3>📈 Benchmarking</h3><p>JMeter plan, smoke script, full runner, <code>experiment-spec.json</code> contract.</p></div>
+  <div class="card"><h3>✅ Verification</h3><p>Backend: Maven tests. Frontend: lint, typecheck, build.</p></div>
+</div>
+
+<h3>Runtime Surface</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Service</th><th>URL</th></tr></thead>
+<tbody>
+  <tr><td>Backend API</td><td><code>http://localhost:1122</code></td></tr>
+  <tr><td>Swagger UI</td><td><code>http://localhost:1122/swagger-ui.html</code></td></tr>
+  <tr><td>OpenAPI JSON</td><td><code>http://localhost:1122/v3/api-docs</code></td></tr>
+  <tr><td>Grouped lab API</td><td><code>http://localhost:1122/v3/api-docs/lab-api</code></td></tr>
+  <tr><td>Health check</td><td><code>http://localhost:1122/actuator/health</code></td></tr>
+  <tr><td>Prometheus</td><td><code>http://localhost:1122/actuator/prometheus</code></td></tr>
+  <tr><td>Actuator metrics</td><td><code>http://localhost:1122/actuator/metrics</code></td></tr>
+  <tr><td>Frontend</td><td><code>http://localhost:3000</code></td></tr>
+  <tr><td>MySQL</td><td><code>localhost:3316</code>, db <code>vetautet</code></td></tr>
+  <tr><td>Redis</td><td><code>localhost:6319</code></td></tr>
+  <tr><td>Kafka</td><td><code>localhost:9094</code></td></tr>
+</tbody>
+</table></div>
+
+<h3>Verification Commands</h3>
+<pre><code># Backend unit &amp; integration tests
+mvn -pl app/backend/xxxx-start -am test
+mvn -pl app/backend/xxxx-start -am "-Dflashsale.integration=true" test
+
+# Frontend
+cd app/frontend && npm run lint && npm run typecheck && npm run build
+
+# Benchmark smoke
+powershell -ExecutionPolicy Bypass -File benchmark/smoke-local.ps1
+
+# JMeter benchmark
+powershell -ExecutionPolicy Bypass -File benchmark/run-jmeter.ps1 -Strategy REDIS_LUA_WITH_COMPENSATION</code></pre>
+
+<h3>Reading Paths</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Role</th><th>Start Here</th><th>Then Read</th></tr></thead>
+<tbody>
+  <tr><td>Reviewer / Interviewer</td><td>Reviewer Guide</td><td>Source Status, Benchmark Results, Architecture</td></tr>
+  <tr><td>Backend Developer</td><td>Architecture</td><td>API Reference, Concurrency &amp; Consistency</td></tr>
+  <tr><td>Operator / SRE</td><td>Lab Operations</td><td>Dashboard Guide, Release Checklist</td></tr>
+  <tr><td>Self-study</td><td>Learning Path Index</td><td>Program Overview, Progress Tracker</td></tr>
+</tbody>
+</table></div>
+
+
+<!-- ═══ PROJECT CONTEXT ═══ -->
+<h2 id="project-context">🎯 Project Context</h2>
+
+<div class="card-grid cols-4">
+  <div class="card"><h3>Goal 1</h3><p>Prove overselling prevented for safe strategies — <code>oversoldCount = 0</code></p></div>
+  <div class="card"><h3>Goal 2</h3><p>Prove Redis-DB consistency achievable — <code>driftAmount = 0</code> for compensated strategy</p></div>
+  <div class="card"><h3>Goal 3</h3><p>Compare 4 strategies with measurable trade-offs — throughput, latency, oversold, drift</p></div>
+  <div class="card"><h3>Goal 4</h3><p>Reproducible benchmark evidence — <code>experiment-spec.json</code> + JMeter + saved manifests</p></div>
+  <div class="card"><h3>Goal 5</h3><p>Reliable event publishing — at-least-once via transactional outbox → Kafka</p></div>
+  <div class="card"><h3>Non-Goals</h3><p>No payment, checkout, fulfillment, buyer accounts, consumer UI, or production auth</p></div>
+</div>
+
+<h3>Key Architecture Decisions</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Decision</th><th>Rationale</th><th>ADR</th></tr></thead>
+<tbody>
+  <tr><td>Transactional Outbox → Kafka</td><td>At-least-once without 2PC</td><td><a href="#adrs">ADR-001</a></td></tr>
+  <tr><td>Strategy Pattern for Stock Deduction</td><td>4 interchangeable algorithms, auto-registered</td><td><a href="#adrs">ADR-002</a></td></tr>
+  <tr><td>Redis as Fast Gate (not source of truth)</td><td>MySQL durable truth; Redis low-latency gating</td><td><a href="#adrs">ADR-003</a></td></tr>
+  <tr><td>Virtual Threads (Java 21)</td><td>High-throughput without reactive complexity</td><td>—</td></tr>
+  <tr><td>DDD-Layered Modular Monolith</td><td>Clear domain/application/infrastructure boundaries</td><td>—</td></tr>
+  <tr><td>Monthly Order Tables</td><td>Avoids single-table hot spots</td><td>—</td></tr>
+</tbody>
+</table></div>
+
+<h3>Constraints</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Layer</th><th>Technology</th></tr></thead>
+<tbody>
+  <tr><td>Language</td><td>Java 21</td></tr>
+  <tr><td>Framework</td><td>Spring Boot 3.3.5</td></tr>
+  <tr><td>Database</td><td>MySQL 8.0 (source of truth)</td></tr>
+  <tr><td>Cache</td><td>Redis 7 (fast gate)</td></tr>
+  <tr><td>Messaging</td><td>Apache Kafka 3.9.0 (KRaft)</td></tr>
+  <tr><td>Build</td><td>Maven multi-module</td></tr>
+  <tr><td>Testing</td><td>JUnit 5, Testcontainers, JMeter</td></tr>
+  <tr><td>Frontend</td><td>Next.js 16.2.4 (operator dashboard)</td></tr>
+  <tr><td>CI/CD</td><td>GitHub Actions, GHCR</td></tr>
+</tbody>
+</table></div>
+
+<h3>Assumptions</h3>
+<ul>
+  <li><strong>A-001:</strong> Local Docker Desktop available for MySQL, Redis, Kafka</li>
+  <li><strong>A-002:</strong> Benchmarks run on single machine — throughput is directional</li>
+  <li><strong>A-003:</strong> Fixture <code>ticketItemId=4</code>, <code>stock=1000</code> sufficient for comparison</li>
+  <li><strong>A-004:</strong> Kafka optional for core order flow (outbox degrades gracefully)</li>
+  <li><strong>A-005:</strong> Admin endpoints not exposed to public networks</li>
+</ul>
+
+<!-- ═══ SOURCE STATUS ═══ -->
+<h2 id="source-status">📊 Source Status</h2>
+
+<h3>Status Summary</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Area</th><th>Current Status</th><th>Canonical Source</th></tr></thead>
+<tbody>
+  <tr><td>Project type</td><td>Backend flash-sale concurrency lab</td><td><code>README.md</code></td></tr>
+  <tr><td>Backend modules</td><td>Five Maven: domain, application, infrastructure, controller, start</td><td><code>pom.xml</code></td></tr>
+  <tr><td>Backend runtime</td><td>Java 21, Spring Boot 3.3.5, port <code>1122</code>, virtual threads</td><td><code>application.yml</code></td></tr>
+  <tr><td>API documentation</td><td>Springdoc 2.6.0</td><td><code>OpenApiConfig.java</code></td></tr>
+  <tr><td>Actuator</td><td><code>health</code>, <code>prometheus</code>, <code>metrics</code>; details hidden</td><td><code>application.yml</code></td></tr>
+  <tr><td>Kafka + Outbox</td><td>Transactional outbox to <code>flashsale.orders</code></td><td><code>OutboxService.java</code></td></tr>
+  <tr><td>CD pipeline</td><td>GHCR Docker push on master push</td><td><code>.github/workflows/cd.yml</code></td></tr>
+  <tr><td>Order strategies</td><td><code>UNSAFE_DB</code>, <code>CONDITIONAL_DB</code>, <code>REDIS_LUA</code>, <code>REDIS_LUA_WITH_COMPENSATION</code></td><td><code>OrderStrategy.java</code></td></tr>
+  <tr><td>Frontend</td><td>Next.js 16.2.4 operator dashboard</td><td><code>package.json</code></td></tr>
+  <tr><td>Benchmark</td><td>Reset → warmup → JMeter → consistency → save manifest</td><td><code>experiment-spec.json</code></td></tr>
+</tbody>
+</table></div>
+
+<h3>Backend Modules</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Module</th><th>Role</th></tr></thead>
+<tbody>
+  <tr><td><code>xxxx-domain</code></td><td>Domain entities, repository ports, domain services</td></tr>
+  <tr><td><code>xxxx-application</code></td><td>Orchestration, strategies, idempotency, benchmark models</td></tr>
+  <tr><td><code>xxxx-application</code> (MQ)</td><td>Outbox (<code>OutboxService</code>, <code>OutboxPublishScheduler</code>)</td></tr>
+  <tr><td><code>xxxx-infrastructure</code></td><td>MySQL adapters, Redis adapters, Kafka outbox persistence, Redisson</td></tr>
+  <tr><td><code>xxxx-controller</code></td><td>HTTP controllers, <code>ResultMessage&lt;T&gt;</code> envelope</td></tr>
+  <tr><td><code>xxxx-start</code></td><td>Entrypoint, OpenAPI config, scheduling, integration tests</td></tr>
+</tbody>
+</table></div>
+
+<h3>Docker Profiles</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Profile</th><th>Services</th></tr></thead>
+<tbody>
+  <tr><td>default</td><td>MySQL, Redis, Kafka (KRaft mode)</td></tr>
+  <tr><td><code>observability</code></td><td>Prometheus, Grafana, node exporter, MySQL exporter, Redis exporter</td></tr>
+  <tr><td><code>elk</code></td><td>Elasticsearch, Logstash, Kibana</td></tr>
+</tbody>
+</table></div>
+<p>Production: <code>docker-compose.prod.yml</code> with GHCR images from CD pipeline.</p>
+
+<h3>Messaging &amp; Outbox</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>Status</th></tr></thead>
+<tbody>
+  <tr><td>Broker</td><td>Apache Kafka 3.9.0, KRaft mode (no ZooKeeper)</td></tr>
+  <tr><td>Bootstrap (dev / prod)</td><td><code>localhost:9094</code> / <code>kafka:9092</code></td></tr>
+  <tr><td>Topic</td><td><code>flashsale.orders</code> (configurable via <code>KAFKA_TOPIC</code>)</td></tr>
+  <tr><td>Producer</td><td>String serializer, <code>acks=all</code></td></tr>
+  <tr><td>Batch size</td><td>50 events per scheduler tick</td></tr>
+  <tr><td>Retry</td><td>10s delay, max 5 attempts</td></tr>
+  <tr><td>Metrics</td><td><code>outbox.publish.{success,failure,latency}</code>, <code>outbox.backlog.{pending,failed}</code></td></tr>
+</tbody>
+</table></div>
+
+<div class="table-wrap"><table>
+<thead><tr><th>Event</th><th>Triggered by</th></tr></thead>
+<tbody>
+  <tr><td><code>ORDER_CREATED</code></td><td><code>OrderCreationService</code> after order persistence</td></tr>
+  <tr><td><code>RECONCILIATION</code></td><td><code>OrderReconciliationService</code> on drift repair</td></tr>
+</tbody>
+</table></div>
+
+<h3>API Surface</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Route</th><th>Purpose</th></tr></thead>
+<tbody>
+  <tr><td><code>POST /orders</code></td><td>Create order with selected strategy</td></tr>
+  <tr><td><code>GET /orders</code></td><td>List user orders by <code>userId</code> &amp; <code>yearMonth</code></td></tr>
+  <tr><td><code>GET /orders/{orderNumber}</code></td><td>Read one order trace</td></tr>
+  <tr><td><code>GET /tickets/{ticketItemId}</code></td><td>Read fixture ticket item</td></tr>
+  <tr><td><code>POST /admin/tickets/{id}/stock/warmup</code></td><td>Warm Redis from DB</td></tr>
+  <tr><td><code>POST /admin/benchmarks/reset</code></td><td>Reset stock, orders, idempotency cache</td></tr>
+  <tr><td><code>GET /admin/benchmarks/consistency</code></td><td>Redis vs DB drift snapshot</td></tr>
+  <tr><td><code>POST /admin/benchmarks/reconcile</code></td><td>Force Redis back to DB truth</td></tr>
+  <tr><td><code>GET /admin/benchmarks/runs</code></td><td>List saved run manifests</td></tr>
+  <tr><td><code>GET /admin/benchmarks/runs/{runId}</code></td><td>Read one run manifest</td></tr>
+</tbody>
+</table></div>
+
+<h3>Frontend Proxy Allowlist</h3>
+<ul>
+  <li><code>GET /actuator/health</code> &middot; <code>GET /tickets/{id}</code> &middot; <code>POST /admin/benchmarks/reset</code></li>
+  <li><code>POST /admin/tickets/{id}/stock/warmup</code> &middot; <code>GET /admin/benchmarks/consistency</code></li>
+  <li><code>GET /admin/benchmarks/runs</code> &middot; <code>GET /admin/benchmarks/runs/{runId}</code></li>
+  <li><code>POST /orders</code> &middot; <code>GET /orders</code> &middot; <code>GET /orders/{orderNumber}</code></li>
+</ul>
+<p style="color: var(--text-muted); font-size: 0.82rem;"><code>POST /admin/benchmarks/reconcile</code> exists in backend but not forwarded by dashboard proxy.</p>
+
+<h3>Benchmark Artifacts</h3>
+<pre><code>benchmark/results/{Strategy}-{yyyyMMdd-HHmmss}/
+  reset.json  warmup.json  results.jtl  html/index.html
+  consistency.json  run.json  summary-row.md</code></pre>
+<p>Defaults: <code>ticketItemId=4</code>, <code>stock=1000</code>, <code>totalRequests=5000</code>, <code>concurrency=100</code>, strategy <code>REDIS_LUA_WITH_COMPENSATION</code>.</p>
+
+<h3>Known Boundaries</h3>
+<ul>
+  <li>Backend reliability lab — not a complete ticket sales or e-commerce product.</li>
+  <li>Admin endpoints are local controls without product-grade auth.</li>
+  <li>Payment, checkout, fulfillment, notifications are outside current scope.</li>
+  <li>Dashboard is an operator surface only.</li>
+</ul>
+
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<h2 id="architecture">🏗️ Architecture</h2>
+
+<h3>Runtime Stack</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Component</th><th>Setting</th></tr></thead>
+<tbody>
+  <tr><td>Java</td><td>21</td></tr>
+  <tr><td>Spring Boot</td><td><code>3.3.5</code></td></tr>
+  <tr><td>Springdoc</td><td><code>2.6.0</code></td></tr>
+  <tr><td>Backend port</td><td><code>1122</code></td></tr>
+  <tr><td>MySQL</td><td><code>localhost:3316</code>, db <code>vetautet</code></td></tr>
+  <tr><td>Redis</td><td><code>localhost:6319</code></td></tr>
+  <tr><td>Kafka</td><td><code>localhost:9094</code>, KRaft, topic <code>flashsale.orders</code></td></tr>
+  <tr><td>Tomcat</td><td>Virtual threads, max 500, min-spare 50</td></tr>
+  <tr><td>Frontend</td><td>Next.js 16 on <code>localhost:3000</code></td></tr>
+</tbody>
+</table></div>
+
+<h3>Main Order Flow</h3>
+<pre><code>TicketOrderController.createOrder
+  → TicketOrderAppServiceImpl.createOrder
+  → OrderCreationService.createOrder
+    → validateCreateOrderRequest
+    → IdempotencyService.getOrCreate(userId:idempotencyKey)
+    → StockDeductionStrategyRegistry.get(strategy)
+    → selected StockDeductionStrategy.decrease
+    → OrderDeductionDomainService.ensureMonthlyOrderTable(yearMonth)
+    → OrderDeductionDomainService.insertOrder(yearMonth, order)
+    → OutboxService.record("Order", orderNumber, "ORDER_CREATED", response)
+  → ResultMessage&lt;CreateOrderResponse&gt;</code></pre>
+
+<h3>Stock Strategies</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>Implementation</th><th>Key dependency</th></tr></thead>
+<tbody>
+  <tr><td><code>UNSAFE_DB</code></td><td>UnsafeDbStockDeductionStrategy</td><td>MySQL unconditional update</td></tr>
+  <tr><td><code>CONDITIONAL_DB</code></td><td>ConditionalDbStockDeductionStrategy</td><td>MySQL conditional update</td></tr>
+  <tr><td><code>REDIS_LUA</code></td><td>RedisLuaStockDeductionStrategy</td><td>Redis Lua gate + DB update</td></tr>
+  <tr><td><code>REDIS_LUA_WITH_COMPENSATION</code></td><td>RedisLuaCompensatingStockDeductionStrategy</td><td>Redis Lua + DB + Redis restore</td></tr>
+</tbody>
+</table></div>
+
+<h3>Storage</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Table</th><th>Role</th></tr></thead>
+<tbody>
+  <tr><td><code>ticket</code></td><td>Event fixture</td></tr>
+  <tr><td><code>ticket_item</code></td><td>Stock fixture; <code>stock_available</code> mutated</td></tr>
+  <tr><td><code>ticket_order_YYYYMM</code></td><td>Monthly order table, created on demand</td></tr>
+  <tr><td><code>ticket_order_details_YYYYMM</code></td><td>Detail fixture from seed data</td></tr>
+</tbody>
+</table></div>
+<pre><code>-- Safe DB predicate
+UPDATE TicketDetail t
+SET t.stockAvailable = t.stockAvailable - :quantity
+WHERE t.id = :ticketId AND t.stockAvailable >= :quantity</code></pre>
+<p>Redis key: <code>TICKET:{ticketItemId}:STOCK</code>. Redis is the fast gate/cache; MySQL is durable truth.</p>
+
+<h3>Consistency</h3>
+<pre><code>initialStock = dbStockAfter + dbOrderCount
+expectedRedisStock = initialStock - dbOrderCount
+driftAmount = redisStockAfter - expectedRedisStock
+oversoldCount = max(0, -dbStockAfter)</code></pre>
+<p>Healthy compensated run: <code>oversoldCount=0</code>, <code>redisDbInconsistencyCount=0</code>.</p>
+<p><code>OrderReconciliationService</code> runs every 30s after 10s initial delay for ticket <code>4</code>.</p>
+
+<h3>Messaging — Kafka &amp; Outbox</h3>
+<pre><code>OrderCreationService (within @Transactional)
+  → domain change persisted to MySQL
+  → OutboxService.record() writes event row atomically
+OutboxPublishScheduler (every 1s)
+  → reads pending batch (50 per tick)
+  → KafkaTemplate → topic flashsale.orders
+  → marks PUBLISHED or FAILED (retryable, max 5 attempts)</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Property</th><th>Default</th></tr></thead>
+<tbody>
+  <tr><td><code>app.kafka.topic</code></td><td><code>flashsale.orders</code></td></tr>
+  <tr><td><code>app.outbox.publish-batch-size</code></td><td><code>50</code></td></tr>
+  <tr><td><code>app.outbox.retry-delay</code></td><td><code>10s</code></td></tr>
+  <tr><td><code>app.outbox.max-attempts</code></td><td><code>5</code></td></tr>
+</tbody>
+</table></div>
+
+<h3>CI/CD</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Job</th><th>Validates</th></tr></thead>
+<tbody>
+  <tr><td>Backend — Unit Tests</td><td><code>mvn test</code> for app, controller, infra</td></tr>
+  <tr><td>Backend — Integration Tests</td><td>Docker-gated Testcontainers</td></tr>
+  <tr><td>Backend — Package JAR</td><td>Builds &amp; uploads fat JAR</td></tr>
+  <tr><td>Observability Smoke</td><td>Health, Prometheus, log format</td></tr>
+  <tr><td>Frontend — Checks</td><td>Lint, typecheck, build</td></tr>
+  <tr><td>Infra — Validation</td><td>Compose, Prometheus, ELK, Nginx, Redis Sentinel</td></tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead><tr><th>Image</th><th>GHCR Path</th></tr></thead>
+<tbody>
+  <tr><td>Backend</td><td><code>ghcr.io/qwan30/flashsale-backend:latest</code></td></tr>
+  <tr><td>Frontend</td><td><code>ghcr.io/qwan30/flashsale-frontend:latest</code></td></tr>
+</tbody>
+</table></div>
+
+<h3>Observability</h3>
+<pre><code>GET /actuator/health
+GET /actuator/prometheus
+GET /actuator/metrics
+
+flashsale.orders{strategy,result}
+flashsale.reconciliation{action,direction}
+outbox.publish.{success,failure,latency}
+outbox.backlog.{pending,failed}
+
+@Observed: order.create, stock.warmup, benchmark.reset, consistency.check</code></pre>
+
+
+<!-- ═══ ADRs ═══ -->
+<h2 id="adrs">📋 Architecture Decision Records</h2>
+
+<div class="card-grid cols-4">
+  <div class="card">
+    <h3>ADR-001: Kafka Outbox</h3>
+    <p><span class="badge badge-green">Accepted</span> &middot; 2026-05-31</p>
+    <p>Transactional Outbox pattern for reliable event publishing. Events written atomically with domain changes, async published via scheduler. At-least-once delivery with retry.</p>
+  </div>
+  <div class="card">
+    <h3>ADR-002: Strategy Pattern</h3>
+    <p><span class="badge badge-green">Accepted</span> &middot; 2026-04-27</p>
+    <p>Strategy + Registry pattern for stock deduction. 4 interchangeable algorithms auto-registered via <code>@Component</code>. Type-safe EnumMap lookup per request.</p>
+  </div>
+  <div class="card">
+    <h3>ADR-003: Redis as Gate</h3>
+    <p><span class="badge badge-green">Accepted</span> &middot; 2026-04-27</p>
+    <p>MySQL is durable source of truth; Redis is fast gate/cache. Compensation + reconciliation repair drift. 2.5× throughput over DB-only with zero oversell.</p>
+  </div>
+  <div class="card">
+    <h3>ADR Template</h3>
+    <p>Use <code>04-architecture/adr/adr-template.md</code> for future architecture decisions.</p>
+  </div>
+</div>
+
+<!-- ═══ CONCURRENCY ═══ -->
+<h2 id="concurrency">⚙️ Concurrency &amp; Consistency</h2>
+
+<h3>Core Invariants</h3>
+<pre><code>dbStockAfter >= 0          oversoldCount = 0          dbOrderCount <= initialStock</code></pre>
+<p>For <code>REDIS_LUA_WITH_COMPENSATION</code>: <code>redisStockAfter = dbStockAfter</code>, <code>driftAmount = 0</code>.</p>
+<p><code>UNSAFE_DB</code> is intentionally allowed to violate these — it exists to make race conditions visible.</p>
+
+<h3>Strategy Comparison</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>Oversell safety</th><th>Redis drift behavior</th></tr></thead>
+<tbody>
+  <tr><td><code>UNSAFE_DB</code></td><td><span class="badge badge-red">no</span></td><td>n/a</td></tr>
+  <tr><td><code>CONDITIONAL_DB</code></td><td><span class="badge badge-green">yes</span></td><td>Redis may differ if warmed but unused</td></tr>
+  <tr><td><code>REDIS_LUA</code></td><td><span class="badge badge-green">yes</span> (normal)</td><td>Can drift on DB/order failures</td></tr>
+  <tr><td><code>REDIS_LUA_WITH_COMPENSATION</code></td><td><span class="badge badge-green">yes</span></td><td>Restores Redis on known failures</td></tr>
+</tbody>
+</table></div>
+
+<div class="strategy-grid">
+  <div class="strategy-card">
+    <div class="name"><span class="badge badge-red">UNSAFE_DB</span></div>
+    <div class="desc">DB decrement without stock predicate. Race-condition baseline — overselling is expected evidence.</div>
+    <pre style="margin-top:8px;"><code>UPDATE ticket_item
+SET stock_available = stock_available - :qty
+WHERE id = :ticketItemId</code></pre>
+  </div>
+  <div class="strategy-card">
+    <div class="name"><span class="badge badge-green">CONDITIONAL_DB</span></div>
+    <div class="desc">Single atomic check-and-deduct. Zero affected rows = clean rejection.</div>
+    <pre style="margin-top:8px;"><code>UPDATE ticket_item
+SET stock_available = stock_available - :qty
+WHERE id = :id AND stock_available >= :qty</code></pre>
+  </div>
+  <div class="strategy-card">
+    <div class="name"><span class="badge badge-blue">REDIS_LUA</span></div>
+    <div class="desc">Redis Lua gate first, then DB. Fast rejection, but no compensation on failure.</div>
+    <pre style="margin-top:8px;"><code>1. Lua decrement Redis atomically
+2. Reject if Redis < quantity
+3. DB conditional update
+4. No restore on failure</code></pre>
+  </div>
+  <div class="strategy-card">
+    <div class="name"><span class="badge badge-green">REDIS_LUA + COMP</span></div>
+    <div class="desc">Redis Lua + DB + immediate restore. Preferred strategy for demos.</div>
+    <pre style="margin-top:8px;"><code>1. Lua decrement Redis
+2. DB conditional update
+3. Restore Redis if DB rejects
+4. Compensation flag for order insert fail
+5. Scheduled reconcile for double-fault</code></pre>
+  </div>
+</div>
+
+<h3>Reconciliation</h3>
+<pre><code>1. Read Redis stock     4. If drift != 0, set Redis = DB
+2. Read DB stock        5. Emit flashsale.reconciliation metric
+3. drift = redis - db   6. Publish RECONCILIATION event via outbox → Kafka</code></pre>
+<p>Scheduled every 30s (10s initial delay) for default ticket item <code>4</code>. Manual: <code>POST /admin/benchmarks/reconcile</code>.</p>
+
+<h3>Failure Semantics</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Result code</th><th>Meaning</th><th>Recovery</th></tr></thead>
+<tbody>
+  <tr><td><code>INVALID_REQUEST</code></td><td>Missing/invalid request field</td><td>Fix request</td></tr>
+  <tr><td><code>REDIS_STOCK_UNAVAILABLE</code></td><td>Redis key missing or insufficient</td><td>Reset + warmup</td></tr>
+  <tr><td><code>DB_STOCK_DECREMENT_FAILED</code></td><td>DB conditional update rejected</td><td>Check stock, strategy, consistency</td></tr>
+  <tr><td><code>ORDER_CREATE_FAILED</code></td><td>Stock OK but insert failed</td><td>Check consistency, reconcile</td></tr>
+  <tr><td><code>WARMUP_FAILED</code></td><td>Could not read DB stock</td><td>Verify fixture data</td></tr>
+</tbody>
+</table></div>
+
+<h3>Reviewer Interpretation</h3>
+<ul>
+  <li><code>UNSAFE_DB</code> — overselling proves the race condition.</li>
+  <li><code>CONDITIONAL_DB</code> — simplest DB-safe baseline.</li>
+  <li><code>REDIS_LUA</code> — fast Redis gating, drift becomes visible.</li>
+  <li><code>REDIS_LUA_WITH_COMPENSATION</code> — best demo: fast rejection + practical repair.</li>
+  <li>Throughput = local evidence; rerun on target machine before publishing claims.</li>
+</ul>
+
+
+<!-- ═══ BENCHMARKING ═══ -->
+<h2 id="benchmarking">📈 Benchmarking &amp; Lab Operations</h2>
+
+<h3>Prerequisites</h3>
+<ul><li>Java 21, Maven, Docker Desktop, PowerShell (Windows), JMeter under <code>benchmark/jmeter</code></li></ul>
+
+<h3>Start Services</h3>
+<pre><code>docker compose -f environment/docker-compose-dev.yml up -d
+# Optional: --profile observability</code></pre>
+
+<h3>Build &amp; Run</h3>
+<pre><code>mvn -pl app/backend/xxxx-start -am -DskipTests package
+java -jar app/backend/xxxx-start/target/xxxx-start-1.0-SNAPSHOT.jar</code></pre>
+
+<h3>Experiment Contract</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Field</th><th>Default</th></tr></thead>
+<tbody>
+  <tr><td><code>baseUrl</code></td><td><code>http://localhost:1122</code></td></tr>
+  <tr><td><code>ticketItemId</code></td><td><code>4</code></td></tr>
+  <tr><td><code>stock</code></td><td><code>1000</code></td></tr>
+  <tr><td><code>totalRequests</code></td><td><code>5000</code></td></tr>
+  <tr><td><code>concurrency</code></td><td><code>100</code></td></tr>
+  <tr><td>strategy</td><td><code>REDIS_LUA_WITH_COMPENSATION</code></td></tr>
+</tbody>
+</table></div>
+<p>Standard cycle: <strong>Reset → Warm Redis → Run requests → Check consistency → Save evidence</strong></p>
+
+<h3>Smoke &amp; Benchmark</h3>
+<pre><code>powershell -ExecutionPolicy Bypass -File benchmark/smoke-local.ps1
+
+powershell -ExecutionPolicy Bypass -File benchmark/run-jmeter.ps1 `
+  -Strategy REDIS_LUA_WITH_COMPENSATION -Threads 100 -TotalRequests 5000 -Stock 1000</code></pre>
+
+<h3>Latest Local Benchmark (2026-05-31, ACER)</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Strategy</th><th>Throughput</th><th>Avg ms</th><th>P95</th><th>Success</th><th>Failed</th><th>Oversold</th><th>Drift</th></tr></thead>
+<tbody>
+  <tr><td><code>UNSAFE_DB</code></td><td>84.71</td><td>1084.86</td><td>1778</td><td>5000</td><td>0</td><td><span class="badge badge-red">4000</span></td><td><span class="badge badge-amber">1</span></td></tr>
+  <tr><td><code>CONDITIONAL_DB</code></td><td>173.08</td><td>494.35</td><td>741</td><td>1000</td><td>4000</td><td><span class="badge badge-green">0</span></td><td><span class="badge badge-green">0</span></td></tr>
+  <tr><td><code>REDIS_LUA</code></td><td>226.25</td><td>361.33</td><td>829</td><td>1000</td><td>4000</td><td><span class="badge badge-green">0</span></td><td><span class="badge badge-green">0</span></td></tr>
+  <tr style="background:#f0fdf4;"><td><code>REDIS_LUA_WITH_COMPENSATION</code></td><td><strong>443.03</strong></td><td><strong>165.95</strong></td><td><strong>492</strong></td><td>1000</td><td>4000</td><td><span class="badge badge-green">0</span></td><td><span class="badge badge-green">0</span></td></tr>
+</tbody>
+</table></div>
+
+<h3>Manual Lab Cycle</h3>
+<pre><code># Reset
+curl -X POST http://localhost:1122/admin/benchmarks/reset \
+  -H "Content-Type: application/json" \
+  -d "{\"ticketItemId\":4,\"stock\":1000,\"yearMonth\":\"202604\"}"
+
+# Warm Redis
+curl -X POST http://localhost:1122/admin/tickets/4/stock/warmup
+
+# Create order
+curl -X POST http://localhost:1122/orders \
+  -H "Content-Type: application/json" \
+  -d "{\"ticketItemId\":4,\"userId\":42,\"quantity\":1,\"strategy\":\"REDIS_LUA_WITH_COMPENSATION\",\"idempotencyKey\":\"manual-1\"}"
+
+# Consistency check
+curl "http://localhost:1122/admin/benchmarks/consistency?ticketItemId=4&yearMonth=202604"
+
+# Reconcile
+curl -X POST "http://localhost:1122/admin/benchmarks/reconcile?ticketItemId=4&yearMonth=202604"</code></pre>
+
+<h3>Troubleshooting</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Symptom</th><th>Check</th></tr></thead>
+<tbody>
+  <tr><td>Docker connection error</td><td>Start Docker Desktop first</td></tr>
+  <tr><td><code>/orders</code> returns Redis unavailable</td><td>Run reset + warmup; confirm Redis running</td></tr>
+  <tr><td>Kafka connection refused</td><td>Confirm Kafka in compose; check <code>KAFKA_BOOTSTRAP_SERVERS</code></td></tr>
+  <tr><td>Outbox backlog growing</td><td>Check Kafka connectivity; inspect <code>outbox.backlog.pending</code></td></tr>
+  <tr><td>High <code>redisDbInconsistencyCount</code></td><td>Check strategy, run manual reconcile</td></tr>
+  <tr><td><code>oversoldCount > 0</code></td><td>Confirm not <code>UNSAFE_DB</code>; reset before next run</td></tr>
+</tbody>
+</table></div>
+
+
+<!-- ═══ STATE MACHINES ═══ -->
+<h2 id="state-machines">🔄 State Machines</h2>
+
+<h3>OutboxEvent Lifecycle</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>State</th><th>Entry</th><th>Purpose</th></tr></thead>
+<tbody>
+  <tr><td><code>PENDING</code></td><td><code>record()</code> within <code>@Transactional</code></td><td>Awaiting first publish attempt</td></tr>
+  <tr><td><code>PUBLISHED</code></td><td>Kafka send OK</td><td>Delivered to Kafka</td></tr>
+  <tr><td><code>FAILED</code></td><td>Kafka error/timeout</td><td>Retryable or terminal after 5 attempts</td></tr>
+</tbody>
+</table></div>
+<pre><code>PENDING → publishPendingEvents() → PUBLISHED (Kafka OK) | FAILED (error)
+FAILED → retryFailedEvents() → PENDING (after 10s, attempts < 5)
+FAILED → TERMINAL (attempts ≥ 5)</code></pre>
+
+<h3>Stock Lifecycle</h3>
+<pre><code>INITIAL → WARM (warmupStock) → DECREMENTING (strategy.decrease)
+  → SOLD_OUT (stock=0) | OVERSOLD (stock<0, UNSAFE_DB only)
+  → DRIFTED (Redis≠DB) → WARM (reconcile)</code></pre>
+
+<h3>Benchmark Run</h3>
+<pre><code>RESET → WARMED → RUNNING → COMPLETED → CHECKED → SAVED</code></pre>
+
+<h3>Reconciliation</h3>
+<pre><code>IDLE (every 30s) → CHECK (getConsistency)
+  → drift=0 → IDLE
+  → drift≠0 → REPAIR (setStockCache) + outbox RECONCILIATION event → IDLE</code></pre>
+
+<!-- ═══ API REFERENCE ═══ -->
+<h2 id="api-reference">🔌 API Reference</h2>
+
+<h3>Response Envelope</h3>
+<pre><code>{ "success": true, "message": "success", "code": 200, "timestamp": 1777280000000, "result": {} }</code></pre>
+<div class="table-wrap"><table>
+<thead><tr><th>Case</th><th>HTTP</th><th>Code</th></tr></thead>
+<tbody>
+  <tr><td>Valid request, order created</td><td><code>200</code></td><td><code>200</code></td></tr>
+  <tr><td>Invalid request body/field</td><td><code>400</code></td><td><code>400</code> / <code>INVALID_REQUEST</code></td></tr>
+  <tr><td>Business rejection</td><td><code>200</code></td><td><code>409</code></td></tr>
+</tbody>
+</table></div>
+
+<h3>Create Order</h3>
+<pre><code>POST /orders
+{
+  "ticketItemId": 4, "userId": 42, "quantity": 1,
+  "strategy": "REDIS_LUA_WITH_COMPENSATION",
+  "idempotencyKey": "user-42-run-1"
+}</code></pre>
+<p>Validation: all fields required. <code>ticketItemId</code>/<code>userId</code>/<code>quantity</code> positive. <code>strategy</code> must be supported enum. <code>idempotencyKey</code> non-empty.</p>
+
+<h3>Order Query</h3>
+<pre><code>GET /orders?userId=42&yearMonth=202604
+GET /orders/{orderNumber}</code></pre>
+
+<h3>Ticket APIs</h3>
+<pre><code>GET /tickets/{ticketItemId}
+GET /ticket/{ticketId}/detail/{detailId}?version={version}
+GET /ticket/ping/java  →  { "status": "OK" }  (1s delay)</code></pre>
+
+<h3>Admin Benchmark</h3>
+<pre><code>POST /admin/tickets/{id}/stock/warmup
+POST /admin/benchmarks/reset  { "ticketItemId":4, "stock":1000, "yearMonth":"202604" }
+GET  /admin/benchmarks/consistency?ticketItemId=4&yearMonth=202604
+POST /admin/benchmarks/reconcile?ticketItemId=4&yearMonth=202604
+GET  /admin/benchmarks/runs
+GET  /admin/benchmarks/runs/{runId}</code></pre>
+
+<h3>Deprecated Routes</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Route</th><th>Replacement</th></tr></thead>
+<tbody>
+  <tr><td><code>GET /order/{id}/{qty}/order</code></td><td><code>POST /orders</code> with <code>UNSAFE_DB</code></td></tr>
+  <tr><td><code>GET /order/{id}/{qty}/cas</code></td><td><code>POST /orders</code> with current strategy</td></tr>
+  <tr><td><code>GET /order/{userId}/list?ntable=</code></td><td><code>GET /orders?userId=&yearMonth=</code></td></tr>
+  <tr><td><code>GET /order/{userId}/{orderNumber}</code></td><td><code>GET /orders/{orderNumber}</code></td></tr>
+</tbody>
+</table></div>
+
+
+<!-- ═══ DATABASE ═══ -->
+<h2 id="database">🗄️ Database Schema &amp; ERD</h2>
+
+<h3>Core Tables</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Table</th><th>Role</th><th>Key Columns</th></tr></thead>
+<tbody>
+  <tr><td><code>ticket</code></td><td>Event fixture</td><td>PK <code>id</code>, name, start_time, status</td></tr>
+  <tr><td><code>ticket_item</code></td><td>Stock fixture</td><td>PK <code>id</code>, <code>stock_available</code> (mutated), <code>stock_initial</code></td></tr>
+  <tr><td><code>ticket_order_YYYYMM</code></td><td>Monthly orders</td><td>PK <code>id</code>, UK <code>order_number</code>, FK→ticket_item</td></tr>
+  <tr><td><code>outbox_event</code></td><td>Outbox persistence</td><td>PK UUID, <code>status</code>, <code>payload</code>, indexed (status, created_at)</td></tr>
+</tbody>
+</table></div>
+
+<h3>Entity Relationships</h3>
+<pre><code>ticket 1──N ticket_item 1──N ticket_order_YYYYMM 1──N outbox_event</code></pre>
+
+<h3>Key Queries</h3>
+<pre><code>-- Safe deduction
+UPDATE ticket_item SET stock_available = stock_available - :qty
+WHERE id = :id AND stock_available >= :qty;
+
+-- Outbox drain
+SELECT * FROM outbox_event WHERE status = 'PENDING' ORDER BY created_at LIMIT 50;</code></pre>
+
+<h3>Concurrency Controls</h3>
+<ul>
+  <li><strong>Conditional UPDATE</strong> — atomic stock check-and-decrement</li>
+  <li><strong>InnoDB row-level locking</strong> — implicit in UPDATE statements</li>
+  <li><strong>Idempotency</strong> — in-memory cache prevents duplicate orders</li>
+  <li><strong>Outbox transactional write</strong> — atomic business + event persistence</li>
+</ul>
+
+<!-- ═══ DASHBOARD ═══ -->
+<h2 id="dashboard">🎛️ Dashboard Guide</h2>
+
+<p>Next.js 16.2.4 + React 19.2.4 operator dashboard — not a consumer product.</p>
+
+<h3>Routes</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Route</th><th>Purpose</th></tr></thead>
+<tbody>
+  <tr><td><code>/</code></td><td>Lab entry</td></tr>
+  <tr><td><code>/events</code></td><td>Fixture catalog</td></tr>
+  <tr><td><code>/events/{id}</code></td><td>Fixture detail</td></tr>
+  <tr><td><code>/booking</code></td><td>Controlled order probe</td></tr>
+  <tr><td><code>/my-orders</code></td><td>Monthly order browser</td></tr>
+  <tr><td><code>/orders/{orderNumber}</code></td><td>Order trace</td></tr>
+  <tr><td><code>/admin/control-desk</code></td><td>Reset, warmup, health, probes, consistency</td></tr>
+  <tr><td><code>/admin/benchmark</code></td><td>Run review</td></tr>
+  <tr><td><code>/admin/consistency</code></td><td>Redis/DB consistency view</td></tr>
+</tbody>
+</table></div>
+
+<h3>Screen Priorities</h3>
+<ol>
+  <li><strong>Control desk</strong> — reset, warm Redis, health, order probes, consistency checks.</li>
+  <li><strong>Benchmark report</strong> — throughput, latency, orders, oversold, drift.</li>
+  <li><strong>Consistency view</strong> — Redis vs DB stock, order count, oversold, drift.</li>
+  <li><strong>Order probe</strong> — single order with strategy + idempotency key.</li>
+  <li><strong>Order traces</strong> — monthly order rows by user and month.</li>
+</ol>
+
+<pre><code>cd app/frontend
+npm install
+copy .env.local.example .env.local
+npm run dev</code></pre>
+
+
+<!-- ═══ RELEASE CHECKLIST ═══ -->
+<h2 id="release-checklist">✅ Release Checklist</h2>
+
+<h3>Documentation</h3>
+<ul class="checklist">
+  <li>README.md points to current documentation map</li>
+  <li>SOURCE_STATUS.md matches Maven modules, runtime, frontend, benchmark, verification</li>
+  <li>API_REFERENCE.md matches controller routes, DTOs, envelope semantics</li>
+  <li>CONCURRENCY_AND_CONSISTENCY.md matches 4 OrderStrategy implementations + reconciliation</li>
+  <li>BENCHMARKING.md matches smoke-local.ps1, run-jmeter.ps1, experiment-spec.json</li>
+  <li>DASHBOARD_GUIDE.md describes operator surface</li>
+  <li>Compatibility pages point to replacements, no stale claims</li>
+</ul>
+
+<h3>API Visibility</h3>
+<ul class="checklist">
+  <li>Backend starts on <code>localhost:1122</code></li>
+  <li>Health: <code>/actuator/health</code></li>
+  <li>Actuator exposure: <code>health,prometheus,metrics</code>; details hidden</li>
+  <li>Swagger UI + OpenAPI + grouped lab API available</li>
+  <li>Prometheus metrics at <code>/actuator/prometheus</code></li>
+  <li>Dashboard proxy allowlist matches <code>api.ts</code></li>
+</ul>
+
+<h3>Build &amp; Tests</h3>
+<ul class="checklist">
+  <li><code>mvn -pl app/backend/xxxx-start -am test</code> passes</li>
+  <li><code>mvn -pl app/backend/xxxx-start -am "-Dflashsale.integration=true" test</code> passes</li>
+  <li>Frontend: <code>lint</code>, <code>typecheck</code>, <code>build</code> all pass</li>
+</ul>
+
+<h3>Benchmark</h3>
+<ul class="checklist">
+  <li>Smoke: <code>smoke-local.ps1</code> passes</li>
+  <li>JMeter: <code>run-jmeter.ps1 -Strategy REDIS_LUA_WITH_COMPENSATION</code> completes</li>
+  <li><code>run.json</code> + <code>summary-row.md</code> exist</li>
+  <li><code>oversoldCount = 0</code> for safe strategies</li>
+  <li>Numbers labeled as local-machine evidence</li>
+</ul>
+
+<h3>GitNexus</h3>
+<ul class="checklist">
+  <li><code>npx gitnexus status</code> — re-analyze if stale</li>
+  <li>Change detection before commit; confirm scope is expected</li>
+</ul>
+
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div>
+        <h3>⚡ Flash-Sale Concurrency Engine</h3>
+        <p>Spring Boot backend reliability lab for stock deduction under concurrent flash-sale load.</p>
+        <p class="meta">Generated 2026-06-14 — docs synced to current source state.</p>
+      </div>
+      <div>
+        <h3>Runtime</h3>
+        <p>Java 21 · Spring Boot 3.3.5 · MySQL 8.0 · Redis 7 · Kafka 3.9.0 · Next.js 16.2.4</p>
+        <p class="meta">Backend :1122 · Frontend :3000</p>
+      </div>
+      <div>
+        <h3>Docs Index</h3>
+        <p><a href="#overview">Overview</a> · <a href="#source-status">Source Status</a> · <a href="#architecture">Architecture</a></p>
+        <p><a href="#concurrency">Concurrency</a> · <a href="#benchmarking">Benchmarking</a> · <a href="#api-reference">API</a></p>
+        <p><a href="#dashboard">Dashboard</a> · <a href="#release-checklist">Release</a></p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

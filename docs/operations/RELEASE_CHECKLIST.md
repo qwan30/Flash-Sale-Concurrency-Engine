@@ -18,7 +18,7 @@ Use this checklist before presenting the project, publishing a portfolio summary
 
 - [ ] Backend starts on `http://localhost:1122`.
 - [ ] Health check is available at `http://localhost:1122/actuator/health`.
-- [ ] Actuator web exposure remains limited to `health,prometheus`, with health details hidden by default.
+- [ ] Actuator web exposure remains limited to `health,prometheus,metrics`, with health details hidden by default.
 - [ ] Swagger UI opens at `http://localhost:1122/swagger-ui.html`.
 - [ ] OpenAPI JSON is available at `http://localhost:1122/v3/api-docs`.
 - [ ] Grouped lab API JSON is available at `http://localhost:1122/v3/api-docs/lab-api`.

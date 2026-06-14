@@ -12,7 +12,7 @@ This guide covers local setup, smoke testing, JMeter benchmarking, result artifa
 
 ## Local Services
 
-Start MySQL and Redis:
+Start MySQL, Redis, and Kafka:
 
 ```bash
 docker compose -f environment/docker-compose-dev.yml up -d
@@ -26,6 +26,7 @@ Default services:
 | Swagger UI | `http://localhost:1122/swagger-ui.html` |
 | MySQL | `localhost:3316` |
 | Redis | `localhost:6319` |
+| Kafka | `localhost:9094` |
 | Prometheus endpoint | `http://localhost:1122/actuator/prometheus` |
 
 Optional observability profile:
@@ -262,6 +263,8 @@ npm run build
 |---|---|
 | Docker connection error | Start Docker Desktop before Docker Compose or integration tests |
 | `/orders` returns Redis stock unavailable | Run reset and warmup; confirm Redis is running |
+| Kafka connection refused | Confirm Kafka is running in dev compose; check `KAFKA_BOOTSTRAP_SERVERS` |
+| Outbox backlog growing | Check Kafka connectivity; inspect `outbox.backlog.pending` metric |
 | high `redisDbInconsistencyCount` | Check strategy context, then run manual reconcile |
 | `oversoldCount > 0` | Confirm whether `UNSAFE_DB` was used; reset before the next run |
 | Swagger UI missing | Confirm `springdoc-openapi-starter-webmvc-ui` is on the `xxxx-start` classpath |

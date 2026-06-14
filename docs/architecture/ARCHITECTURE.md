@@ -25,6 +25,8 @@ The system is a Spring Boot backend reliability lab with an optional Next.js ope
 | Backend port | `1122` |
 | MySQL | `localhost:3316`, database `vetautet` |
 | Redis | `localhost:6319` |
+| Kafka | `localhost:9094`, KRaft mode, topic `flashsale.orders` |
+| Tomcat | virtual threads enabled, max 500 threads, min-spare 50 |
 | Benchmark result path | `${BENCHMARK_RESULTS_DIR:benchmark/results}` |
 | Frontend | Next.js 16 on `http://localhost:3000` |
 
@@ -142,8 +144,68 @@ The backend exposes actuator endpoints and Micrometer metrics:
 ```text
 GET /actuator/health
 GET /actuator/prometheus
+GET /actuator/metrics
 flashsale.orders{strategy,result}
 flashsale.reconciliation{action,direction}
+outbox.publish.{success,failure,latency}
+outbox.backlog.{pending,failed}
 ```
 
+`@Observed` spans are created for `order.create`, `stock.warmup`, `benchmark.reset`, and `consistency.check` service methods via Micrometer Tracing with the Brave bridge.
+
 The optional Docker observability profile starts Prometheus and Grafana.
+
+## Messaging — Kafka And Transactional Outbox
+
+The backend uses the transactional outbox pattern for reliable event publishing to Kafka.
+
+```text
+OrderCreationService (within @Transactional)
+  → domain change persisted to MySQL
+  → OutboxService.record() atomically writes event row
+                                                    ↓
+OutboxPublishScheduler (every 1s)
+  → OutboxService.publishPendingEvents() reads pending batch
+  → KafkaTemplate sends to topic flashsale.orders
+  → marks event PUBLISHED or FAILED (retryable)
+```
+
+Key configuration in `application.yml`:
+
+| Property | Default | Meaning |
+|---|---|---|
+| `app.kafka.topic` | `flashsale.orders` | Kafka topic for outbox events |
+| `app.outbox.publish-batch-size` | `50` | Events processed per scheduler tick |
+| `app.outbox.retry-delay` | `10s` | Delay before retrying a failed event |
+| `app.outbox.max-attempts` | `5` | Max publish attempts before event is abandoned |
+
+Events published:
+
+| Type | Emitted by | Payload |
+|---|---|---|
+| `ORDER_CREATED` | `OrderCreationService` after order persistence | `CreateOrderResponse` fields |
+| `RECONCILIATION` | `OrderReconciliationService` on drift repair | `ReconciliationResult` fields |
+
+Kafka runs in KRaft mode (no ZooKeeper) via `apache/kafka:3.9.0`. The producer uses `acks=all` for durability. The outbox guarantees at-least-once delivery: if Kafka is unreachable, events stay in the database and are retried.
+
+## CI/CD Pipeline
+
+**CI** (`.github/workflows/ci.yml`): runs on every push and PR to master.
+
+| Job | What it validates |
+|---|---|
+| Backend — Unit Tests | `mvn test` for application, controller, and infrastructure modules |
+| Backend — Integration Tests | Docker-gated tests with Testcontainers |
+| Backend — Package JAR | Builds and uploads the Spring Boot fat JAR |
+| Observability Smoke Test | Starts the backend JAR, verifies health, Prometheus metrics, and structured log format |
+| Frontend — Lint, Typecheck & Build | `npm run lint`, `npm run typecheck`, `npm run build` |
+| Infra — Config Validation | Validates docker-compose files, Prometheus config, ELK configs, Nginx, and Redis Sentinel |
+
+**CD** (`.github/workflows/cd.yml`): on push to master, builds and pushes Docker images to GitHub Container Registry.
+
+| Image | Registry path |
+|---|---|
+| Backend | `ghcr.io/qwan30/flashsale-backend:latest` |
+| Frontend | `ghcr.io/qwan30/flashsale-frontend:latest` |
+
+Production deployment uses `environment/docker-compose.prod.yml` which references these pre-built images alongside MySQL, Redis, and Kafka services.
