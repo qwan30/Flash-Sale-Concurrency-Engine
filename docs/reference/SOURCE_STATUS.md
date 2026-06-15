@@ -164,7 +164,7 @@ Use these commands as the current local verification surface.
 Backend:
 
 ```bash
-mvn -pl app/backend/xxxx-start -am test
+mvn test
 ```
 
 Docker-gated integration tests:
@@ -181,6 +181,39 @@ npm run lint
 npm run typecheck
 npm run build
 ```
+
+Frontend E2E browser tests (require backend + frontend running):
+
+```bash
+cd app/frontend
+npm run test:e2e
+npm run test:e2e:ui       # interactive UI mode
+npm run test:e2e:debug    # headed mode with DevTools
+npm run test:e2e:report   # open HTML report
+```
+
+Current test coverage (June 2026):
+
+| Module | Test Classes | Tests | Type |
+|--------|-------------|-------|------|
+| `xxxx-application` | `BenchmarkRunServiceTest` | 2 | Unit |
+| `xxxx-application` | `TicketOrderAppServiceImplTest` | 5 | Unit |
+| `xxxx-application` | `AllStrategiesAppServiceTest` | 9 | Unit (all 4 strategies) |
+| `xxxx-controller` | `TicketOrderControllerTest` | 1 | MockMvc |
+| `xxxx-controller` | `TicketOrderControllerNegativeTest` | 4 | MockMvc (negative cases) |
+| `xxxx-controller` | `AdminBenchmarkControllerTest` | 7 | MockMvc (all admin endpoints) |
+| `xxxx-infrastructure` | `OrderDeductionInfrasRepositoryImplTest` | 2 | Repository |
+| `xxxx-start` | `FlashSaleConcurrencyIntegrationTest` | 2 | Integration (needs Docker) |
+| **Total (Java)** | | **32** | Zero failures |
+| **E2E (Playwright)** | 5 spec files | **19** | Browser-based |
+
+E2E test structure under `app/frontend/e2e/`:
+- `specs/real-user-journey.spec.ts` — browse→buy→verify→sellout→idempotency
+- `specs/admin-operator.spec.ts` — setup→probe→drift→reconcile→benchmark
+- `specs/concurrent-flash-sale.spec.ts` — all 4 strategies under concurrent load
+- `specs/screenshot-all-pages.spec.ts` — full-page screenshots of all 9 dashboard routes
+- `fixtures/api-helpers.ts` — direct API setup/teardown helpers
+- `pages/booking.ts`, `pages/control-desk.ts`, `pages/events.ts` — Page Object Models
 
 Docs do not currently provide a checked-in link-check command. After documentation edits, run a local Markdown/image link scan or add a repo script before treating docs link validation as repeatable automation. External URLs and runtime URLs still require the corresponding service to be running.
 

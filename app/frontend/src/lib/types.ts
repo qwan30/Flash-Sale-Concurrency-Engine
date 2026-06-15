@@ -101,6 +101,12 @@ export type ConsistencySnapshot = {
   dbOrderCount: number;
   oversoldCount: number;
   redisDbInconsistencyCount: number;
+  /** The initial stock configured for this ticket item. */
+  initialStock?: number;
+  /** The stock Redis *should* have: initialStock - dbOrderCount. */
+  expectedRedisStock?: number;
+  /** Signed drift: redisStockAfter - expectedRedisStock. Positive = Redis over, negative = lost. */
+  driftAmount?: number;
 };
 
 export type BenchmarkRunSummary = {

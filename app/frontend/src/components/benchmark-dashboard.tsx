@@ -13,10 +13,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listBenchmarkRuns } from "@/lib/api";
+import { getBenchmarkRun, listBenchmarkRuns } from "@/lib/api";
 import { fallbackBenchmarkRows } from "@/lib/benchmark-data";
 import { strategyDetails } from "@/lib/strategy";
-import type { BenchmarkRunSummary } from "@/lib/types";
+import type { BenchmarkRunDetail, BenchmarkRunSummary } from "@/lib/types";
 import { formatNumber } from "@/lib/utils";
 
 /**
@@ -29,6 +29,8 @@ export function BenchmarkDashboard() {
   const [runs, setRuns] = useState<BenchmarkRunSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedRun, setSelectedRun] = useState<BenchmarkRunDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -64,6 +66,14 @@ export function BenchmarkDashboard() {
     [rows],
   );
   const sourceLabel = runs.length > 0 ? "Recorded runs" : "Sample rows";
+
+  const onSelectRun = (runId: string) => {
+    setLoadingDetail(true);
+    getBenchmarkRun(runId)
+      .then((response) => setSelectedRun(response.result))
+      .catch(() => setSelectedRun(null))
+      .finally(() => setLoadingDetail(false));
+  };
 
   return (
     <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -193,7 +203,7 @@ export function BenchmarkDashboard() {
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={`${row.runId}-history`}>
+              <TableRow key={`${row.runId}-history`} className="cursor-pointer hover:bg-[#f7f7f7]" onClick={() => onSelectRun(row.runId)}>
                 <TableCell className="font-mono text-xs">{row.runId}</TableCell>
                 <TableCell>{row.date}</TableCell>
                 <TableCell>{row.machine}</TableCell>
@@ -206,6 +216,36 @@ export function BenchmarkDashboard() {
           </TableBody>
         </Table>
       </section>
+
+      {loadingDetail ? (
+        <section className="rounded-xl bg-white p-5 text-center text-sm text-[#898989]">
+          Loading run detail...
+        </section>
+      ) : selectedRun ? (
+        <section className="rounded-xl bg-white p-5 shadow-[rgba(19,19,22,0.7)_0_1px_5px_-4px,rgba(34,42,53,0.08)_0_0_0_1px,rgba(34,42,53,0.05)_0_4px_8px_0]">
+          <h2 className="font-display text-xl font-semibold text-[#242424]">
+            Run {selectedRun.summary.runId}
+          </h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg bg-[#f7f7f7] p-3">
+              <p className="text-xs text-[#898989]">Redis stock after</p>
+              <p className="text-lg font-semibold">{selectedRun.summary.redisStockAfter}</p>
+            </div>
+            <div className="rounded-lg bg-[#f7f7f7] p-3">
+              <p className="text-xs text-[#898989]">DB stock after</p>
+              <p className="text-lg font-semibold">{selectedRun.summary.dbStockAfter}</p>
+            </div>
+            <div className="rounded-lg bg-[#f7f7f7] p-3">
+              <p className="text-xs text-[#898989]">Order count</p>
+              <p className="text-lg font-semibold">{selectedRun.summary.dbOrderCount}</p>
+            </div>
+            <div className="rounded-lg bg-[#f7f7f7] p-3">
+              <p className="text-xs text-[#898989]">Drift</p>
+              <p className="text-lg font-semibold">{selectedRun.summary.redisDbInconsistencyCount}</p>
+            </div>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

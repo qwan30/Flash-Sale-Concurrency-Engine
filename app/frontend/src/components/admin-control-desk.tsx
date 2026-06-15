@@ -149,7 +149,7 @@ export function AdminControlDesk() {
       <header className="flex flex-col gap-5 border-b border-black/[0.06] pb-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <Badge variant={health?.status === "UP" ? "success" : "warning"}>
+            <Badge variant={health?.status === "UP" ? "success" : "warning"} data-testid="health-status">
               <Server className="mr-1 h-3 w-3" />
               Backend {health?.status ?? "checking"}
             </Badge>
@@ -165,6 +165,7 @@ export function AdminControlDesk() {
         <Button
           type="button"
           variant="secondary"
+          data-testid="health-refresh-btn"
           onClick={refreshControlDesk}
           disabled={loadingKey === "overview"}
         >
@@ -236,6 +237,7 @@ export function AdminControlDesk() {
                   type="number"
                   min={1}
                   value={ticketItemId}
+                  data-testid="control-ticket-item-id"
                   onChange={(event) => setTicketItemId(Number(event.target.value))}
                 />
               </Field>
@@ -244,6 +246,7 @@ export function AdminControlDesk() {
                   type="number"
                   min={0}
                   value={stock}
+                  data-testid="control-stock"
                   onChange={(event) => setStock(Number(event.target.value))}
                 />
               </Field>
@@ -251,11 +254,12 @@ export function AdminControlDesk() {
                 <Input
                   inputMode="numeric"
                   value={yearMonth}
+                  data-testid="control-year-month"
                   onChange={(event) => setYearMonth(event.target.value)}
                 />
               </Field>
               <div className="flex flex-wrap gap-2 sm:col-span-3">
-                <Button type="submit" disabled={loadingKey === "reset"}>
+                <Button type="submit" data-testid="control-reset-btn" disabled={loadingKey === "reset"}>
                   {loadingKey === "reset" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
@@ -266,6 +270,7 @@ export function AdminControlDesk() {
                 <Button
                   type="button"
                   variant="secondary"
+                  data-testid="control-warmup-btn"
                   onClick={onWarmup}
                   disabled={loadingKey === "warmup"}
                 >
@@ -279,6 +284,7 @@ export function AdminControlDesk() {
                 <Button
                   type="button"
                   variant="secondary"
+                  data-testid="consistency-check-btn"
                   onClick={onConsistencyCheck}
                   disabled={loadingKey === "consistency"}
                 >
@@ -288,7 +294,7 @@ export function AdminControlDesk() {
               </div>
             </form>
             {lastReset ? (
-              <Alert className="mt-4">
+              <Alert className="mt-4" data-testid="consistency-result">
                 Reset complete for ticket {lastReset.ticketItemId}. Redis stock{" "}
                 {lastReset.redisStockAfter}, DB stock {lastReset.dbStockAfter}.
               </Alert>

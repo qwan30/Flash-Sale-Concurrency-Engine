@@ -199,6 +199,7 @@ export function UserBookingDashboard({
                 <Label htmlFor="booking-user-id">User ID</Label>
                 <Input
                   id="booking-user-id"
+                  data-testid="booking-user-id"
                   type="number"
                   min={1}
                   value={userId}
@@ -209,6 +210,7 @@ export function UserBookingDashboard({
                 <Label htmlFor="booking-quantity">Quantity</Label>
                 <Input
                   id="booking-quantity"
+                  data-testid="booking-quantity"
                   type="number"
                   min={1}
                   max={10}
@@ -226,6 +228,7 @@ export function UserBookingDashboard({
                 <Label htmlFor="booking-strategy">Strategy</Label>
                 <select
                   id="booking-strategy"
+                  data-testid="booking-strategy"
                   value={strategy}
                   onChange={(selectEvent) => setStrategy(selectEvent.target.value as OrderStrategy)}
                   className="h-10 w-full rounded-lg bg-white px-3 text-sm text-[#242424] shadow-[rgba(34,42,53,0.10)_0_0_0_1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50"
@@ -242,11 +245,13 @@ export function UserBookingDashboard({
               </div>
             </details>
 
-            {errorMessage ? <Alert>{errorMessage}</Alert> : null}
+            {errorMessage ? <Alert data-testid="booking-error">{errorMessage}</Alert> : null}
             {lastOrder ? (
-              <Alert>
+              <Alert data-testid="booking-result">
                 {lastOrder.success ? "Accepted" : "Rejected"}: {lastOrder.message}
-                {lastOrder.orderNumber ? ` (${lastOrder.orderNumber})` : ""}
+                {lastOrder.orderNumber ? (
+                  <span data-testid="booking-order-number"> ({lastOrder.orderNumber})</span>
+                ) : null}
               </Alert>
             ) : null}
 
@@ -254,6 +259,7 @@ export function UserBookingDashboard({
               type="submit"
               size="lg"
               className="w-full"
+              data-testid="booking-submit-btn"
               disabled={isSubmitting || isSoldOut || quantity < 1 || userId < 1}
             >
               {isSubmitting ? (

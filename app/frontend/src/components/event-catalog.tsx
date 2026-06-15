@@ -84,9 +84,15 @@ export function EventCatalog({ events }: { events: EventSummary[] }) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {filteredEvents.map((event) => (
-          <EventCard key={event.ticketItemId} event={event} />
-        ))}
+        {filteredEvents.length === 0 ? (
+          <p className="col-span-full py-16 text-center text-base leading-7 text-[#898989]">
+            No events match your search. Try adjusting the filters.
+          </p>
+        ) : (
+          filteredEvents.map((event) => (
+            <EventCard key={event.ticketItemId} event={event} />
+          ))
+        )}
       </div>
     </section>
   );
@@ -96,7 +102,7 @@ function EventCard({ event }: { event: EventSummary }) {
   const canOpenDetail = event.ticketItemId === 4 && event.status !== "sold_out";
 
   return (
-    <article className="flex min-h-[360px] flex-col rounded-xl bg-white p-5 shadow-[rgba(19,19,22,0.7)_0_1px_5px_-4px,rgba(34,42,53,0.08)_0_0_0_1px,rgba(34,42,53,0.05)_0_4px_8px_0]">
+    <article data-testid="event-card" className="flex min-h-[360px] flex-col rounded-xl bg-white p-5 shadow-[rgba(19,19,22,0.7)_0_1px_5px_-4px,rgba(34,42,53,0.08)_0_0_0_1px,rgba(34,42,53,0.05)_0_4px_8px_0]">
       <div className="mb-5 rounded-lg bg-[#f7f7f7] p-4">
         <div className="flex items-start justify-between gap-3">
           <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[#898989]">

@@ -30,7 +30,7 @@ Use this checklist before presenting the project, publishing a portfolio summary
 Backend test command:
 
 ```bash
-mvn -pl app/backend/xxxx-start -am test
+mvn test
 ```
 
 Docker-gated integration command:
@@ -46,6 +46,13 @@ cd app/frontend
 npm run lint
 npm run typecheck
 npm run build
+```
+
+Frontend E2E browser tests (requires backend + frontend running):
+
+```bash
+cd app/frontend
+npm run test:e2e
 ```
 
 ## Benchmark Evidence

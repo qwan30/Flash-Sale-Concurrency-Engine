@@ -22,7 +22,7 @@ Use this hub to reach the current source-backed docs. Java source, Maven files, 
 | Actuator | Exposes `health`, `prometheus`, and `metrics`; health details are hidden by default |
 | Messaging | Apache Kafka 3.9.0 (KRaft mode) with transactional outbox pattern for at-least-once event publishing |
 | CI/CD | CI runs unit tests, integration tests, observability smoke, frontend checks, and infra validation; CD builds and pushes Docker images to GHCR |
-| Frontend dashboard | Next.js 16.2.4 and React 19.2.4 in `app/frontend`, optional operator dashboard only |
+| Frontend dashboard | Next.js 16.2.4 and React 19.2.4 in `app/frontend`, optional operator dashboard with E2E Playwright test suite |
 | Frontend proxy | `/api/backend/*` forwards only allowlisted dashboard backend paths |
 | Benchmark contract | `benchmark/experiment-spec.json` drives reset, warmup, JMeter, and consistency checks |
 | Verification commands | Backend Maven tests plus frontend lint, typecheck, and build are the standard local gates |
@@ -141,6 +141,13 @@ cd app/frontend
 npm run lint
 npm run typecheck
 npm run build
+```
+
+Frontend E2E browser tests (requires backend + frontend running):
+
+```bash
+cd app/frontend
+npm run test:e2e
 ```
 
 Benchmark smoke:
