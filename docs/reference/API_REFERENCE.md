@@ -29,9 +29,6 @@ These routes exist for local experiments and framework checks. They are not part
 
 | Route | Purpose |
 |---|---|
-| `GET /hello/hi` | Local hello endpoint |
-| `GET /hello/hi/v1` | Rate-limited hello variant |
-| `GET /hello/circuit/breaker` | Circuit-breaker experiment endpoint |
 
 ## Response Envelope
 

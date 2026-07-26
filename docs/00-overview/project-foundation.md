@@ -191,7 +191,7 @@ No formal versioning yet — the lab API is internal/operator-facing. Grouped Op
 
 | Pattern | Implementation | Config |
 |---|---|---|
-| Rate limiter | Resilience4j `@RateLimiter` | 2 req/10s (`backendA`), 5 req/10s (`backendB`) |
+| Rate limiter | Resilience4j `@RateLimiter` | `orderApi` on `POST /orders`, default 20,000 req/s via `ORDER_API_RATE_LIMIT` |
 | Circuit breaker | Resilience4j `@CircuitBreaker` | 50% failure threshold, 5s open, 10 sliding window |
 | Distributed lock | Redisson | Single or Sentinel mode |
 | Outbox retry | `OutboxService.retryFailedEvents()` | 10s delay, max 5 attempts |

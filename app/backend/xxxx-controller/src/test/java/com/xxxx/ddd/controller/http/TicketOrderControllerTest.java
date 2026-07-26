@@ -1,5 +1,6 @@
 package com.xxxx.ddd.controller.http;
 
+import com.xxxx.ddd.application.model.TicketOrderDTO;
 import com.xxxx.ddd.application.model.order.CreateOrderRequest;
 import com.xxxx.ddd.application.model.order.CreateOrderResponse;
 import com.xxxx.ddd.application.model.order.OrderStrategy;
@@ -14,8 +15,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -67,5 +71,38 @@ class TicketOrderControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.result.orderNumber").value("OKX-SGN-42-1777280000000"))
                 .andExpect(jsonPath("$.result.userId").value(42));
+    }
+
+    @Test
+    void listOrdersReturnsOrders() throws Exception {
+        TicketOrderDTO dto = new TicketOrderDTO();
+        dto.setUserId(42);
+        dto.setOrderNumber("OKX-SGN-42-1777280000000");
+        dto.setTotalAmount(java.math.BigDecimal.valueOf(5000));
+
+        when(ticketOrderAppService.findAllByUser("202606", 42L)).thenReturn(List.of(dto));
+
+        mockMvc.perform(get("/orders")
+                        .param("userId", "42")
+                        .param("yearMonth", "202606"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.result[0].orderNumber").value("OKX-SGN-42-1777280000000"))
+                .andExpect(jsonPath("$.result[0].userId").value(42));
+    }
+
+    @Test
+    void getOrderReturnsOrder() throws Exception {
+        TicketOrderDTO dto = new TicketOrderDTO();
+        dto.setUserId(42);
+        dto.setOrderNumber("OKX-SGN-42-1777280000000");
+        dto.setTotalAmount(java.math.BigDecimal.valueOf(5000));
+
+        when(ticketOrderAppService.findByOrderNumber(null, "OKX-SGN-42-1777280000000")).thenReturn(dto);
+
+        mockMvc.perform(get("/orders/OKX-SGN-42-1777280000000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.result.orderNumber").value("OKX-SGN-42-1777280000000"));
     }
 }

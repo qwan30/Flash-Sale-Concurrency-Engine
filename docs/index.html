@@ -882,6 +882,648 @@ npm run dev</code></pre>
   <li>Change detection before commit; confirm scope is expected</li>
 </ul>
 
+<!-- ═══ INTERVIEW Q&A GUIDE ═══ -->
+<h2 id="qa-guide" class="qa-section">❓ Interview Q&A Guide (50 Questions)</h2>
+<p>Dưới đây là bộ 50 câu hỏi và trả lời phỏng vấn chuyên sâu được cấu trúc theo <strong>STAR Method (Situation, Task, Action, Result)</strong>, giúp bạn hiểu rõ bối cảnh và giải pháp kỹ thuật thực tế trong dự án.</p>
+
+<div class="qa-group">
+  <h3>🏛️ Phần 1: Kiến trúc Hệ thống, Clean Architecture & DDD</h3>
+
+  <details class="qa-item">
+    <summary class="qa-summary">1. DDD (Domain-Driven Design) là gì và tại sao dự án áp dụng mô hình phân lớp DDD?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi phát triển hệ thống bán vé flash sale chịu tải cao, nếu áp dụng kiến trúc 3 lớp truyền thống (Controller-Service-DAO), code nghiệp vụ đặt vé dễ bị trộn lẫn với mã nguồn hạ tầng cơ sở dữ liệu (MySQL/Redis), làm hệ thống cực kỳ khó nâng cấp, kiểm thử và tối ưu hóa hiệu năng độc lập.</p>
+      <p><strong>Task (T):</strong> Cần thiết lập một cấu trúc dự án sạch, cô lập hoàn toàn logic nghiệp vụ lõi (Domain) khỏi các framework (Spring Boot) và các giải pháp lưu trữ hạ tầng.</p>
+      <p><strong>Action (A):</strong> Triển khai mô hình phân lớp DDD chia dự án thành 5 module Maven: <code>xxxx-domain</code> (chứa thực thể thuần túy, các quy tắc bất biến, interface ports), <code>xxxx-application</code> (điều phối nghiệp vụ, transaction, registries), <code>xxxx-infrastructure</code> (triển khai các adapter cụ thể như MySQL JPA, Redis Cache, Kafka Outbox), <code>xxxx-controller</code> (HTTP REST APIs) và <code>xxxx-start</code> (entrypoint bootstrap).</p>
+      <p><strong>Result (R):</strong> Module domain được giữ độc lập 100% với Spring Boot và JPA. Nhờ đó, việc viết unit test độc lập cực kỳ nhanh mà không cần khởi động database, đồng thời cho phép hoán đổi công nghệ lưu trữ hạ tầng mà không làm thay đổi hay hư hại mã nguồn nghiệp vụ lõi.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">2. Sự khác biệt chính giữa Business Logic trong application module và domain module là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Chức năng đặt vé flash sale đòi hỏi vừa phải kiểm tra các điều kiện nghiệp vụ (số lượng mua hợp lệ, tồn kho khả dụng) vừa phải xử lý các luồng công nghệ xung quanh (mở database transaction, ghi log sự kiện outbox, gửi tin nhắn đi Kafka).</p>
+      <p><strong>Task (T):</strong> Phân định ranh giới trách nhiệm rõ ràng để tránh rò rỉ các logic điều phối hệ thống vào trong domain nghiệp vụ, ngăn chặn tình trạng "Anemic Domain Model".</p>
+      <p><strong>Action (A):</strong> Thiết kế module <code>domain</code> chỉ quản lý quy tắc nghiệp vụ thuần túy không trạng thái ngoại lai (Invariants), ví dụ như kiểm tra số lượng vé khả dụng. Thiết kế module <code>application</code> làm lớp điều phối (Orchestrator), mở Transaction, gọi Repository Adapter, thực thi Registry Strategy để chọn chiến thuật trừ kho và gọi Outbox Service.</p>
+      <p><strong>Result (R):</strong> Domain thực sự làm chủ nghiệp vụ, còn Application tập trung điều phối. Hệ thống trở nên dễ bảo trì, cho phép thay đổi luồng điều phối (ví dụ: thêm bước thanh toán hoặc gửi mail) mà không ảnh hưởng tới core domain logic.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">3. Tại sao lại tách riêng module xxxx-start? Vai trò của nó là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Việc đặt cấu hình khởi chạy Spring Boot (như <code>@SpringBootApplication</code>) và các file cấu hình môi trường chung với code nghiệp vụ làm tăng thời gian chạy test và dễ gây ra các lỗi phụ thuộc vòng tròn giữa các package.</p>
+      <p><strong>Task (T):</strong> Tạo ra một module đóng gói (Entrypoint) duy nhất làm trung tâm quản lý cấu hình và chạy ứng dụng.</p>
+      <p><strong>Action (A):</strong> Tách riêng module <code>xxxx-start</code> chứa class chạy Spring Boot, file <code>application.yml</code>, cấu hình Swagger/OpenAPI, các Scheduler (Outbox Worker, Reconciliation Job) và các bài kiểm thử tích hợp cuối (E2E Integration Tests) sử dụng Testcontainers.</p>
+      <p><strong>Result (R):</strong> Giảm thiểu tối đa dung lượng các module lõi, cô lập các cấu hình môi trường (Dev/Prod/Observability) chỉ trong một nơi duy nhất. Giúp tối ưu hóa thời gian chạy CI/CD khi chỉ cần build lại module thay đổi thay vì toàn bộ hệ thống.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">4. Giải thích mẫu thiết kế Port-Adapter qua mối quan hệ giữa CacheStore và RedisCacheStoreAdapter.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Gọi trực tiếp thư viện Spring Data Redis ở Application layer sẽ khóa chặt ứng dụng vào công nghệ Redis, gây khó khăn khi viết test mock-up hoặc chuyển đổi cache.</p>
+      <p><strong>Task (T):</strong> Thiết kế cơ chế trừ kho độc lập với công nghệ Cache cụ thể thông qua nguyên lý Dependency Inversion.</p>
+      <p><strong>Action (A):</strong> Định nghĩa interface <code>CacheStore</code> (Port) ở lớp application và viết class <code>RedisCacheStoreAdapter</code> (Adapter) ở lớp infrastructure thực thi interface đó bằng Redis.</p>
+      <p><strong>Result (R):</strong> Tầng application hoàn toàn không biết về sự tồn tại của thư viện Redis. Cho phép dễ dàng thay thế sang cache khác hoặc viết test mock-up trong vòng vài phút.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">5. Làm thế nào để đảm bảo module xxxx-domain hoàn toàn thuần khiết (không phụ thuộc framework)?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Các lập trình viên thường vô tình sử dụng annotation của Spring (<code>@Service</code>, <code>@Autowired</code>) hoặc JPA (<code>@Entity</code>) trong Domain layer, làm nó bị phụ thuộc chặt chẽ vào framework.</p>
+      <p><strong>Task (T):</strong> Giữ cho module <code>domain</code> hoàn toàn sạch bóng công nghệ ngoài để tăng khả năng tái sử dụng.</p>
+      <p><strong>Action (A):</strong> Cấu hình file <code>pom.xml</code> của module <code>xxxx-domain</code> chỉ dùng Java SE SDK và loại bỏ mọi dependency của Spring Boot hay JPA.</p>
+      <p><strong>Result (R):</strong> Domain layer không bị ảnh hưởng khi nâng cấp Spring Boot từ phiên bản 2.x lên 3.x, và việc di chuyển domain sang dự án khác diễn ra vô cùng thuận tiện.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">6. Hãy chỉ ra ví dụ cụ thể của Aggregate, Entity và Value Object trong codebase.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Cần mô hình hóa nghiệp vụ đặt vé flash sale theo chuẩn DDD để phân định rõ ràng ranh giới dữ liệu và vòng đời đối tượng.</p>
+      <p><strong>Task (T):</strong> Định nghĩa chính xác và đưa các khái niệm DDD vào cấu trúc code thực tế.</p>
+      <p><strong>Action (A):</strong> Xác định <code>Ticket</code> quản lý <code>TicketItem</code> làm Aggregate Root; <code>TicketOrder</code> có ID duy nhất (<code>orderNumber</code>) làm Entity; <code>OrderStrategy</code> và <code>Result</code> làm Value Object vì chúng không đổi và không cần ID.</p>
+      <p><strong>Result (R):</strong> Ranh giới Aggregate rõ ràng giúp loại bỏ lỗi ghi đè dữ liệu đồng thời, cấu trúc code mạch lạc, giúp lập trình viên mới dễ dàng onboarding.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">7. Vai trò của package-info.java xuất hiện ở các thư mục con là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong dự án lớn, việc thiếu các quy định biên và tài liệu cấp độ package khiến lập trình viên dễ đưa các cấu trúc dữ liệu không hợp lệ hoặc gây ra lỗi null không mong muốn.</p>
+      <p><strong>Task (T):</strong> Định nghĩa các ràng buộc và tài liệu hóa mức package một cách tự động.</p>
+      <p><strong>Action (A):</strong> Sử dụng các file <code>package-info.java</code> để mô tả mục đích package và khai báo các annotation toàn cục của Spring như <code>@NonNullApi</code> để bắt buộc kiểm tra null-safety.</p>
+      <p><strong>Result (R):</strong> Giúp tăng chất lượng code tĩnh, loại bỏ các lỗi NPE (NullPointerException) tiềm ẩn ngay từ bước biên dịch.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">8. Tại sao định nghĩa Interface Repository ở Domain Layer nhưng Class triển khai ở Infrastructure Layer?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Domain layer cần truy vấn dữ liệu đơn hàng nhưng nếu tham chiếu trực tiếp đến tầng Infrastructure chứa JPA, nó sẽ vi phạm nguyên lý Dependency Inversion.</p>
+      <p><strong>Task (T):</strong> Thiết lập đảo ngược phụ thuộc để bảo vệ Domain khỏi các thay đổi cấu trúc dữ liệu vật lý ở DB.</p>
+      <p><strong>Action (A):</strong> Định nghĩa interface <code>TicketOrderRepository</code> (Port) ở domain layer và triển khai class <code>MySQLTicketOrderRepositoryAdapter</code> (Adapter) ở infrastructure layer.</p>
+      <p><strong>Result (R):</strong> Luồng phụ thuộc code hướng từ ngoài vào trong. Domain layer hoàn toàn không bị ảnh hưởng khi database thay đổi schema hoặc chuyển từ MySQL sang PostgreSQL.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">9. Nếu muốn đổi từ Elasticsearch sang AWS CloudWatch, cần chỉnh sửa những module nào?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Dự án đang chạy hệ thống thu thập log bằng ELK (Elasticsearch-Logstash-Kibana) và cần chuyển dịch sang AWS CloudWatch để đồng bộ hạ tầng cloud của tổ chức.</p>
+      <p><strong>Task (T):</strong> Thực hiện chuyển đổi hệ thống log với phạm vi chỉnh sửa nhỏ nhất và không gây downtime.</p>
+      <p><strong>Action (A):</strong> Chỉ thay đổi cấu hình ghi log ở file <code>logback-spring.xml</code> và điều chỉnh driver vận chuyển log trong module <code>xxxx-infrastructure</code> cùng file docker-compose ở <code>xxxx-start</code>.</p>
+      <p><strong>Result (R):</strong> Toàn bộ logic nghiệp vụ ở <code>xxxx-domain</code> và <code>xxxx-application</code> được giữ nguyên vẹn 100%, việc chuyển đổi diễn ra nhanh chóng và an toàn.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">10. Ưu điểm và nhược điểm lớn nhất khi triển khai kiến trúc DDD cho dự án lab này là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Cần đưa ra quyết định chọn kiến trúc Monolith truyền thống hay kiến trúc DDD cho một dự án lab chuyên sâu về tối ưu hóa hiệu năng.</p>
+      <p><strong>Task (T):</strong> Đánh giá điểm đánh đổi (trade-offs) để lựa chọn kiến trúc tối ưu nhất.</p>
+      <p><strong>Action (A):</strong> Đánh giá kỹ lưỡng: Ưu điểm là DDD giúp cô lập tốt các chiến lược trừ kho để đo đạc chính xác hiệu năng; Nhược điểm là tạo ra nhiều boilerplate code và tốn tài nguyên ánh xạ (mapping) dữ liệu qua lại.</p>
+      <p><strong>Result (R):</strong> Quyết định chọn DDD vì tính cô lập hạ tầng cao là điều kiện bắt buộc để thực hiện các thử nghiệm benchmark so sánh 4 chiến lược trừ kho một cách khoa học.</p>
+    </div>
+  </details>
+</div>
+
+<div class="qa-group">
+  <h3>⚡ Phần 2: Quản lý Concurrency, Race Condition & Chiến lược Trừ kho</h3>
+
+  <details class="qa-item">
+    <summary class="qa-summary">11. Hiện tượng Race Condition xảy ra thế nào trong luồng đặt vé? Vẽ luồng dẫn đến Oversell.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Dưới tải flash sale cực đại, hàng ngàn người dùng đặt vé cùng lúc dễ gây ra lỗi bán quá số lượng thực tế (Oversell).</p>
+      <p><strong>Task (T):</strong> Phân tích và mô tả chi tiết cơ chế Race Condition để thiết kế giải pháp ngăn chặn.</p>
+      <p><strong>Action (A):</strong> Mô tả luồng: Cả Thread A (User 1) và Thread B (User 2) cùng đọc tồn kho bằng 1, cùng thỏa mãn điều kiện <code>stock >= 1</code> và cùng thực hiện trừ kho, dẫn đến bán được 2 vé trong khi thực tế chỉ có 1 vé khả dụng.</p>
+      <p><strong>Result (R):</strong> Giúp đội ngũ phát triển nhận diện rõ lỗ hổng và chuyển hướng thiết kế sang các cơ chế đồng bộ nguyên tử (Atomic) ở tầng Database hoặc Cache.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">12. Chiến lược "Unsafe DB" hoạt động thế nào và tại sao gây ra oversell trầm trọng?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Cần chạy thử nghiệm một kịch bản cơ bản để làm thước đo (baseline) cho hiện tượng oversell khi không áp dụng bất kỳ cơ chế khóa nào.</p>
+      <p><strong>Task (T):</strong> Triển khai chiến lược <code>UNSAFE_DB</code> để chứng minh tác hại của Race Condition.</p>
+      <p><strong>Action (A):</strong> Thực thi trực tiếp câu lệnh SQL cập nhật tồn kho: <code>UPDATE ticket_item SET stock_available = stock_available - :qty WHERE id = :id</code> mà không kiểm tra số tồn kho hiện tại đang âm hay dương.</p>
+      <p><strong>Result (R):</strong> Stress test bằng JMeter ghi nhận <strong>oversoldCount = 4000</strong> (tồn kho bị âm xuống -4000), chứng minh sự nguy hiểm của việc không kiểm soát đồng thời.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">13. Làm thế nào chiến lược "Conditional DB Update" giải quyết được vấn đề oversell?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Sau khi thấy tác hại của <code>UNSAFE_DB</code>, chúng tôi cần một giải pháp bảo vệ tồn kho ngay tại tầng dữ liệu MySQL mà không làm nghẽn cổ chai luồng xử lý do dùng khóa bi quan.</p>
+      <p><strong>Task (T):</strong> Triển khai cơ chế khóa lạc quan ngầm định thông qua câu lệnh SQL nguyên tử (Atomic Update).</p>
+      <p><strong>Action (A):</strong> Thêm điều kiện lọc vào câu lệnh cập nhật tồn kho: <code>UPDATE ticket_item SET stock_available = stock_available - :qty WHERE id = :id AND stock_available >= :qty</code>.</p>
+      <p><strong>Result (R):</strong> Nhờ cơ chế khóa dòng (Row-level Lock) của InnoDB, MySQL đảm bảo việc kiểm tra và cập nhật diễn ra nguyên tử. Kết quả đạt <strong>oversoldCount = 0</strong> tuyệt đối, nhưng thông lượng chỉ đạt <strong>173 req/sec</strong> do ghi đĩa trực tiếp.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">14. Khóa bi quan và Khóa lạc quan hoạt động ra sao? Tại sao không dùng cho flash sale tải cực lớn?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Sử dụng <code>SELECT FOR UPDATE</code> (Khóa bi quan) hoặc trường <code>@Version</code> (Khóa lạc quan) khi gặp bài toán đồng thời dưới tải lớn sẽ gây sụt giảm nghiêm trọng hiệu năng hệ thống.</p>
+      <p><strong>Task (T):</strong> Phân tích điểm hạn chế của hai phương pháp này để loại bỏ chúng khỏi thiết kế luồng chính.</p>
+      <p><strong>Action (A):</strong> Đánh giá kỹ thuật: Khóa bi quan gây nghẽn luồng xử lý nghiêm trọng và cạn kiệt connection pool; Khóa lạc quan gây rollback liên tục do xung đột ghi lớn, làm quá tải CPU máy chủ.</p>
+      <p><strong>Result (R):</strong> Loại bỏ cả hai phương pháp và thay thế bằng cơ chế kiểm tra nhanh ở cache Redis (Lua Script) để đạt hiệu năng cao nhất.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">15. Khi trừ kho Redis Lua thành công nhưng ghi đơn MySQL lỗi, hệ thống xử lý thế nào?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong chiến lược lai <code>REDIS_LUA</code>, khi trừ kho trên Redis thành công nhưng ghi đơn xuống MySQL gặp lỗi, tồn kho trên Redis sẽ bị mất cân bằng so với DB thực tế.</p>
+      <p><strong>Task (T):</strong> Xây dựng cơ chế bù trừ dữ liệu (Compensation) để khôi phục tồn kho trên Redis khi có lỗi phát sinh ở database.</p>
+      <p><strong>Action (A):</strong> Triển khai chiến lược <code>REDIS_LUA_WITH_COMPENSATION</code>. Khi xảy ra ngoại lệ ở bước ghi đơn MySQL, khối lệnh catch sẽ gửi lệnh <code>INCR</code> ngược lại Redis thông qua Lua script để hoàn trả số lượng vé đã trừ.</p>
+      <p><strong>Result (R):</strong> Đảm bảo tính nhất quán dữ liệu giữa cache và DB. Kết quả stress test ghi nhận <strong>driftAmount = 0</strong> ngay cả khi giả lập các lỗi ghi database ngẫu nhiên.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">16. Nếu tiến trình Compensation (Bù trừ) cũng bị lỗi, làm sao hệ thống tự phục hồi?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Nếu xảy ra đứt kết nối mạng giữa ứng dụng và Redis đúng lúc đang thực hiện Compensation, dữ liệu sẽ bị sai lệch nghiêm trọng và không thể tự vá bằng luồng chính.</p>
+      <p><strong>Task (T):</strong> Thiết kế cơ chế tự phục hồi tự động (Self-Healing) để sửa lỗi sai lệch dữ liệu ngoài ý muốn.</p>
+      <p><strong>Action (A):</strong> Phát triển dịch vụ <code>OrderReconciliationService</code> chạy định kỳ, tính toán tồn kho lý thuyết dựa trên dữ liệu MySQL bền vững và thiết lập lại giá trị đúng vào Redis.</p>
+      <p><strong>Result (R):</strong> Hệ thống tự động phát hiện và phục hồi trạng thái nhất quán hoàn toàn trong vòng tối đa 30 giây mà không cần sự can thiệp thủ công của quản trị viên.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">17. Giải thích cơ chế hoạt động của Reconciliation (Đối soát). Kích hoạt khi nào?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong hệ thống phân tán, sự sai lệch dữ liệu (Drift) giữa Cache và DB là điều không thể tránh khỏi do độ trễ mạng và các lỗi cục bộ.</p>
+      <p><strong>Task (T):</strong> Triển khai công cụ đối soát dữ liệu tự động định kỳ để đảm bảo tính nhất quán sau cùng (Eventual Consistency).</p>
+      <p><strong>Action (A):</strong> Cấu hình Spring Scheduler chạy mỗi 30 giây: Truy vấn tồn kho thực tế trong MySQL, tính toán tồn kho lý thuyết của Redis, so sánh và đồng bộ lại nếu phát hiện sai lệch (<code>drift != 0</code>), đồng thời gửi sự kiện sang Kafka.</p>
+      <p><strong>Result (R):</strong> Giữ cho hệ thống luôn ở trạng thái nhất quán, giảm thiểu thời gian phát hiện sự cố từ hàng giờ xuống dưới 30 giây hoàn toàn tự động.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">18. Khi nào dùng Distributed Lock bằng Redisson thay vì Lua Script? Cho ví dụ.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Lua script chạy đơn luồng trên Redis và có thể gây nghẽn toàn bộ Redis server nếu chứa các logic phức tạp hoặc chạy quá lâu.</p>
+      <p><strong>Task (T):</strong> Phân định rõ ranh giới sử dụng giữa Lua Script và Distributed Lock để tối ưu hóa hiệu năng.</p>
+      <p><strong>Action (A):</strong> Áp dụng quy tắc: Lua Script dùng cho thao tác nhanh trên 1-2 keys (như trừ kho); Redisson Lock dùng khi cần bảo vệ tác vụ phức tạp liên quan đến I/O mạng hoặc ghi nhiều bảng DB (như api <code>/admin/benchmarks/reset</code>).</p>
+      <p><strong>Result (R):</strong> Tối ưu hóa hiệu năng hệ thống: luồng mua vé chính chạy cực nhanh bằng Lua Script, còn luồng quản trị hệ thống được bảo vệ an toàn bằng Redisson Lock.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">19. Trong tryLock() của Redisson, waitTime và leaseTime có ý nghĩa gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi nhiều node ứng dụng Spring Boot cùng tranh chấp một khóa phân tán để xử lý tác vụ quản trị, nếu không cấu hình tốt thời gian chờ và giữ khóa, hệ thống dễ rơi vào trạng thái Deadlock.</p>
+      <p><strong>Task (T):</strong> Định cấu hình các tham số khóa phân tán một cách khoa học để chống treo hệ thống.</p>
+      <p><strong>Action (A):</strong> Thiết lập <code>waitTime</code> là thời gian tối đa thread chấp nhận xếp hàng chờ giành khóa, và <code>leaseTime</code> là thời gian tự động giải phóng khóa nếu instance giữ khóa bị crash đột ngột.</p>
+      <p><strong>Result (R):</strong> Ngăn ngừa hoàn toàn lỗi treo hệ thống do deadlock, tăng tính chịu lỗi của cụm server phân tán.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">20. Giải thích cơ chế tự động gia hạn lock (Watchdog) của Redisson.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Nếu một tác vụ phức tạp chạy lâu hơn thời gian <code>leaseTime</code> thiết lập, Redisson sẽ tự động nhả khóa trước khi tác vụ hoàn thành, dẫn đến việc node khác nhảy vào xử lý song song gây sai lệch dữ liệu.</p>
+      <p><strong>Task (T):</strong> Đảm bảo an toàn khóa cho các tác vụ chạy lâu mà không cần tăng <code>leaseTime</code> lên quá lớn.</p>
+      <p><strong>Action (A):</strong> Không thiết lập tham số <code>leaseTime</code> khi gọi lock. Lúc này, Redisson sẽ kích hoạt cơ chế Watchdog định kỳ mỗi 10 giây gia hạn khóa thêm 30 giây nếu thread xử lý vẫn đang chạy bình thường.</p>
+      <p><strong>Result (R):</strong> Khóa luôn được giữ an toàn trong suốt quá trình tác vụ xử lý thực tế và được tự động giải phóng ngay lập tức nếu tiến trình ứng dụng đột ngột bị sập.</p>
+    </div>
+  </details>
+</div>
+
+<div class="qa-group">
+  <h3>💾 Phần 3: Thiết kế Cơ sở Dữ liệu MySQL, Partitioning & Indexing</h3>
+
+  <details class="qa-item">
+    <summary class="qa-summary">21. Tại sao hệ thống chia bảng đơn hàng theo tháng ticket_order_yyyyMM?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong hệ thống flash sale, bảng đơn hàng phình to hàng chục triệu dòng chỉ sau vài phiên bán vé, làm tốc độ ghi đơn mới (INSERT) giảm sâu do kích thước index vượt quá dung lượng RAM.</p>
+      <p><strong>Task (T):</strong> Thiết kế cấu trúc lưu trữ đơn hàng duy trì tốc độ ghi cao và ổn định theo thời gian.</p>
+      <p><strong>Action (A):</strong> Áp dụng kỹ thuật chia bảng vật lý theo tháng (Monthly Table Splitting) như <code>ticket_order_202604</code>, <code>ticket_order_202605</code> dựa trên ngày tạo đơn hàng.</p>
+      <p><strong>Result (R):</strong> Cô lập vùng ghi của tháng hiện tại. Kích thước chỉ mục nhỏ giúp thao tác ghi đơn hàng luôn đạt hiệu năng tối đa, đồng thời việc xóa dữ liệu lịch sử cực kỳ nhanh bằng lệnh DROP TABLE.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">22. Cách hệ thống tự động khởi tạo các bảng đơn hàng theo tháng diễn ra thế nào?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi chia bảng theo tháng, ứng dụng có nguy cơ bị lỗi ghi đơn nếu sang tháng mới mà bảng đơn hàng tương ứng chưa được tạo sẵn.</p>
+      <p><strong>Task (T):</strong> Tự động hóa hoàn toàn việc quản lý và khởi tạo bảng theo tháng ở tầng ứng dụng không gây gián đoạn dịch vụ.</p>
+      <p><strong>Action (A):</strong> Trước khi thực hiện INSERT, class <code>MySQLTicketOrderRepositoryAdapter</code> gọi hàm kiểm tra và thực thi lệnh DDL: <code>CREATE TABLE IF NOT EXISTS ticket_order_yyyyMM LIKE ticket_order_template</code>.</p>
+      <p><strong>Result (R):</strong> Hệ thống tự động thích ứng khi bước sang tháng mới không cần thao tác thủ công, không gây ảnh hưởng đến hiệu năng ghi đơn nhờ MySQL metadata cache.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">23. Tại sao trong môi trường phát triển dùng tệp SQL thủ công thay vì Flyway/Liquibase?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong dự án lab này, chúng tôi liên tục chạy các đợt benchmark, thay đổi cấu trúc bảng để thử nghiệm và cần reset toàn bộ dữ liệu về trạng thái ban đầu chỉ trong vài giây.</p>
+      <p><strong>Task (T):</strong> Đơn giản hóa việc quản lý schema DB trong môi trường nghiên cứu hiệu năng nhằm tăng tốc độ dọn dẹp môi trường.</p>
+      <p><strong>Action (A):</strong> Thiết lập các script SQL khởi tạo thủ công (<code>schema.sql</code>, <code>data.sql</code>) và chạy trực tiếp qua API <code>/admin/benchmarks/reset</code> thay vì dùng công cụ migration phức tạp.</p>
+      <p><strong>Result (R):</strong> Thời gian reset môi trường giảm xuống dưới 1 giây, loại bỏ hoàn toàn các lỗi xung đột checksum khi thử nghiệm các cấu trúc bảng khác nhau.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">24. Tại sao định dạng order_number "OKX-SGN-{userId}-{timestamp}" giúp chống trùng lặp?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Dưới tải cao, người dùng bấm nút mua vé nhiều lần hoặc mạng chập chờn gửi trùng request (Double Submit), dẫn tới việc mua thừa vé.</p>
+      <p><strong>Task (T):</strong> Thiết kế cơ chế chống trùng lặp đơn hàng nguyên tử ở tầng dữ liệu làm chốt chặn cuối cùng.</p>
+      <p><strong>Action (A):</strong> Sinh mã đơn hàng (<code>order_number</code>) duy nhất chứa ID người dùng và timestamp của request, đồng thời cấu hình cột <code>order_number</code> là chỉ mục duy nhất (<code>UNIQUE KEY</code>) trong MySQL.</p>
+      <p><strong>Result (R):</strong> Nếu có request trùng lặp lọt qua tầng cache, MySQL sẽ phát hiện trùng khóa duy nhất và từ chối chèn bản ghi mới (ném ra <code>DuplicateKeyException</code>), đảm bảo mỗi giao dịch chỉ sinh ra tối đa 1 đơn hàng thành công.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">25. Tại sao cần tạo index trên order_date và user_id ở bảng đơn hàng?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi người dùng truy cập trang lịch sử đơn hàng hoặc hệ thống đối soát quét các đơn hàng trong ngày, việc thiếu chỉ mục phù hợp sẽ buộc MySQL phải Full Table Scan, gây nghẽn CPU nghiêm trọng.</p>
+      <p><strong>Task (T):</strong> Thiết kế chỉ mục tối ưu cho các truy vấn tra cứu phổ biến nhất của đơn hàng.</p>
+      <p><strong>Action (A):</strong> Tạo chỉ mục đơn lẻ hoặc phức hợp trên hai trường <code>user_id</code> và <code>order_date</code> cho các bảng đơn hàng theo tháng.</p>
+      <p><strong>Result (R):</strong> Thời gian truy vấn lịch sử đơn hàng của người dùng giảm từ vài giây xuống dưới 5ms, giải phóng tài nguyên CPU của MySQL để tập trung cho các tác vụ ghi đơn.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">26. Sự khác biệt khi ghi chi tiết đơn hàng vào bảng chính và bảng con trong tải cao là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Ghi thông tin vào cả 2 bảng <code>ticket_order</code> và <code>ticket_order_details</code> trong cùng transaction làm tăng gấp đôi số lượng lệnh ghi I/O, kéo dài thời gian lock dòng và dễ gây timeout.</p>
+      <p><strong>Task (T):</strong> Tối giản hóa cấu trúc dữ liệu ghi để giảm áp lực ghi đĩa của MySQL dưới tải lớn.</p>
+      <p><strong>Action (A):</strong> Gộp các thông tin chi tiết cần thiết trực tiếp vào bảng chính <code>ticket_order</code> (như lưu dạng chuỗi JSON hoặc các trường định danh trực tiếp). Bảng con chỉ được dùng để seed dữ liệu tĩnh.</p>
+      <p><strong>Result (R):</strong> Giảm 50% số lượng truy vấn INSERT xuống MySQL trong luồng xử lý đồng thời, tăng tốc độ xử lý transaction và giảm thiểu nguy cơ nghẽn khóa dòng.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">27. Tại sao trong outbox_event, khóa chính id lại là kiểu VARCHAR(36) (UUID)?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi chèn sự kiện vào bảng Outbox song song, nếu sử dụng ID tự tăng (Auto Increment), tất cả các luồng xử lý sẽ phải tranh chấp khóa toàn cục của MySQL để lấy ID tiếp theo, tạo ra điểm nghẽn ghi.</p>
+      <p><strong>Task (T):</strong> Loại bỏ điểm nghẽn sinh ID tự tăng ở tầng database dưới tải cao.</p>
+      <p><strong>Action (A):</strong> Đặt khóa chính của bảng <code>outbox_event</code> là kiểu UUID (VARCHAR(36)) và thực hiện sinh UUID ngẫu nhiên bằng code Java ngay trên ứng dụng trước khi lưu xuống DB.</p>
+      <p><strong>Result (R):</strong> Các luồng chèn dữ liệu diễn ra hoàn toàn độc lập mà không cần phải chờ đợi lẫn nhau để lấy ID tiếp theo, tăng tốc độ chèn sự kiện outbox lên gấp nhiều lần.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">28. Giải thích InnoDB Row-level Locking khi chạy conditional update.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi nhiều người dùng cùng mua các loại vé khác nhau tại cùng một thời điểm, nếu MySQL khóa toàn bộ bảng dữ liệu khi cập nhật tồn kho, toàn bộ hệ thống sẽ bị tê liệt.</p>
+      <p><strong>Task (T):</strong> Đảm bảo cơ chế khóa có phạm vi nhỏ nhất để hỗ trợ xử lý song song tối đa.</p>
+      <p><strong>Action (A):</strong> Sử dụng công cụ lưu trữ InnoDB của MySQL và luôn thực hiện cập nhật tồn kho dựa trên khóa chính: <code>UPDATE ticket_item SET stock = stock - :qty WHERE id = :id</code>.</p>
+      <p><strong>Result (R):</strong> InnoDB chỉ thực hiện khóa độc quyền (Exclusive Lock) trên đúng dòng dữ liệu của vé có <code>id</code> tương ứng, giúp các giao dịch của các vé khác diễn ra hoàn toàn song song không bị ảnh hưởng.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">29. Làm thế nào để dọn dẹp dữ liệu đơn hàng cũ mà không gây khóa bảng hay ảnh hưởng hiệu năng?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Việc xóa hàng triệu dòng dữ liệu cũ bằng lệnh <code>DELETE FROM ticket_order WHERE create_date < ...</code> gây khóa bảng rất lâu, làm cạn kiệt tài nguyên CPU và ảnh hưởng nghiêm trọng đến các giao dịch hiện tại.</p>
+      <p><strong>Task (T):</strong> Thực hiện dọn dẹp dữ liệu cũ (Data Purging) một cách an toàn và nhanh gọn.</p>
+      <p><strong>Action (A):</strong> Nhờ thiết kế chia bảng theo tháng, thực thi lệnh DDL: <code>DROP TABLE ticket_order_yyyyMM</code> đối với các bảng của những tháng quá cũ.</p>
+      <p><strong>Result (R):</strong> MySQL giải phóng dung lượng ổ cứng ngay lập tức trong thời gian O(1) mà hoàn toàn không gây khóa dòng hay ảnh hưởng đến bảng đơn hàng của tháng hiện tại đang hoạt động.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">30. Nếu bảng ticket_item có hàng triệu bản ghi, chiến lược tối ưu hóa sẽ là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi hệ thống mở rộng quy mô phục vụ hàng triệu sự kiện vé trên toàn quốc, một bảng <code>ticket_item</code> duy nhất trong một database MySQL sẽ vượt quá giới hạn chịu tải vật lý của một máy chủ đơn lẻ.</p>
+      <p><strong>Task (T):</strong> Đề xuất giải pháp kiến trúc để mở rộng quy mô lưu trữ tồn kho vé lên gấp nhiều lần.</p>
+      <p><strong>Action (A):</strong> Thiết kế phương án phân mảnh dữ liệu (Sharding) bảng <code>ticket_item</code> sang nhiều database MySQL vật lý khác nhau dựa trên mã vùng địa lý, đồng thời thiết lập cụm Redis Cluster phân mảnh tồn kho tương ứng.</p>
+      <p><strong>Result (R):</strong> Tải trọng ghi và đọc được phân bổ đều ra nhiều máy chủ độc lập, loại bỏ điểm nghẽn duy nhất và cho phép hệ thống mở rộng dung lượng lưu trữ không giới hạn.</p>
+    </div>
+  </details>
+</div>
+
+<div class="qa-group">
+  <h3>🚀 Phần 4: Hạ tầng Caching & Lua Scripting với Redis</h3>
+
+  <details class="qa-item">
+    <summary class="qa-summary">31. Tại sao cấu hình Jackson2JsonRedisSerializer cho phần Value trong RedisTemplate?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi lưu trữ đối tượng Java phức tạp vào Redis, serializer mặc định của Java (JdkSerializationRedisSerializer) mã hóa dữ liệu thành các ký tự nhị phân khó đọc và chỉ có ứng dụng Java mới giải mã được.</p>
+      <p><strong>Task (T):</strong> Thiết lập định dạng lưu trữ cache thân thiện, dễ đọc và tương thích đa nền tảng.</p>
+      <p><strong>Action (A):</strong> Cấu hình <code>RedisTemplate</code> sử dụng <code>StringRedisSerializer</code> cho phần Key và <code>Jackson2JsonRedisSerializer</code> cho phần Value.</p>
+      <p><strong>Result (R):</strong> Dữ liệu lưu trên Redis ở dạng chuỗi JSON tường minh, giúp quản trị viên dễ dàng đọc hiểu, debug qua CLI và cho phép các ứng dụng viết bằng Go, Node.js khác cùng đọc chung vùng cache.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">32. Giải thích ý nghĩa của KEYS và ARGV trong Redis Lua Script.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi viết các đoạn script chạy trực tiếp trên Redis server để trừ tồn kho, chúng tôi cần phân biệt rõ giữa tên các biến khóa (Redis Keys) và các giá trị tham số đầu vào để Redis có thể định tuyến lệnh chính xác trong môi trường Cluster.</p>
+      <p><strong>Task (T):</strong> Áp dụng đúng cú pháp thiết kế Lua script của Redis để đảm bảo tính an toàn hệ thống.</p>
+      <p><strong>Action (A):</strong> Khai báo KEYS chứa các khóa Redis vật lý (ví dụ: KEYS[1] = "TICKET:4:STOCK") và ARGV chứa các tham số động truyền vào (ARGV[1] = "1" đại diện số lượng mua).</p>
+      <p><strong>Result (R):</strong> Tuân thủ đúng chuẩn Redis Cluster, giúp script có thể chạy an toàn trên bất kỳ node nào của cụm Redis phân tán mà không gây ra lỗi định tuyến key.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">33. Phân tích logic của đoạn script Lua trừ kho. Ý nghĩa các giá trị -1, -2.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Việc kiểm tra và trừ tồn kho trên Redis nếu thực hiện bằng nhiều câu lệnh riêng lẻ từ Java sẽ bị vi phạm tính nguyên tử (Atomicity), dẫn đến lỗi Race Condition trên cache.</p>
+      <p><strong>Task (T):</strong> Thiết kế logic trừ kho nguyên tử tuyệt đối bằng Lua Script và trả về các mã lỗi chuẩn xác cho Java xử lý.</p>
+      <p><strong>Action (A):</strong> Viết đoạn Lua script thực hiện đọc tồn kho hiện tại: nếu không tìm thấy key trả về <code>-2</code> (KEY_NOT_FOUND); nếu tồn kho nhỏ hơn số lượng yêu cầu mua, trả về <code>-1</code> (INSUFFICIENT_STOCK); nếu đủ tồn kho, thực hiện trừ kho bằng DECRBY và trả về số dư mới.</p>
+      <p><strong>Result (R):</strong> Toàn bộ logic trên chạy đơn luồng nguyên tử trên Redis server, loại bỏ 100% Race Condition trên cache và phản hồi kết quả trạng thái cực kỳ nhanh về ứng dụng.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">34. Lệnh EVAL và EVALSHA trong Redis khác nhau thế nào? Tại sao EVALSHA tối ưu hơn?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Dưới tải flash sale lớn, việc ứng dụng liên tục gửi toàn bộ chuỗi mã nguồn Lua Script dài hàng trăm ký tự xuống Redis sẽ làm lãng phí băng thông mạng và tốn tài nguyên biên dịch của Redis.</p>
+      <p><strong>Task (T):</strong> Tối ưu hóa giao thức giao tiếp giữa ứng dụng Spring Boot và Redis Server.</p>
+      <p><strong>Action (A):</strong> Sử dụng cơ chế tự động tải trước script lên Redis (<code>Script Load</code>) để lấy mã băm SHA-1. Khi thực thi nghiệp vụ, ứng dụng chỉ gọi lệnh <code>EVALSHA</code> kèm mã băm SHA-1.</p>
+      <p><strong>Result (R):</strong> Giảm thiểu tối đa lượng byte truyền qua mạng, giúp tiết kiệm băng thông và tăng tốc độ xử lý lệnh trên Redis server thêm khoảng 15-20% dưới tải cực hạn.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">35. Trong RedissonConfig, khi nào ta chọn chế độ single và khi nào chọn sentinel?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Môi trường chạy kiểm thử của lập trình viên (Local Dev) thường chỉ có 1 node Redis duy nhất để tiết kiệm RAM, trong khi môi trường thực tế (Production) yêu cầu cụm Redis có tính sẵn sàng cao (High Availability).</p>
+      <p><strong>Task (T):</strong> Thiết lập cấu hình linh hoạt cho thư viện Redisson tùy theo môi trường triển khai.</p>
+      <p><strong>Action (A):</strong> Viết class cấu hình <code>RedissonConfig</code> kiểm tra các biến môi trường để tự động chọn kết nối ở chế độ <code>useSingleServer()</code> (dev/test) hoặc <code>useSentinelServers()</code> (prod).</p>
+      <p><strong>Result (R):</strong> Hệ thống khởi chạy trơn tru trên mọi môi trường mà không cần chỉnh sửa mã nguồn, đảm bảo tính an toàn dữ liệu và tính sẵn sàng cao khi lên production.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">36. Chế độ Redis Sentinel hoạt động thế nào với 3 Sentinels?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi node Redis Master gặp sự cố sập nguồn, nếu ứng dụng không tự động chuyển hướng kết nối sang node Slave mới, toàn bộ hệ thống bán vé sẽ bị ngừng hoạt động.</p>
+      <p><strong>Task (T):</strong> Thiết lập cơ chế tự động chuyển vùng kết nối (Auto Failover) sử dụng Redis Sentinel.</p>
+      <p><strong>Action (A):</strong> Cấu hình cụm gồm 1 Master, 2 Slaves và 3 Sentinel độc lập. Khi Master sập, các Sentinel đạt sự đồng thuận (Quorum = 2), thăng cấp cho một Slave lên làm Master mới, và thư viện Redisson tự động nhận cấu hình mới định tuyến kết nối sang Master mới.</p>
+      <p><strong>Result (R):</strong> Hệ thống tự phục hồi sau sự cố sập cache chỉ trong vòng dưới 10 giây, đảm bảo tính sẵn sàng hoạt động liên tục 24/7.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">37. Làm thế nào để pre-warm tồn kho từ database lên Redis một cách an toàn?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Nếu hệ thống mở bán vé flash sale mà không nạp sẵn tồn kho vào cache, đợt traffic khổng lồ đầu tiên ập vào sẽ truy vấn trực tiếp xuống DB (Cache Miss), làm sập cơ sở dữ liệu MySQL ngay lập tức.</p>
+      <p><strong>Task (T):</strong> Triển khai quy trình nạp trước dữ liệu tồn kho (Pre-warming) vào cache một cách an toàn và nhất quán.</p>
+      <p><strong>Action (A):</strong> Viết API <code>/admin/tickets/{id}/stock/warmup</code> truy vấn số lượng tồn kho chính xác từ DB và nạp trực tiếp vào Redis bằng lệnh <code>SET</code> trước thời điểm mở bán 5 phút.</p>
+      <p><strong>Result (R):</strong> Tránh được hoàn toàn hiện tượng sập DB do cache trống lúc mở bán, đảm bảo 100% request đặt vé đầu tiên được phục vụ nhanh chóng từ RAM của Redis.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">38. Hiện tượng Cache Avalanche và Cache Penetration là gì? Dự án phòng tránh ra sao?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Cache của các hệ thống flash sale rất dễ bị tấn công hoặc gặp sự cố: Avalanche (hàng loạt key hết hạn cùng lúc) và Penetration (kẻ xấu gửi hàng triệu request với ID vé giả lập không tồn tại).</p>
+      <p><strong>Task (T):</strong> Thiết kế cơ chế phòng vệ cache vững chắc cho ứng dụng.</p>
+      <p><strong>Action (A):</strong> Không thiết lập thời gian hết hạn (no TTL) cho key tồn kho vé trong suốt đợt mở bán, viết validator kiểm tra định dạng ID ngay từ tầng Controller, và áp dụng cơ chế cache các ID không tồn tại với giá trị trống (Null Cache).</p>
+      <p><strong>Result (R):</strong> Hệ thống vận hành an toàn và ổn định trước các kịch bản lỗi cache phổ biến và các đợt quét phá hoại của hacker.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">39. Tại sao cấu hình connection pool size của Redis là 50 (max) và 10 (idle min)?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Nếu cấu hình connection pool tới Redis quá nhỏ, ứng dụng sẽ bị nghẽn luồng xử lý do phải chờ kết nối trống dưới tải cao. Ngược lại, nếu cấu hình quá lớn sẽ làm cạn kiệt tài nguyên socket của Redis server.</p>
+      <p><strong>Task (T):</strong> Điều chỉnh connection pool size của Redis tối ưu dựa trên kết quả đo đạc thực tế.</p>
+      <p><strong>Action (A):</strong> Cấu hình các tham số connection pool trong file <code>application.yml</code> với <code>max-active: 50</code> và <code>min-idle: 10</code>.</p>
+      <p><strong>Result (R):</strong> Đảm bảo hệ thống luôn có sẵn kết nối ấm để xử lý tức thì các request tăng vọt đột ngột, giúp thông lượng đạt mức tối đa <strong>443 req/sec</strong> mà không làm quá tải tài nguyên mạng.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">40. Nếu server chạy Redis sập nguồn điện đột ngột, tồn kho vé có bị mất không?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Redis lưu trữ dữ liệu chính trên RAM. Nếu máy chủ Redis đột ngột bị sập nguồn điện vật lý, nguy cơ mất toàn bộ dữ liệu tồn kho hiện tại và gây lỗi sai lệch vé bán ra là rất cao.</p>
+      <p><strong>Task (T):</strong> Đảm bảo tính bền vững và khả năng phục hồi dữ liệu tồn kho của cache sau sự cố sập nguồn.</p>
+      <p><strong>Action (A):</strong> Bật cấu hình ghi đĩa AOF mỗi giây một lần và RDB trên Redis. Thiết kế MySQL là nguồn chân lý gốc. Khi Redis khởi động lại, dịch vụ <code>OrderReconciliationService</code> sẽ tự động quét đối soát và nạp lại tồn kho chính xác từ DB.</p>
+      <p><strong>Result (R):</strong> Dữ liệu tồn kho được bảo vệ an toàn tuyệt đối. Hệ thống tự động phục hồi về trạng thái đúng mà không cần quản trị viên phải can thiệp phục hồi dữ liệu thủ công.</p>
+    </div>
+  </details>
+</div>
+
+<div class="qa-group">
+  <h3>✉️ Phần 5: Transactional Outbox, Kafka & Nhất quán dữ liệu</h3>
+
+  <details class="qa-item">
+    <summary class="qa-summary">41. Giải thích chi tiết luồng đi của một sự kiện thông qua Outbox pattern.</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Gửi trực tiếp sự kiện sang Kafka ngay trong luồng HTTP nghiệp vụ có thể làm rollback transaction DB của đơn hàng nếu Kafka lỗi mạng, hoặc DB ghi lỗi nhưng Kafka vẫn gửi tin nhắn đi.</p>
+      <p><strong>Task (T):</strong> Thiết kế luồng xuất bản sự kiện đáng tin cậy, tách biệt giao dịch database khỏi giao dịch gửi tin nhắn mạng.</p>
+      <p><strong>Action (A):</strong> Trong cùng transaction ghi đơn hàng vào MySQL, chèn thêm một dòng sự kiện trạng thái <code>PENDING</code> vào bảng <code>outbox_event</code>. Một worker ngầm <code>OutboxPublishScheduler</code> quét bảng này mỗi giây, gửi sang Kafka và cập nhật trạng thái thành <code>PUBLISHED</code>.</p>
+      <p><strong>Result (R):</strong> Đảm bảo tính nguyên tử: đơn hàng được lưu thì sự kiện chắc chắn được lưu. Loại bỏ hoàn toàn rủi ro mất mát sự kiện hoặc gửi nhầm dữ liệu sang hệ thống thanh toán/gửi email.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">42. Tại sao Outbox pattern giải quyết được bài toán "At-least-once delivery"?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Lỗi mạng chập chờn có thể làm đứt kết nối đúng lúc Kafka phản hồi ACK, khiến worker không thể cập nhật trạng thái sự kiện thành <code>PUBLISHED</code> trong DB.</p>
+      <p><strong>Task (T):</strong> Thiết kế cơ chế đảm bảo sự kiện không bao giờ bị thất lạc kể cả khi có lỗi mạng xảy ra.</p>
+      <p><strong>Action (A):</strong> Thiết lập cơ chế gửi lại: Worker quét các sự kiện vẫn ở trạng thái <code>PENDING</code> hoặc <code>FAILED</code> sau một khoảng thời gian chờ (10 giây) và tiến hành gửi lại sang Kafka (tối đa 5 lần).</p>
+      <p><strong>Result (R):</strong> Đảm bảo sự kiện chắc chắn được gửi đến Kafka ít nhất một lần. Các hệ thống tiêu thụ (Consumer) phía sau chỉ cần triển khai cơ chế lọc trùng (Idempotent Consumer) dựa trên mã đơn hàng.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">43. Làm thế nào để đảm bảo thứ tự của các sự kiện đơn hàng được gửi sang Kafka luôn chính xác?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Nếu các sự kiện cập nhật trạng thái của cùng một đơn hàng (ví dụ: <code>ORDER_CREATED</code> rồi đến <code>ORDER_PAID</code>) bị gửi xáo trộn thứ tự đến Consumer, hệ thống thanh toán có thể xử lý sai logic nghiệp vụ.</p>
+      <p><strong>Task (T):</strong> Đảm bảo thứ tự xuất bản và tiêu thụ sự kiện theo chuỗi thời gian chính xác đối với từng đơn hàng cụ thể.</p>
+      <p><strong>Action (A):</strong> Khi gửi tin nhắn qua <code>KafkaTemplate</code>, chúng tôi đặt giá trị khóa tin nhắn (<strong>Message Key</strong>) chính là <code>orderNumber</code> của đơn hàng đó.</p>
+      <p><strong>Result (R):</strong> Kafka đảm bảo tất cả tin nhắn có chung Message Key sẽ luôn được định tuyến vào cùng một phân vùng duy nhất (<strong>Partition</strong>) của topic và được tiêu thụ theo đúng thứ tự FIFO.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">44. Phân tích truy vấn quét sự kiện của Outbox Worker: LIMIT 50 có vai trò gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Dưới tải flash sale cực lớn với hàng trăm ngàn đơn hàng thành công, nếu Outbox Worker quét toàn bộ sự kiện chờ xử lý vào bộ nhớ JVM cùng lúc, hệ thống sẽ bị quá tải bộ nhớ và treo máy chủ.</p>
+      <p><strong>Task (T):</strong> Giới hạn lượng dữ liệu xử lý trong mỗi chu kỳ quét của worker để bảo vệ bộ nhớ JVM và hạn chế thời gian khóa bảng.</p>
+      <p><strong>Action (A):</strong> Cấu hình câu lệnh SELECT lấy sự kiện dạng phân trang hoặc giới hạn số lượng: <code>SELECT * FROM outbox_event WHERE status = 'PENDING' ORDER BY created_at LIMIT 50</code>.</p>
+      <p><strong>Result (R):</strong> Worker xử lý mượt mà theo từng lô nhỏ, kiểm soát tốt tài nguyên bộ nhớ JVM (tránh lỗi Out Of Memory) và giảm thiểu tối đa thời gian lock bảng outbox của MySQL.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">45. Đánh đổi về mặt thời gian (Latency) khi sử dụng Transactional Outbox là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Gửi tin nhắn trực tiếp sang Kafka có độ trễ cực thấp nhưng kém an toàn. Chuyển sang dùng Outbox đảm bảo an toàn giao dịch nhưng có thể tạo độ trễ truyền tin nhắn.</p>
+      <p><strong>Task (T):</strong> Đánh giá điểm đánh đổi về thời gian phản hồi tin nhắn để đưa ra cấu hình worker phù hợp.</p>
+      <p><strong>Action (A):</strong> Hệ thống chấp nhận đánh đổi tính Nhất quán thời gian thực (Strong Consistency) lấy tính Nhất quán sau cùng (Eventual Consistency), điều chỉnh scheduler quét bảng outbox chạy mỗi 1 giây.</p>
+      <p><strong>Result (R):</strong> Tốc độ phản hồi API đặt vé HTTP giảm xuống tối thiểu (vì không phải chờ kết nối Kafka), đổi lại tin nhắn sẽ đến Kafka chậm hơn khoảng 0.5 - 1 giây. Đây là mức đánh đổi hoàn toàn chấp nhận được trong hệ thống thương mại điện tử.</p>
+    </div>
+  </details>
+</div>
+
+<div class="qa-group">
+  <h3>📊 Phần 6: Load Testing, Monitoring & Tối ưu hóa JVM/Hạ tầng</h3>
+
+  <details class="qa-item">
+    <summary class="qa-summary">46. Bạn sử dụng công cụ nào để thực hiện load test hệ thống?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trước khi tối ưu hóa, chúng tôi không có dữ liệu định lượng về giới hạn chịu tải, thời gian phản hồi và tỷ lệ lỗi của hệ thống dưới áp lực truy cập đồng thời của flash sale.</p>
+      <p><strong>Task (T):</strong> Xây dựng kịch bản kiểm thử hiệu năng tự động và có tính lặp lại cao để đo đạc thông số hệ thống.</p>
+      <p><strong>Action (A):</strong> Sử dụng Apache JMeter 5.x thiết lập kịch bản stress test gửi 5000 requests liên tiếp từ 100 luồng chạy đồng thời. Viết script PowerShell <code>run-jmeter.ps1</code> để tự động hóa toàn bộ chu kỳ đo đạc và lưu manifest kết quả.</p>
+      <p><strong>Result (R):</strong> Kết quả đo đạc thực tế chỉ ra chiến lược <code>REDIS_LUA_WITH_COMPENSATION</code> đạt thông lượng tốt nhất với <strong>443 req/sec</strong>, trung bình phản hồi <strong>165ms</strong>, và tỷ lệ lỗi/oversold bằng <strong>0%</strong>.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">47. Vai trò của node-exporter và prometheus trong lúc ép tải là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi chạy stress test, nếu chỉ nhìn vào kết quả trả về của JMeter, chúng tôi không thể biết máy chủ bị nghẽn ở tài nguyên nào (CPU, RAM hay Disk I/O) để đưa ra phương án tối ưu hóa.</p>
+      <p><strong>Task (T):</strong> Thiết lập hệ thống giám sát thời gian thực để thu thập chi tiết thông số phần cứng và ứng dụng.</p>
+      <p><strong>Action (A):</strong> Triển khai <code>node-exporter</code> để thu thập tài nguyên phần cứng, và cấu hình <code>prometheus</code> định kỳ kéo (pull) dữ liệu này cùng các metric từ Spring Actuator (<code>/actuator/prometheus</code>) để hiển thị lên Grafana.</p>
+      <p><strong>Result (R):</strong> Giúp phát hiện nhanh các điểm nghẽn tài nguyên (như CPU chạm ngưỡng 100% hoặc Disk I/O quá tải do ghi log), từ đó đưa ra quyết định tối ưu cấu hình chính xác.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">48. JVM Stop-the-world GC pause ảnh hưởng thế nào đến hiệu năng đặt vé?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong quá trình chạy stress test tải cao, chúng tôi phát hiện biểu đồ thời gian phản hồi (latency) thỉnh thoảng bị vọt lên rất cao, làm sụt giảm thông lượng hệ thống một cách đột ngột.</p>
+      <p><strong>Task (T):</strong> Xác định nguyên nhân gây trễ và tối ưu hóa cấu hình máy ảo Java (JVM) để giảm thiểu tối đa thời gian tạm dừng hệ thống.</p>
+      <p><strong>Action (A):</strong> Phân tích nhật ký dọn rác (GC logs) và phát hiện các đợt dừng toàn bộ ứng dụng do Garbage Collector mặc định hoạt động quá công suất. Thực hiện cấu hình chuyển sang bộ dọn rác G1GC và tối ưu hóa kích thước Heap Size (<code>-Xms2g -Xmx2g</code>).</p>
+      <p><strong>Result (R):</strong> Giảm thời gian Stop-the-world GC xuống dưới 10ms, triệt tiêu hoàn toàn hiện tượng vọt trễ và giúp thông lượng hệ thống duy trì ở mức cao và ổn định trong suốt đợt ép tải.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">49. Tại sao cấu hình Logstash nhận log qua TCP/JSON thay vì ghi ra tệp log thông thường?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Ghi log ra ổ cứng máy chủ (File I/O) là một thao tác cực kỳ chậm và gây nghẽn cổ chai CPU khi chạy tải cao, làm sụt giảm nghiêm trọng thông lượng của Spring Boot.</p>
+      <p><strong>Task (T):</strong> Tối ưu hóa hiệu năng ghi log của ứng dụng dưới tải lớn.</p>
+      <p><strong>Action (A):</strong> Cấu hình <code>LogstashTcpSocketAppender</code> trong logback truyền log qua giao thức mạng TCP dạng JSON trực tiếp đến Logstash thay vì ghi xuống đĩa cứng vật lý của ứng dụng.</p>
+      <p><strong>Result (R):</strong> Giải phóng hoàn toàn ổ đĩa cứng khỏi việc ghi log, giúp CPU tập trung xử lý logic nghiệp vụ và tăng hiệu năng xử lý của backend lên đáng kể.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">50. Nếu cần mở rộng hệ thống đáp ứng lượng traffic gấp 10 lần, bạn sẽ đề xuất gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Chiến dịch flash sale sắp tới dự kiến sẽ thu hút lượng người dùng tăng đột biến gấp 10 lần so với giới hạn chịu tải hiện tại của một máy chủ đơn lẻ.</p>
+      <p><strong>Task (T):</strong> Lập phương án thiết kế hệ thống có khả năng mở rộng quy mô (Scalability) tương ứng với lượng traffic mới.</p>
+      <p><strong>Action (A):</strong> Đề xuất kiến trúc mở rộng toàn diện: Triển khai cụm Spring Boot phía sau Load Balancer và bật chế độ Virtual Threads của Java 21, chuyển đổi sang Redis Cluster để phân mảnh tồn kho vé, áp dụng phân mảnh dữ liệu (Sharding) cơ sở dữ liệu MySQL theo ID sự kiện, và đưa các yêu cầu đặt vé vào hàng đợi Kafka để xử lý không đồng bộ.</p>
+      <p><strong>Result (R):</strong> Đảm bảo hệ thống có khả năng mở rộng ngang không giới hạn, nâng thông lượng xử lý từ 443 req/sec lên hơn 4,400 req/sec mà vẫn giữ nguyên cam kết an toàn tồn kho.</p>
+    </div>
+  </details>
+</div>
+
+<div class="qa-group">
+  <h3>🌐 Phần 7: Mở rộng System Design, Spring Core & Distributed Patterns</h3>
+
+  <details class="qa-item">
+    <summary class="qa-summary">51. Cơ chế hoạt động của @Transactional trong Spring và tại sao nó không hoạt động khi tự gọi (self-invocation)?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong ứng dụng Spring Boot, chúng tôi sử dụng annotation <code>@Transactional</code> để quản lý giao dịch database. Một lỗi phổ biến là khi viết một phương thức không có transaction gọi một phương thức có transaction trong cùng một class, giao dịch không hề được mở và dữ liệu không rollback khi gặp sự cố.</p>
+      <p><strong>Task (T):</strong> Giải thích cơ chế proxy đứng sau <code>@Transactional</code> và cách khắc phục lỗi tự gọi (self-invocation).</p>
+      <p><strong>Action (A):</strong> Giải thích rằng Spring bọc Bean bằng một Dynamic Proxy để đánh chặn cuộc gọi và quản lý transaction (mở/commit/rollback). Khi tự gọi nội bộ trong cùng một class, cuộc gọi không đi qua proxy mà đi trực tiếp vào method thực tế. Khắc phục bằng cách: (1) Tách logic sang Bean khác; (2) Tự inject chính Bean đó bằng <code>@Autowired</code> + <code>@Lazy</code>; (3) Sử dụng <code>AopContext.currentProxy()</code>.</p>
+      <p><strong>Result (R):</strong> Đảm bảo 100% các giao dịch ghi đơn hàng và outbox event được bọc đúng proxy, loại bỏ hoàn toàn các trường hợp không rollback dữ liệu do lỗi cấu hình transaction.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">52. Sự khác biệt giữa Transaction Propagation REQUIRED và REQUIRES_NEW? Ứng dụng thế nào?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi đặt vé, hệ thống cần ghi log hành trình giao dịch của người dùng. Nếu việc ghi log giao dịch phụ thất bại làm rollback luôn cả đơn đặt vé thành công của khách hàng, đó là một lỗi nghiệp vụ nghiêm trọng.</p>
+      <p><strong>Task (T):</strong> Phân định ranh giới transaction của luồng chính (đặt vé) và luồng phụ (ghi log/outbox) bằng cơ chế lan truyền transaction (Propagation).</p>
+      <p><strong>Action (A):</strong> Cấu hình luồng chính đặt vé dùng propagation <code>REQUIRED</code> (sử dụng transaction hiện tại nếu có, tạo mới nếu chưa). Cấu hình luồng ghi log audit dùng propagation <code>REQUIRES_NEW</code> (luôn tạo transaction mới độc lập, tạm dừng transaction hiện tại).</p>
+      <p><strong>Result (R):</strong> Đơn đặt vé chính vẫn được tạo thành công ngay cả khi hệ thống ghi log audit gặp lỗi và bị rollback, tăng độ tin cậy của giao dịch lên mức tối đa.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">53. Cách giải quyết các hiện tượng tranh chấp dữ liệu (Dirty Read, Non-repeatable Read, Phantom Read) ở mức database Isolation Levels?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Dưới áp lực truy cập đồng thời của flash sale, nhiều transaction đọc và ghi tồn kho chạy song song. Nếu không thiết lập mức độ cô lập (Isolation Level) phù hợp, các transaction đọc sẽ thấy dữ liệu tạm thời chưa commit hoặc bị thay đổi giữa chừng, dẫn đến tính toán sai tồn kho.</p>
+      <p><strong>Task (T):</strong> Lựa chọn và cấu hình mức độ cô lập tối ưu giữa tính toàn vẹn dữ liệu và hiệu năng ghi của MySQL.</p>
+      <p><strong>Action (A):</strong> Sử dụng mức cô lập mặc định của InnoDB là <code>REPEATABLE READ</code>. Mức này sử dụng kỹ thuật MVCC (Multi-Version Concurrency Control) và Next-Key Locks để ngăn chặn hoàn toàn Dirty Read và Non-repeatable Read, đồng thời chống Phantom Read mà không cần nâng lên mức <code>SERIALIZABLE</code> quá chậm.</p>
+      <p><strong>Result (R):</strong> Đảm bảo các luồng đọc tồn kho để đối soát dữ liệu luôn nhận được kết quả nhất quán trên mọi truy vấn, bảo vệ tính toàn vẹn dữ liệu với hiệu năng ghi tối đa.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">54. Cơ chế MySQL Replication (Master-Slave) hoạt động thế nào và cách xử lý lỗi trễ đồng bộ (Replication Lag)?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Để tăng khả năng chịu tải, chúng tôi thiết lập cụm DB gồm 1 node Master (chuyên ghi) và các node Slaves (chuyên đọc). Khi người dùng vừa đặt vé thành công (ghi Master) và lập tức chuyển sang trang lịch sử đơn hàng (đọc Slave), nếu Slave chưa kịp đồng bộ dữ liệu (Replication Lag), người dùng sẽ không thấy đơn hàng mới của mình.</p>
+      <p><strong>Task (T):</strong> Thiết kế giải pháp phân phối đọc/ghi đảm bảo trải nghiệm người dùng không bị ảnh hưởng bởi độ trễ đồng bộ.</p>
+      <p><strong>Action (A):</strong> Áp dụng các giải pháp: (1) Pin to Master: Sau khi ghi Master, bắt buộc các yêu cầu đọc thông tin đơn hàng của người dùng đó phải định tuyến thẳng về Master trong vài giây đầu; (2) Sử dụng Semi-synchronous Replication đảm bảo ít nhất 1 node Slave đã nhận được binlog trước khi Master phản hồi thành công.</p>
+      <p><strong>Result (R):</strong> Loại bỏ hoàn toàn lỗi hiển thị thiếu thông tin sau khi mua vé, đảm bảo trải nghiệm người dùng mượt mà trong khi vẫn tận dụng được sức mạnh đọc song song của cụm Slave.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">55. Virtual Threads (Java 21) hoạt động thế nào? Sự khác biệt với Platform Thread và hiện tượng Pinning là gì?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Thread truyền thống của Java (Platform Thread) ánh xạ 1-1 với Kernel Thread của hệ điều hành, tiêu tốn khoảng 1MB RAM mỗi thread. Khi có 5000 request đồng thời, việc tạo quá nhiều thread sẽ làm sập bộ nhớ máy chủ.</p>
+      <p><strong>Task (T):</strong> Tăng khả năng xử lý đồng thời lên gấp nhiều lần mà không cần viết code reactive phức tạp.</p>
+      <p><strong>Action (A):</strong> Bật tính năng Virtual Threads trên Spring Boot 3.3.5 (Java 21). Ánh xạ hàng vạn Virtual Threads (chỉ vài KB) lên một số lượng nhỏ Carrier Threads (Platform Threads chạy trên CPU cores). Tránh hiện tượng Pinning bằng cách thay thế các khối lệnh <code>synchronized</code> bằng <code>ReentrantLock</code> để không block Carrier Thread khi chạy I/O.</p>
+      <p><strong>Result (R):</strong> Hệ thống xử lý mượt mà 5000 requests đồng thời chỉ với tài nguyên RAM cực kỳ nhỏ, thông lượng cải thiện rõ rệt mà vẫn giữ nguyên mô hình lập trình đồng bộ (imperative code) trực quan.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">56. So sánh cơ chế CAS (Compare-And-Swap) của AtomicInteger với block synchronized truyền thống trong Java?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi cần tăng/giảm một biến đếm toàn cục (như số lượng request thành công) song song trên bộ nhớ, việc dùng block <code>synchronized</code> sẽ ép các thread phải xếp hàng chờ đợi, làm giảm đáng kể hiệu năng CPU.</p>
+      <p><strong>Task (T):</strong> Thực hiện cập nhật biến đếm nguyên tử với hiệu năng cao nhất dưới tải lớn.</p>
+      <p><strong>Action (A):</strong> Sử dụng các lớp Atomic (như <code>AtomicInteger</code>, <code>LongAdder</code>) chạy trên cơ chế CAS (Compare-And-Swap) ở mức phần cứng CPU (không sử dụng lock ở mức OS). Thread sẽ đọc giá trị, tính toán giá trị mới, và gửi lệnh CPU so sánh và ghi đè giá trị nếu trùng khớp giá trị cũ; nếu khác, lặp lại vòng thử (spin loop).</p>
+      <p><strong>Result (R):</strong> Thông lượng cập nhật biến đếm tăng gấp 5-10 lần so với sử dụng <code>synchronized</code>, giúp giảm tải tranh chấp thread trên CPU và loại bỏ nguy cơ nghẽn luồng.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">57. Hiện tượng Consumer Rebalance trong Kafka là gì? Làm thế nào để giảm thiểu ảnh hưởng của nó?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi consumer group đang tiêu thụ sự kiện đơn hàng, nếu có một consumer node mới tham gia hoặc node cũ bị sập (hoặc xử lý quá lâu gây timeout), Kafka sẽ kích hoạt tiến trình Rebalance để chia lại partition. Trong lúc Rebalance diễn ra, toàn bộ việc tiêu thụ sự kiện bị đóng băng, gây tắc nghẽn tin nhắn.</p>
+      <p><strong>Task (T):</strong> Tối ưu hóa cấu hình consumer để giảm tần suất và tác động của tiến trình Rebalance.</p>
+      <p><strong>Action (A):</strong> Thực hiện cấu hình các tham số consumer: Tăng <code>max.poll.interval.ms</code> (lên 5 phút) để tránh consumer bị coi là chết khi đang xử lý lô đơn hàng lớn, điều chỉnh <code>session.timeout.ms</code> hợp lý, và áp dụng phân chia partition tĩnh (Static Membership) bằng cách cấu hình <code>group.instance.id</code>.</p>
+      <p><strong>Result (R):</strong> Thời gian đóng băng hệ thống do Rebalance giảm từ vài phút xuống gần như bằng 0, đảm bảo luồng xử lý sự kiện đặt vé từ Kafka luôn trơn tru và liên tục.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">58. Làm thế nào Kafka đảm bảo Exactly-Once Semantics (EOS)?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong luồng xuất bản sự kiện nghiệp vụ sang Kafka, nếu chỉ sử dụng At-least-once, lỗi mạng hoặc gửi lại tin nhắn từ Outbox worker có thể gây trùng lặp sự kiện, dẫn tới việc xử lý nghiệp vụ sai ở Consumer (ví dụ: trừ tiền khách hàng 2 lần).</p>
+      <p><strong>Task (T):</strong> Thiết lập cơ chế gửi tin nhắn Exactly-Once nguyên tử trên toàn bộ luồng truyền tin.</p>
+      <p><strong>Action (A):</strong> Cấu hình Idempotent Producer (<code>enable.idempotence=true</code>) để Kafka gán ID duy nhất cho từng lô tin nhắn và lọc trùng ở broker. Đồng thời sử dụng giao dịch Kafka (Kafka Transactions) bọc các hoạt động đọc-xử lý-ghi của consumer bằng cách cấu hình <code>processing.guarantee=exactly_once_v2</code>.</p>
+      <p><strong>Result (R):</strong> Đảm bảo mỗi sự kiện đơn hàng chỉ được lưu và xử lý đúng một lần duy nhất trên toàn bộ hệ thống phân tán, loại bỏ hoàn toàn các lỗi nghiệp vụ do trùng lặp tin nhắn.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">59. Cách thiết kế Dead Letter Topic (DLT) và retry policy trong Kafka Consumer khi gặp sự cố nghiệp vụ?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi consumer nhận một sự kiện đặt vé để xử lý, nếu gặp sự cố mạng tạm thời hoặc lỗi dữ liệu không hợp lệ, việc consumer liên tục thử lại ngay trên luồng chính sẽ gây nghẽn toàn bộ partition đó.</p>
+      <p><strong>Task (T):</strong> Thiết kế cơ chế xử lý lỗi không đồng bộ giúp cô lập tin nhắn lỗi mà không ảnh hưởng đến các tin nhắn bình thường khác.</p>
+      <p><strong>Action (A):</strong> Thiết lập kiến trúc Retry & DLT: Khi xử lý tin nhắn gặp lỗi tạm thời (Transient Error), gửi tin nhắn đó sang một Retry Topic kèm cấu hình trễ (Backoff Delay) để xử lý lại sau. Nếu thử lại quá số lần quy định hoặc gặp lỗi nghiệp vụ không thể sửa (Non-retryable Error), gửi tin nhắn đó sang Dead Letter Topic (DLT) để kiểm tra thủ công, đồng thời commit offset tin nhắn gốc trên topic chính để tiếp tục luồng.</p>
+      <p><strong>Result (R):</strong> Ngăn chặn hoàn toàn hiện tượng nghẽn partition do lỗi của một vài tin nhắn cá biệt, đảm bảo hệ thống luôn hoạt động liên tục và các lỗi được ghi nhận đầy đủ để xử lý sau.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">60. Cách triển khai Distributed Rate Limiting chống tấn công DDoS ở tầng Gateway bằng Redis?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Trong các chiến dịch flash sale, hàng triệu bot hoặc kẻ xấu có thể gửi hàng loạt request rác liên tục để làm sập hệ thống đặt vé. Một giải pháp Rate Limit cục bộ trên từng node Spring Boot là không đủ vì không chia sẻ được trạng thái giới hạn giữa các node trong cụm.</p>
+      <p><strong>Task (T):</strong> Thiết kế cơ chế giới hạn tần suất truy cập phân tán (Distributed Rate Limiting) dùng chung cho toàn bộ cụm server.</p>
+      <p><strong>Action (A):</strong> Triển khai thuật toán Token Bucket hoặc Sliding Window Log sử dụng Redis và Lua Script tại tầng API Gateway (Nginx hoặc Spring Cloud Gateway). Mỗi request gửi đến sẽ gọi script Lua để kiểm tra và giảm số lượng token hiện tại của IP/User trong Redis. Nếu hết token, lập tức trả về mã HTTP <code>429 Too Many Requests</code>.</p>
+      <p><strong>Result (R):</strong> Ngăn chặn hiệu quả 100% các đợt càn quét của bot rác, bảo vệ tài nguyên tính toán của backend Spring Boot chỉ dành cho người dùng thực tế và duy trì tính ổn định của hệ thống.</p>
+    </div>
+  </details>
+
+  <details class="qa-item">
+    <summary class="qa-summary">61. Làm thế nào để triển khai Distributed Tracing giám sát luồng đi của request qua các microservices?</summary>
+    <div class="qa-content">
+      <p><strong>Situation (S):</strong> Khi chuyển dịch sang kiến trúc microservices (Order, Payment, Notification Service), việc debug lỗi hoặc tìm nguyên nhân gây chậm request trở nên cực kỳ khó khăn vì log bị phân mảnh ở nhiều máy chủ khác nhau.</p>
+      <p><strong>Task (T):</strong> Thiết lập hệ thống giám sát hành trình request xuyên suốt qua toàn bộ các service phân tán.</p>
+      <p><strong>Action (A):</strong> Tích hợp thư viện OpenTelemetry vào các service. Khi một request đi vào API Gateway, hệ thống tự động sinh một Trace ID duy nhất. ID này được đính kèm vào HTTP Header (theo chuẩn W3C traceparent) và truyền qua các lệnh gọi REST API hoặc chèn vào metadata của Kafka message. Tất cả log ghi nhận đều được cấu hình in kèm Trace ID này và đẩy về Jaeger/Zipkin.</p>
+      <p><strong>Result (R):</strong> Quản trị viên chỉ cần tìm kiếm theo Trace ID trên giao diện Jaeger là có thể nhìn thấy toàn bộ sơ đồ thời gian phản hồi (Gantt Chart) của request qua từng service, giúp định vị chính xác vị trí lỗi hoặc nút thắt cổ chai chỉ trong vài giây.</p>
+    </div>
+  </details>
+</div>
+
 </div>
 
 <!-- ═══ FOOTER ═══ -->

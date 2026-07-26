@@ -1,6 +1,6 @@
 package com.xxxx.ddd.domain.service.impl;
 
-import com.xxxx.ddd.domain.respository.TickerOrderRepository;
+import com.xxxx.ddd.domain.repository.TickerOrderRepository;
 import com.xxxx.ddd.domain.service.TickerOrderDomainService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

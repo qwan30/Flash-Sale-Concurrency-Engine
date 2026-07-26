@@ -205,7 +205,7 @@ public class StockOrderCacheService {
         
         // Bước 1: Lấy stock từ MySQL
         TicketDetailCache ticketDetailCache = 
-            ticketDetailCacheServiceRefactor.getTicketDetail(ticketId, null);
+            ticketDetailCacheService.getTicketDetail(ticketId, null);
         if(ticketDetailCache == null) return false;
         
         // Bước 2: Tạo key

@@ -12,10 +12,18 @@
 [![Next.js Dashboard](https://img.shields.io/badge/Dashboard-Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
-**A backend concurrency reliability lab** that proves stock-deduction correctness under extreme flash-sale load. Tests 4 distinct strategies — from naive DB writes through optimistic locking to Redis Lua atomic gating with automatic compensation — producing reproducible JMeter benchmarks, Redis/MySQL consistency verification, and drift self-healing. Built with **Domain-Driven Design** principles, virtual threads, transactional outbox pattern, and a Next.js operator dashboard.
+> **An unsafe stock deduction oversold 4,000 units under 100-thread load and drove database stock to −2,278. Three successive strategies took that to zero — at 2.5× the throughput.**
 
-> **🟢 Lab Status: v2.0 — June 2026**
-> All 4 concurrency strategies benchmarked with reproducible evidence. REDIS_LUA_WITH_COMPENSATION achieves **443 req/s** at **166 ms** average latency with zero oversells and zero Redis/DB drift. CI/CD pipeline active with Docker builds published to GHCR.
+**A backend concurrency reliability lab** that tests stock-deduction correctness under flash-sale load. It compares 4 strategies — unsafe DB updates, conditional DB updates, Redis Lua gating, and Redis Lua with compensation — and records JMeter evidence, Redis/MySQL consistency checks, and reconciliation behavior. Built with **Domain-Driven Design** principles, virtual threads, a transactional outbox, and a Next.js operator dashboard.
+
+Every number quoted below is reproducible from committed artifacts under [`benchmark/results/`](benchmark/results/) — each run directory holds its reset, warmup, consistency snapshot, and summary row.
+
+![Operator control desk](screen-demo/07-admin-control-desk.png)
+
+> **🟢 Evidence status — July 2026**
+> Latest local validation: `REDIS_LUA_WITH_COMPENSATION` completed 5,000 attempts at 100 threads with **0 oversells** and **0 Redis/MySQL drift** (13 July 2026). Its local result was **142.1 req/s**, **643.16 ms** average, and **2,055 ms p95**. It is a single-strategy run, so it is not a replacement for the dated four-strategy comparison below.
+>
+> The last like-for-like four-strategy matrix ran on 31 May 2026; its local winner measured **443.03 req/s** at **165.95 ms** average latency. Treat throughput and latency as machine-specific local evidence, not a production capacity claim. CI/CD configuration and GHCR image publishing are present in the repository.
 >
 > 📚 **[Interactive Documentation Portal →](docs/index.html)** | 📂 **[Documentation Index →](docs/README.md)** | 📋 **[API Contract →](docs/reference/API_REFERENCE.md)** | 📊 **[Benchmark Evidence →](docs/performance/BENCHMARK_RESULTS_ANALYSIS.md)**
 
@@ -25,9 +33,9 @@
 
 **The engineering problem:** How do you handle 5,000 concurrent requests competing for a single inventory SKU — without burning down your MySQL instance under row-level contention, and without selling 1,001 units when only 1,000 exist?
 
-Most developers learn "use a transaction" or "add a WHERE clause." But in a flash sale at 100+ concurrent threads, MySQL row locking serializes all requests into a queue — throughput collapses to ~38 req/s, and P95 latency spikes to 20+ seconds. Moving the gate to Redis solves throughput but introduces **dual-write hazards**: what happens when Redis decrements stock successfully, then MySQL crashes before the order commits?
+Most developers learn "use a transaction" or "add a WHERE clause." Under a flash-sale burst, a hot MySQL row can serialize requests and raise tail latency. Moving the fast gate to Redis can reduce that pressure, but introduces **dual-write hazards**: what happens when Redis decrements stock successfully, then MySQL fails before the order commits?
 
-This lab exists to **prove the answers empirically**, not just theorize about them. It runs 4 distinct strategies under identical JMeter load profiles, measures every outcome, verifies Redis/DB consistency after each run, and publishes the evidence. Every claim in this README is backed by a reproducible benchmark artifact in `benchmark/results/`.
+This lab exists to **test the answers empirically**, not just theorize about them. It can run 4 strategies under the same JMeter workload, records outcomes, and verifies Redis/MySQL consistency after each run. Benchmark artifacts are generated locally under `benchmark/results/`; record the Git revision and environment when promoting a new performance claim.
 
 ---
 
@@ -35,9 +43,9 @@ This lab exists to **prove the answers empirically**, not just theorize about th
 
 | Decision | Rationale | ADR |
 |----------|-----------|-----|
-| **Transactional Outbox + Kafka** (not fire-and-forget) | Guarantees at-least-once event publishing. Orders are written to an outbox table in the same DB transaction as the stock deduction, then published to Kafka by a scheduled relay. No lost events. | [ADR-001](docs/04-architecture/adr/ADR-001-kafka-outbox.md) |
+| **Transactional Outbox + Kafka** (not fire-and-forget) | Persists an order and outbox row in one DB transaction, then publishes through a scheduled relay with at-least-once semantics. Consumers must tolerate duplicates. | [ADR-001](docs/04-architecture/adr/ADR-001-kafka-outbox.md) |
 | **Strategy Pattern** for stock deduction | 4 strategies share a common interface; the active strategy is selected per-request via `strategy` field. Enables A/B comparison under identical load without code changes. | [ADR-002](docs/04-architecture/adr/ADR-002-strategy-pattern.md) |
-| **Redis as Atomic Pre-Gate** (not cache) | Redis Lua scripts execute atomically — no lock contention, no queue. Rejects excess demand in microseconds before it ever reaches MySQL. DB only sees the N requests that actually have stock available. | [ADR-003](docs/04-architecture/adr/ADR-003-redis-as-gate.md) |
+| **Redis as Atomic Pre-Gate** | Redis Lua scripts execute atomically and act as the fast gate/cache; MySQL remains the durable source of truth. Redis-backed strategies reject excess demand before the DB deduction path. | [ADR-003](docs/04-architecture/adr/ADR-003-redis-as-gate.md) |
 
 ---
 
@@ -47,9 +55,9 @@ This lab exists to **prove the answers empirically**, not just theorize about th
 |-----------|----------|----------------|
 | **Overselling under race conditions** | MySQL conditional UPDATE with `WHERE stock_available >= quantity` — atomic read-and-write in one statement | `CONDITIONAL_DB` strategy in `StockDeductionStrategy` |
 | **DB row-lock bottleneck at 100+ threads** | Redis Lua EVAL as atomic pre-gate — rejects excess demand in microseconds, MySQL only processes successful pre-deductions | `REDIS_LUA` strategy, `xxxx-infrastructure` Redis adapter |
-| **Redis/DB drift after partial failure** | Compensation loop: if DB/order commit fails after Redis decrement, an INCR restores Redis immediately + a scheduled reconciliation job repairs any missed drift | `REDIS_LUA_WITH_COMPENSATION` strategy + `ReconciliationJob` |
+| **Redis/DB drift after partial failure** | Compensation loop: if DB/order commit fails after Redis decrement, an INCR restores Redis immediately; scheduled reconciliation repairs detected drift to DB truth | `REDIS_LUA_WITH_COMPENSATION` strategy + `OrderReconciliationService` |
 | **Duplicate order submissions** | Idempotency key (`userId:idempotencyKey`) checked before stock deduction — first write wins, replays return cached result | `IdempotencyService` in `xxxx-application` |
-| **At-least-once event publishing** | Transactional outbox: order + outbox row committed in one DB transaction; `KafkaRelay` publishes unacknowledged events on schedule | Outbox pattern in `xxxx-infrastructure` |
+| **At-least-once event publishing** | Transactional outbox: order + outbox row committed in one DB transaction; `OutboxPublishScheduler` publishes pending events and retries failures | Outbox pattern in `xxxx-application` |
 | **Hot-row contention on monthly partition table** | `ticket_order_{yyyyMM}` partitioned tables per month — spreads write pressure across physical tables | `OrderDeductionDomainService.ensureMonthlyOrderTable` |
 
 ---
@@ -72,7 +80,7 @@ graph TD
     subgraph Cache_Layer["Pre-Deduction Layer (Redis)"]
         RedisLua --> LuaScript["Lua EVAL: DECR + check >= 0"]
         RedisComp --> LuaScriptComp["Lua EVAL: DECR + check + compensation hook"]
-        LuaScript -- "stock <= 0" --> Reject["❌ 422 Sold Out"]
+        LuaScript -- "stock <= 0" --> Reject["❌ Business rejection<br/><i>envelope code 409</i>"]
         LuaScriptComp -- "stock <= 0" --> Reject
     end
 
@@ -85,9 +93,9 @@ graph TD
     end
 
     subgraph Reliability_Layer["Async Reliability"]
-        Outbox --> KafkaRelay["Kafka Relay Publisher"]
-        OutboxComp --> KafkaRelay
-        KafkaRelay --> Kafka{🔔 Kafka KRaft}
+        Outbox --> OutboxScheduler["Outbox Publish Scheduler"]
+        OutboxComp --> OutboxScheduler
+        OutboxScheduler --> Kafka{🔔 Kafka KRaft}
         MySQL -- "Commit fails" --> Rollback["🔄 Compensation: Redis INCR"]
         Rollback --> RedisReset["↩️ Restore Redis Stock"]
     end
@@ -107,25 +115,25 @@ graph TD
 
 ---
 
-## ⚡ Strategy Comparison: Where The Performance Gap Comes From
+## ⚡ Strategy Comparison: Historical May 31 Reference Matrix
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e1e2e', 'primaryTextColor': '#cdd6f4', 'primaryBorderColor': '#89b4fa', 'lineColor': '#a6adc8', 'secondaryColor': '#313244', 'tertiaryColor': '#11111b'}}}%%
 graph LR
-    subgraph CONDITIONAL["CONDITIONAL_DB — 173 req/s"]
+    subgraph CONDITIONAL["CONDITIONAL_DB — 173.08 req/s (May 31 local run)"]
         direction TB
         R1["100 Concurrent Requests"] --> DB1["MySQL Row Lock Queue<br/><i>Serialized — one at a time</i>"]
         DB1 --> C1["WHERE stock >= qty<br/>UPDATE SET stock = stock - qty"]
-        C1 --> R1_OK["✅ Order (173/s)"]
+        C1 --> R1_OK["✅ Order (173.08/s)"]
         C1 --> R1_FAIL["❌ Sold Out"]
     end
 
-    subgraph REDIS_COMP["REDIS_LUA_WITH_COMPENSATION — 443 req/s"]
+    subgraph REDIS_COMP["REDIS_LUA_WITH_COMPENSATION — 443.03 req/s (May 31 local run)"]
         direction TB
         R2["100 Concurrent Requests"] --> RedisGate["Redis Lua EVAL<br/><i>Atomic — all parallel</i>"]
         RedisGate -->|"stock > 0"| DB2["MySQL (only 1,000 requests<br/>instead of 5,000)"]
         RedisGate -->|"stock <= 0"| FastFail["⚡ Instant Reject<br/><i>~1 ms</i>"]
-        DB2 --> R2_OK["✅ Order (443/s)"]
+        DB2 --> R2_OK["✅ Order (443.03/s)"]
         DB2 -->|"commit fails"| Comp["🔄 INCR Redis back"]
     end
 
@@ -140,26 +148,38 @@ graph LR
 
 ---
 
-## 📊 Verified Benchmark Results
+## 📊 Benchmark Evidence
 
-JMeter simulating **5,000 requests** at **100 concurrent threads** competing for **1,000 units** of stock:
+### Latest local correctness validation — July 13, 2026
+
+`REDIS_LUA_WITH_COMPENSATION` completed 5,000 attempts at 100 threads against 1,000 units of stock on `ACER`. The saved run reported 1,000 accepted orders, 4,000 expected sell-out rejections, zero oversells, and zero Redis/MySQL drift.
 
 | Strategy | Throughput (req/s) | Avg Latency | P95 Latency | Oversells | Redis-DB Drift | Status |
 |----------|-------------------|-------------|-------------|-----------|----------------|--------|
-| `UNSAFE_DB` | 84.71 | 1,085 ms | 1,778 ms | **4,000** ❌ | N/A | ❌ FAIL |
+| `REDIS_LUA_WITH_COMPENSATION` | 142.10 | 643.16 ms | 2,055 ms | 0 | 0 | PASS |
+
+This run has no recorded Git SHA and is not comparable to the May matrix. Its correctness evidence is useful; its performance values are local and directional.
+
+### Comparative baseline — May 31, 2026
+
+The following local matrix uses the same 5,000-attempt, 100-thread, 1,000-unit workload across all four strategies. It is retained as a dated comparison baseline, not a current production capacity assertion.
+
+| Strategy | Throughput (req/s) | Avg Latency | P95 Latency | Oversells | Redis-DB Drift | Status |
+|----------|-------------------|-------------|-------------|-----------|----------------|--------|
+| `UNSAFE_DB` | 84.71 | 1,085 ms | 1,778 ms | **4,000** ❌ | N/A | CHECK — intentional unsafe baseline |
 | `CONDITIONAL_DB` | 173.08 | 494 ms | 741 ms | 0 ✅ | 0 ✅ | ✅ PASS |
-| `REDIS_LUA` | 226.25 | 361 ms | 829 ms | 0 ✅ | 0 ⚠️ | ⚠️ PASS (no repair) |
+| `REDIS_LUA` | 226.25 | 361 ms | 829 ms | 0 ✅ | 0 on this healthy path | PASS — no compensation |
 | **`REDIS_LUA_WITH_COMPENSATION`** | **443.03** 🏆 | **166 ms** 🏆 | **492 ms** 🏆 | **0** ✅ | **0** ✅ | ✅ **OPTIMAL** |
 
 ```mermaid
 xychart-beta
-    title "Throughput Comparison — 4 Strategies Under 100-Thread Load"
+    title "May 31 Local Throughput Comparison — 4 Strategies Under 100-Thread Load"
     x-axis ["UNSAFE_DB", "CONDITIONAL_DB", "REDIS_LUA", "REDIS_LUA_WITH_COMPENSATION"]
     y-axis "Requests / Second" 0 --> 500
     bar [84.71, 173.08, 226.25, 443.03]
 ```
 
-> 💡 **The numbers tell the story:** `REDIS_LUA_WITH_COMPENSATION` delivers **2.6× the throughput** and **3.0× lower latency** than the safe DB baseline — while maintaining zero oversells and automatic drift repair. This isn't a micro-benchmark cherry-pick; it's a full 5,000-request JMeter run with 100 parallel threads, producing the HTML report, consistency snapshot, and raw `.jtl` samples stored in `benchmark/results/`.
+> 💡 **Historical comparison:** in this May 31 local matrix, `REDIS_LUA_WITH_COMPENSATION` measured **2.6×** the throughput and about **66% lower average latency** than the conditional-DB baseline, while ending with zero oversells and zero drift. Re-run the complete matrix on one clean, revision-pinned environment before claiming a current ranking or capacity number.
 
 Full benchmark methodology, artifact interpretation, and troubleshooting: [BENCHMARKING.md](docs/performance/BENCHMARKING.md).
 
@@ -331,8 +351,8 @@ npm run build
 
 **Observability stack (optional):**
 ```bash
-# Start backend + MySQL + Redis + Prometheus + Grafana + Loki + Tempo
-docker compose -f environment/docker-compose-dev.yml -f environment/docker-compose.observability.yml up -d
+# Start MySQL, Redis, Kafka, Prometheus, Grafana, and exporters
+docker compose -f environment/docker-compose-dev.yml --profile observability up -d
 ```
 
 **Runtime surface when running locally:**
@@ -392,7 +412,7 @@ If the Redis decrement succeeds but the subsequent DB write fails (connection ti
 
 **Layer 2 — Scheduled Reconciliation (seconds)**
 ```
-ReconciliationJob (runs every 30s):
+OrderReconciliationService (runs every 30s):
   1. SELECT SUM(quantity) FROM ticket_order_{yyyyMM} WHERE ticket_item_id = ?
   2. GET stock:ticket:{id} from Redis
   3. If DB_total + Redis_stock != initial_stock → DRIFT DETECTED
@@ -404,13 +424,13 @@ ReconciliationJob (runs every 30s):
 ```
 GET /admin/benchmarks/consistency?ticketItemId=4&yearMonth=202604
 → {
-    "redisStock": 247,
-    "dbStock": 753,
-    "orderCount": 247,
-    "oversoldRows": 0,
+    "redisStockAfter": 247,
+    "dbStockAfter": 753,
+    "dbOrderCount": 247,
+    "oversoldCount": 0,
     "expectedRedisStock": 247,
-    "drift": 0,
-    "consistent": true
+    "driftAmount": 0,
+    "redisDbInconsistencyCount": 0
   }
 ```
 
@@ -433,13 +453,13 @@ This repository answers three complex system-design questions that senior engine
 ### 1. "How do you prevent the Lost Update problem under high concurrency?"
 
 **The repo proves three answers, ranked by throughput:**
-- **Pessimistic:** `CONDITIONAL_DB` — `WHERE stock_available >= quantity` makes the read and write atomic in one SQL statement. Safe but slow (173 req/s) because MySQL serializes row access.
-- **Optimistic with cache gate:** `REDIS_LUA` — Redis Lua EVAL atomically checks and decrements, filtering excess demand before DB contention. Fast (226 req/s) but vulnerable to drift.
-- **Optimistic with compensation:** `REDIS_LUA_WITH_COMPENSATION` — Redis gate + automatic INCR rollback + scheduled reconciliation. Fast (443 req/s) AND safe. **This is the interview answer you want to give.**
+- **Conditional DB baseline:** `CONDITIONAL_DB` — `WHERE stock_available >= quantity` makes the read and write atomic in one SQL statement. The May 31 local matrix measured 173.08 req/s and zero oversells.
+- **Redis gate without compensation:** `REDIS_LUA` — Redis Lua EVAL atomically checks and decrements, filtering excess demand before DB contention. It needs a failure-path drift strategy.
+- **Redis gate with compensation:** `REDIS_LUA_WITH_COMPENSATION` — Redis gate + INCR rollback + scheduled reconciliation. The preferred lab strategy; it achieved zero oversells and zero drift in the July 13 local validation.
 
 ### 2. "How do you handle partial failures in a dual-write (cache + database) system?"
 
-The compensation loop (immediate INCR on exception) + scheduled reconciliation job (every 30s) + consistency verification endpoint together form a **self-healing eventual-consistency system**. The Chaos Engineering section above documents exactly what happens at each failure point. No hand-waving — every failure mode has a specific recovery path with no data loss.
+The compensation loop (immediate INCR on exception), scheduled reconciliation (every 30s), and consistency endpoint form the lab's recovery path for Redis/MySQL drift. They do not remove the need to test failure modes and durable recovery in a production deployment.
 
 ### 3. "How do you design an idempotent checkout API?"
 
@@ -447,19 +467,45 @@ The `IdempotencyService.getOrCreate(userId:idempotencyKey)` pattern ensures:
 - First request: validates, reserves stock, creates order, stores `(key → orderId)` mapping, returns result
 - Replay request: looks up existing `(key → orderId)`, returns cached result without touching stock
 - The key is client-generated (`userId + idempotencyKey`), so the client controls retry semantics
-- The mapping is stored in the same DB transaction as the order — no separate "idempotency store" to drift
+- The current lab mapping is an in-memory `ConcurrentHashMap`; it demonstrates replay behavior locally and is cleared by benchmark reset. It is not a durable or distributed idempotency store.
 
 ---
 
 ## 🔒 Resilience & Safety
 
-- **Rate Limiting:** Sliding-window rate limiter on order creation endpoint (configurable threshold)
-- **Circuit Breaker:** Redisson-backed distributed circuit breaker for external calls
+- **Rate Limiting:** Resilience4j `@RateLimiter` on `POST /orders` — sheds load with HTTP 429 before a request reaches stock deduction. Configurable via `ORDER_API_RATE_LIMIT` (default 20,000 req/s, deliberately above benchmark throughput so load tests measure the strategies, not the limiter).
 - **Virtual Threads:** Java 21 virtual threads on Tomcat — max 500, min-spare 50 — handle 100+ concurrent connections without platform-thread exhaustion
 - **Transactional Outbox:** Order + outbox event committed atomically; Kafka relay publishes with at-least-once semantics
-- **Flyway Migrations:** Versioned DB schema under `xxxx-start/src/main/resources/db/migration/`
-- **Idempotency:** `userId:idempotencyKey` deduplication prevents double-charge on retry
+- **Distributed Locking:** Redisson locks guard the ticket-detail cache load path, so a cache miss under load does not stampede MySQL
+- **Idempotency:** in-memory `userId:idempotencyKey` deduplication prevents duplicate local order creation during a process lifetime
 - **Consistency Visibility:** `GET /admin/benchmarks/consistency` exposes Redis stock, DB stock, expected values, and drift in one endpoint
+
+---
+
+## 🧯 Failure Modes Handled
+
+Compensation is the usual answer to dual-write failure. The harder question is what happens when the compensation *itself* fails — each mode below has a distinct recovery path and a distinguishable metric.
+
+| # | Failure mode | When it happens | Mechanism | Metric emitted |
+|---|---|---|---|---|
+| 1 | **Stock unavailable** | Redis Lua returns negative remaining, or the conditional `UPDATE` affects 0 rows | Clean rejection before any order row is written | `flashsale.orders{result=failed}` |
+| 2 | **Order insert fails after Redis decrement** | DB rejects or throws once Redis stock is already reserved | Transaction marked rollback-only; Redis restored via compensating `INCR` | `flashsale.compensation{outcome=attempted}` |
+| 3 | **Double fault — compensation itself fails** | The compensating Redis write throws (Redis blip during recovery) | Logged as `COMPENSATION_FAILURE` with exact drift; handed to reconciliation | `flashsale.compensation{outcome=double_fault}` |
+| 4 | **JVM crash mid-transaction** | Process dies between the Redis decrement and the MySQL commit — no in-process handler can run | Scheduled reconciliation compares Redis against DB truth and repairs, bounded by a 30s cycle | `flashsale.reconciliation{action=repair}` |
+
+Implementation: `OrderCreationService` (modes 1–3), `OrderReconciliationService` (mode 4).
+
+---
+
+## ⚠️ Known Limitations
+
+This is a lab, and these are deliberate boundaries rather than oversights:
+
+- **Idempotency is in-memory.** `IdempotencyService` uses a `ConcurrentHashMap`, so it deduplicates within a single process only. Horizontal scaling needs Redis or a DB uniqueness constraint — this is the concrete blocker for multi-instance deployment.
+- **Reconciliation covers one SKU.** `OrderReconciliationService.DEFAULT_TICKET_ITEM_ID` is hardcoded to `4`. A real system would iterate active items and need leader election so instances do not contend over repairs.
+- **Benchmark hardware is not pinned.** All runs are local on a developer laptop with no CPU pinning or thermal control. The same strategy measured 443.03 req/s (31 May) and 142.10 req/s (13 July). **Treat throughput and latency as directional; the correctness columns — oversells and drift — are stable across all runs and are the real result.**
+- **Schema is applied from `environment/mysql/init`,** not a versioned migration tool. Fine for a reproducible lab, insufficient for production change management.
+- **Local lab credentials only.** `docker-compose-dev.yml`, `.env.example`, and CI use `root1234` against throwaway containers. No production secret has ever been in this repository; `.env` is gitignored.
 
 ---
 
@@ -471,8 +517,7 @@ The `IdempotencyService.getOrCreate(userId:idempotencyKey)` pattern ensures:
 │   │   ├── xxxx-domain/          # Domain entities, repository ports, domain services
 │   │   ├── xxxx-application/     # Use cases: order orchestration, strategies (4), idempotency,
 │   │   │                         #   reconciliation, benchmark models
-│   │   ├── xxxx-infrastructure/  # Adapters: MySQL repos, Redis/Redisson, Kafka relay,
-│   │   │                         #   JPA mappers, outbox publisher
+│   │   ├── xxxx-infrastructure/  # Adapters: MySQL repos, Redis/Redisson, JPA mappers
 │   │   ├── xxxx-controller/      # HTTP controllers, ResultMessage<T> envelope
 │   │   └── xxxx-start/           # Spring Boot entry, Flyway, scheduling, actuator, OpenAPI
 │   └── frontend/                 # Next.js 16 operator dashboard (optional)
@@ -485,4 +530,4 @@ The `IdempotencyService.getOrCreate(userId:idempotencyKey)` pattern ensures:
 
 ---
 
-*Built with a focus on empirical proof: every performance claim is backed by a reproducible JMeter benchmark artifact. The code is the spec; the benchmarks are the evidence.*
+*Built with a focus on empirical proof: local JMeter artifacts support the dated claims above. The code is the spec; clean, revision-pinned benchmark runs are the evidence for future performance claims.*

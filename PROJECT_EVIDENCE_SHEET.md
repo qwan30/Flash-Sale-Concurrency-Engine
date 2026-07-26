@@ -42,7 +42,7 @@
 | JMeter | Benchmark plan and wrapper generate artifacts. | `benchmark/run-jmeter.ps1`, `flash-sale-order.jmx` | Core evidence | High | VERIFIED |
 | Next.js/React/TypeScript | Optional operator dashboard and API proxy. | `app/frontend/package.json`, `src/lib/api.ts` | Supporting | Medium | VERIFIED |
 | Docker Compose | Local MySQL/Redis plus optional observability/ELK profiles. | `environment/docker-compose-dev.yml` | Supporting | Medium | VERIFIED |
-| Resilience4j | Demo hello endpoints with rate limiter/circuit breaker. | `HiController.java`, `application.yml` | Configured but minimally used | Low | VERIFIED |
+| Resilience4j | `@RateLimiter` on `POST /orders` with HTTP 429 fallback. | `TicketOrderController.java`, `application.yml` | Admission control on the real order path | Medium | VERIFIED |
 | Payment/VNPAY | No source files found in working tree, but stale Surefire reports mention tests. | `rg`, Surefire XML | Unused or obsolete | Low | CONTRADICTED/MISSING |
 
 ## 4. Problem, users, and workflows

@@ -1,7 +1,8 @@
 package com.xxxx.ddd.infrastructure.persistence.repository;
 
 import com.xxxx.ddd.domain.model.entity.TickerOrder;
-import com.xxxx.ddd.domain.respository.OrderDeductionRepository;
+import com.xxxx.ddd.domain.repository.OrderDeductionRepository;
+
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +16,9 @@ import java.util.List;
 /**
  * Native SQL repository for monthly order tables.
  *
- * <p>The lab stores orders in {@code ticket_order_yyyyMM} tables so benchmark runs can reset and
+ * <p>
+ * The lab stores orders in {@code ticket_order_yyyyMM} tables so benchmark runs
+ * can reset and
  * inspect one month without touching unrelated rows.
  */
 @Service
@@ -64,10 +67,13 @@ public class OrderDeductionInfrasRepositoryImpl implements OrderDeductionReposit
     public void insertOrder(String yearMonth, TickerOrder order) {
         ensureMonthlyOrderTable(yearMonth);
         String tableName = getTableName(yearMonth);
-        String sql = "INSERT INTO " + tableName + " (order_number, user_id, total_amount, terminal_id, order_date, order_notes, updated_at, created_at) " +
+        String sql = "INSERT INTO " + tableName
+                + " (order_number, user_id, total_amount, terminal_id, order_date, order_notes, updated_at, created_at) "
+                +
                 "VALUES (:orderNumber, :userId, :totalAmount, :terminalId, :orderDate, :orderNotes, :updatedAt, :createdAt)";
 
-        // Keep all order timestamps identical so benchmark rows are easy to compare and sort.
+        // Keep all order timestamps identical so benchmark rows are easy to compare and
+        // sort.
         LocalDateTime now = LocalDateTime.now();
         order.setOrderDate(now);
         order.setUpdatedAt(now);

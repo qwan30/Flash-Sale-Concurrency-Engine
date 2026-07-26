@@ -2,7 +2,7 @@ package com.xxxx.ddd.application.service.order.cache;
 
 import com.xxxx.ddd.application.model.cache.TicketDetailCache;
 import com.xxxx.ddd.application.port.cache.CacheStore;
-import com.xxxx.ddd.application.service.ticket.cache.TicketDetailCacheServiceRefactor;
+import com.xxxx.ddd.application.service.ticket.cache.TicketDetailCacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 public class StockOrderCacheService {
 
     @Autowired
-    private TicketDetailCacheServiceRefactor ticketDetailCacheServiceRefactor;
+    private TicketDetailCacheService ticketDetailCacheService;
 
     @Autowired
     private CacheStore cacheStore;
@@ -33,7 +33,7 @@ public class StockOrderCacheService {
             return false;
         }
         // Warm Redis from the durable MySQL stock value before a Redis-first benchmark run.
-        TicketDetailCache ticketDetailCache = ticketDetailCacheServiceRefactor.getTicketDetail(ticketId, null);
+        TicketDetailCache ticketDetailCache = ticketDetailCacheService.getTicketDetail(ticketId, null);
         if(ticketDetailCache == null) {
             return false;
         }
