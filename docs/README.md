@@ -4,6 +4,60 @@ Flash-Sale-Concurrency-Engine is a Spring Boot backend reliability lab for stock
 
 Use this hub to reach the current source-backed docs. Java source, Maven files, runtime config, frontend manifests, benchmark scripts, and test files are canonical when docs drift.
 
+## Quick Start — Run the Project
+
+### Prerequisites
+
+- **Java 21**, **Maven 3.9+**, **Node.js 22+**, **Docker** (with Compose)
+
+### 1. Start Infrastructure (MySQL, Redis, Kafka)
+
+```bash
+docker compose -f environment/docker-compose-dev.yml up -d mysql redis kafka
+```
+
+### 2. Start the Backend (Spring Boot, port 1122)
+
+```bash
+mvn -pl app/backend/xxxx-start -am -DskipTests spring-boot:run
+```
+
+### 3. Start the Frontend (Next.js dev server, port 3000)
+
+```bash
+cd app/frontend
+cp .env.local.example .env.local   # first time only
+npm install                         # first time only
+npm run dev
+```
+
+### Verify
+
+| What | URL |
+|------|-----|
+| Frontend dashboard | http://localhost:3000 |
+| Backend health | http://localhost:1122/actuator/health |
+| Swagger UI | http://localhost:1122/swagger-ui.html |
+| OpenAPI spec | http://localhost:1122/v3/api-docs |
+
+### Port Map
+
+| Service | Container | Host Port | Container Port |
+|---------|-----------|-----------|----------------|
+| MySQL | `pre-event-mysql` | 3316 | 3306 |
+| Redis | `pre-event-redis` | 6319 | 6379 |
+| Kafka | `pre-event-kafka` | 9094 | 9094 |
+| Backend | (host process) | 1122 | — |
+| Frontend | (host process) | 3000 | — |
+
+### Alternative: Production-style via Docker Compose
+
+```bash
+docker compose -f environment/docker-compose.prod.yml up -d
+```
+
+This runs pre-built GHCR images for backend and frontend alongside the data services. No local Java/Node required, but images must be current (pushed by the CD pipeline).
+
 ## Reading Paths
 
 | Role | Start Here | Then Read |
@@ -20,7 +74,7 @@ Use this hub to reach the current source-backed docs. Java source, Maven files, 
 | Backend runtime | Java 21, Spring Boot 3.3.5, five Maven modules, app port `1122`, virtual threads enabled |
 | API docs | Springdoc 2.6.0, Swagger UI at `/swagger-ui.html`, OpenAPI at `/v3/api-docs`, grouped lab API at `/v3/api-docs/lab-api` |
 | Actuator | Exposes `health`, `prometheus`, and `metrics`; health details are hidden by default |
-| Messaging | Apache Kafka 3.9.0 (KRaft mode) with transactional outbox pattern for at-least-once event publishing |
+| Messaging | Kafka (Confluent 7.9.0 for dev, Apache 3.9.0 for prod) in KRaft mode with transactional outbox pattern for at-least-once event publishing |
 | CI/CD | CI runs unit tests, integration tests, observability smoke, frontend checks, and infra validation; CD builds and pushes Docker images to GHCR |
 | Frontend dashboard | Next.js 16.2.4 and React 19.2.4 in `app/frontend`, optional operator dashboard with E2E Playwright test suite |
 | Frontend proxy | `/api/backend/*` forwards only allowlisted dashboard backend paths |
@@ -42,6 +96,9 @@ Full source-status detail lives in [reference/SOURCE_STATUS.md](reference/SOURCE
 | Document | Purpose |
 |---|---|
 | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | System overview, runtime stack, order flow, storage model |
+| [architecture/SYSTEM_ARCHITECTURE_DIAGRAM.md](architecture/SYSTEM_ARCHITECTURE_DIAGRAM.md) | ★ **System Architecture Diagram** — network, container, and physical layer flow |
+| [architecture/USE_CASE_DIAGRAM.md](architecture/USE_CASE_DIAGRAM.md) | ★ **Use Case Diagram** — Operator, Buyer, and Scheduler use cases |
+| [architecture/CLASS_DIAGRAM.md](architecture/CLASS_DIAGRAM.md) | ★ **Class Diagram** — domain entities, services, ports, and adapters |
 | [04-architecture/domain-driven-design.md](04-architecture/domain-driven-design.md) | Bounded contexts, aggregates, domain events, ubiquitous language |
 | [04-architecture/coding-standards.md](04-architecture/coding-standards.md) | Java conventions, naming, DI, error handling, Lombok usage |
 | [04-architecture/resilience-patterns.md](04-architecture/resilience-patterns.md) | Rate limiter, circuit breaker, distributed lock, outbox retry |

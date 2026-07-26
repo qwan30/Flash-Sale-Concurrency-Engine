@@ -1,4 +1,4 @@
-package com.xxxx.ddd.domain.respository;
+package com.xxxx.ddd.domain.repository;
 
 public interface HiDomainRepository {
 

@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -156,5 +157,17 @@ class TicketOrderControllerNegativeTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value(409))
                 .andExpect(jsonPath("$.result.code").value("DB_STOCK_DECREMENT_FAILED"));
+    }
+
+    @Test
+    void listOrdersThrowsExceptionWhenInvalidYearMonth() {
+        when(ticketOrderAppService.findAllByUser("02", 42L))
+                .thenThrow(new IllegalArgumentException("yearMonth must match yyyyMM"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(Exception.class, () -> {
+            mockMvc.perform(get("/orders")
+                            .param("userId", "42")
+                            .param("yearMonth", "02"));
+        });
     }
 }

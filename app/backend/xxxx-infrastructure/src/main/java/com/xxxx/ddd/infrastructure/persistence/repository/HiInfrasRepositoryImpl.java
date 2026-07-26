@@ -1,7 +1,8 @@
 package com.xxxx.ddd.infrastructure.persistence.repository;
 
-import com.xxxx.ddd.domain.respository.HiDomainRepository;
 import org.springframework.stereotype.Service;
+
+import com.xxxx.ddd.domain.repository.HiDomainRepository;
 
 @Service
 public class HiInfrasRepositoryImpl implements HiDomainRepository {

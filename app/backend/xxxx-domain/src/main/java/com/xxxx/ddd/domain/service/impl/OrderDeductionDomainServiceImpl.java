@@ -1,7 +1,7 @@
 package com.xxxx.ddd.domain.service.impl;
 
 import com.xxxx.ddd.domain.model.entity.TickerOrder;
-import com.xxxx.ddd.domain.respository.OrderDeductionRepository;
+import com.xxxx.ddd.domain.repository.OrderDeductionRepository;
 import com.xxxx.ddd.domain.service.OrderDeductionDomainService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -28,7 +28,7 @@ public class OrderDeductionDomainServiceImpl implements OrderDeductionDomainServ
 
     @Override
     public List<Object[]> findAll(String yearMonth) {
-        return orderDeductionRepository.findAll(yearMonth);//List.of();
+        return orderDeductionRepository.findAll(yearMonth);// List.of();
     }
 
     @Override
@@ -38,7 +38,7 @@ public class OrderDeductionDomainServiceImpl implements OrderDeductionDomainServ
 
     @Override
     public Object[] findByOrderNumber(String yearMonth, String orderNumber) {
-        return orderDeductionRepository.findByOrderNumber(yearMonth, orderNumber);//new Object[0];
+        return orderDeductionRepository.findByOrderNumber(yearMonth, orderNumber);// new Object[0];
     }
 
     @Override
