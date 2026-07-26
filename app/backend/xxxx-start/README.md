@@ -71,7 +71,7 @@ public class StartApplication {
 | Annotation | Mục đích |
 |------------|----------|
 | `@SpringBootApplication` | Auto-configuration + Component Scan toàn bộ `com.xxxx.*` |
-| `@EnableScheduling` | Bật cron jobs (`OutboxPublishScheduler`, `WarmupDataBeforeEvent`) |
+| `@EnableScheduling` | Bật cron jobs (`OutboxPublishScheduler`, `OrderReconciliationService`) |
 
 ### `OpenApiConfig.java` — Swagger UI
 
@@ -120,8 +120,7 @@ app.redisson.mode: single
 app.redisson.single-address: redis://127.0.0.1:6319
 
 # Resilience4j
-resilience4j.circuitbreaker.instances.checkRandom.*
-resilience4j.ratelimiter.instances.backendA/B
+resilience4j.ratelimiter.instances.orderApi.*
 
 # Observability
 management.endpoints.web.exposure.include: health, prometheus, metrics
@@ -157,11 +156,9 @@ Khi `StartApplication.main()` chạy:
    ├── @RestController  → TicketOrderController, AdminBenchmarkController, ...
    ├── @Service          → OrderCreationService, OutboxService, ...
    │   └── Domain Service Impl → inject Repository Impl (Infrastructure)
-   └── @Component        → WarmupDataBeforeEvent (@PostConstruct)
-
+   
 3. @PostConstruct (Warmup)
-   └── WarmupDataBeforeEvent.loadDataTicketItemOnce()
-       └── Load stock từ MySQL vào Redis cache
+          └── Load stock từ MySQL vào Redis cache
 
 4. @EnableScheduling (Cron Jobs)
    └── OutboxPublishScheduler

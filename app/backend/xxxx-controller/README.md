@@ -37,7 +37,6 @@ controller/
 │   ├── TicketQueryController.java         ← API truy vấn vé
 │   ├── TicketDetailController.java        ← API chi tiết vé + ping
 │   ├── AdminBenchmarkController.java      ← API quản trị benchmark
-│   └── HiController.java                 ← Health-check / Demo
 │
 ├── model/                      ← Các object dùng cho request/response
 │   ├── vo/                     ← Value Objects (response wrapper)
@@ -128,7 +127,7 @@ CreateOrderResponse.success == true            →  200 OK
 
 ---
 
-### 5. `HiController` — Health Check
+### 5. Rate limiting on `POST /orders`
 
 | Endpoint | Method | Mô tả |
 |----------|--------|--------|

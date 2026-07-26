@@ -43,18 +43,15 @@ domain/
 │   ├── OrderDeductionRepository.java  ← CRUD đơn hàng theo bảng tháng (yyyyMM)
 │   ├── TickerOrderRepository.java     ← Trừ stock (CAS, Level-based)
 │   ├── TicketDetailRepository.java    ← Đọc chi tiết vé
-│   └── HiDomainRepository.java       ← Demo/health-check
 │
 ├── service/                ← Domain Services — Logic nghiệp vụ
 │   ├── OrderDeductionDomainService.java      ← Interface: quản lý đơn hàng
 │   ├── TickerOrderDomainService.java         ← Interface: trừ stock
 │   ├── TicketDetailDomainService.java        ← Interface: đọc chi tiết vé
-│   ├── HiDomainService.java                 ← Interface: demo
 │   └── impl/                                ← Triển khai cụ thể
 │       ├── OrderDeductionDomainServiceImpl.java
 │       ├── TickerOrderDomainServiceImpl.java
 │       ├── TicketDetailDomainServiceImpl.java
-│       └── HiDomainServiceImpl.java
 │
 └── event/                  ← Domain Events — Sự kiện nghiệp vụ
     ├── OrderEvent.java             ← Event: ORDER_CREATED, ORDER_REJECTED, STOCK_EXHAUSTED
@@ -126,7 +123,6 @@ Khai báo **hợp đồng** truy xuất dữ liệu mà Domain cần, nhưng **K
 | `OrderDeductionRepository` | Tạo bảng tháng, insert/query đơn hàng, đếm, xóa |
 | `TickerOrderRepository` | Trừ stock (3 chiến lược: unsafe, CAS, level-based) |
 | `TicketDetailRepository` | Đọc chi tiết vé theo ID |
-| `HiDomainRepository` | Health-check |
 
 ### `service/` — Domain Service
 

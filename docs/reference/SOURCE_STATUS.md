@@ -57,7 +57,6 @@ Compatibility and local utility APIs remain in source for old benchmark plans an
 |---|---|
 | `/order/...` | Compatibility routes mapped to modern order behavior |
 | `/ticket/...` | Legacy fixture-detail routes and local latency ping |
-| `/hello/...` | Local hello, circuit-breaker, and rate-limiter experiments |
 
 Admin benchmark endpoints are local lab controls. They are not app-auth protected and should not be exposed as public buyer-facing APIs.
 

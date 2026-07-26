@@ -62,7 +62,6 @@ application/
 │   │   └── cache/                             ← Cache chi tiết vé
 │   │
 │   ├── event/                  ← Nhóm: Sự kiện
-│   │   ├── EventAppService.java               ← Interface: quản lý event
 │   │   ├── impl/                              ← Implement
 │   │   └── cached/                            ← Cache event
 │   │
@@ -100,7 +99,6 @@ application/
 │   └── TicketDetailMapper.java        ← Chuyển đổi Entity ↔ DTO
 │
 ├── cronjob/                    ← Cron Jobs / Startup Tasks
-│   └── WarmupDataBeforeEvent.java     ← @PostConstruct: load stock vào cache khi khởi động
 │
 ├── config/                     ← Configuration (dự phòng)
 ├── exception/                  ← Custom Exceptions (dự phòng)

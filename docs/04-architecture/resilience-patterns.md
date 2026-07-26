@@ -1,31 +1,30 @@
 # Resilience Patterns
 
-> Derived from `project-foundation.md` §10. Timeout, retry, circuit breaker, rate limiter, and distributed lock patterns.
+> Derived from `project-foundation.md` §10. Rate limiter, distributed lock, outbox retry, and reconciliation patterns.
 
 ## 1. Resilience4j Rate Limiter
 
 ```yaml
 resilience4j.ratelimiter.instances:
-  backendA: { limitForPeriod: 2, limitRefreshPeriod: 10s, timeoutDuration: 0 }
-  backendB: { limitForPeriod: 5, limitRefreshPeriod: 10s, timeoutDuration: 3s }
+  orderApi:
+    limitForPeriod: ${ORDER_API_RATE_LIMIT:20000}
+    limitRefreshPeriod: 1s
+    timeoutDuration: 0
 ```
 
-Used on `HiController` for local experiments. Pattern: `@RateLimiter(name = "...", fallbackMethod = "...")`.
+Applied to `TicketOrderController.createOrder` (`POST /orders`) via
+`@RateLimiter(name = "orderApi", fallbackMethod = "createOrderRateLimited")`.
 
-## 2. Resilience4j Circuit Breaker
+The limiter is the outermost admission control: it sheds load before a request can reach stock
+deduction, so a burst beyond the ceiling is rejected rather than queuing on Redis or MySQL. The
+fallback returns **HTTP 429**, which keeps shed load distinguishable from a sell-out rejection
+(409) and a malformed request (400).
 
-```yaml
-resilience4j.circuitbreaker.instances.checkRandom:
-  slidingWindowSize: 10
-  permittedNumberOfCallsInHalfOpenState: 3
-  minimumNumberOfCalls: 5
-  waitDurationInOpenState: 5s
-  failureRateThreshold: 50
-```
+The default ceiling of 20,000 req/s sits far above the highest throughput measured in the
+benchmark matrix (443 req/s), so load tests measure the deduction strategies rather than the
+limiter. Lower `ORDER_API_RATE_LIMIT` to demonstrate shedding behavior.
 
-Used on `HiController.circuitBreaker()`. Pattern: `@CircuitBreaker(name = "...", fallbackMethod = "...")`.
-
-## 3. Distributed Lock (Redisson)
+## 2. Distributed Lock (Redisson)
 
 | Mode | Config |
 |---|---|
@@ -40,7 +39,7 @@ public interface DistributedLockService {
 }
 ```
 
-## 4. Transactional Outbox Retry
+## 3. Transactional Outbox Retry
 
 | Parameter | Default | Meaning |
 |---|---|---|
@@ -51,7 +50,7 @@ public interface DistributedLockService {
 **Happy**: `record()` → `publishPendingEvents()` → Kafka → `markPublished()`
 **Retry**: `markFailed()` → `retryFailedEvents()` after 10s → reset PENDING → retry → after 5 attempts → stays FAILED
 
-## 5. Retry Decision Matrix
+## 4. Retry Decision Matrix
 
 | Failure | Retry? | Strategy |
 |---|---|---|
@@ -62,7 +61,7 @@ public interface DistributedLockService {
 | Business rule violation | ❌ No | Return domain result code |
 | Idempotency duplicate | ❌ No | Return cached response |
 
-## 6. Thread & Connection Pools
+## 5. Thread & Connection Pools
 
 | Pool | Max | Min Idle |
 |---|---|---|
@@ -71,7 +70,7 @@ public interface DistributedLockService {
 | Lettuce (Redis) | 10 active, 5 idle | 5 |
 | Virtual threads | Enabled | — |
 
-## 7. Reconciliation as Resilience
+## 6. Reconciliation as Resilience
 
 `OrderReconciliationService`: every 30s (10s initial delay), default ticket `4`. Sets Redis to DB truth on drift. Emits `RECONCILIATION` event via outbox → Kafka. Manual: `POST /admin/benchmarks/reconcile`.
 

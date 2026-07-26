@@ -12,7 +12,13 @@
 [![Next.js Dashboard](https://img.shields.io/badge/Dashboard-Next.js_16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
+> **An unsafe stock deduction oversold 4,000 units under 100-thread load and drove database stock to −2,278. Three successive strategies took that to zero — at 2.5× the throughput.**
+
 **A backend concurrency reliability lab** that tests stock-deduction correctness under flash-sale load. It compares 4 strategies — unsafe DB updates, conditional DB updates, Redis Lua gating, and Redis Lua with compensation — and records JMeter evidence, Redis/MySQL consistency checks, and reconciliation behavior. Built with **Domain-Driven Design** principles, virtual threads, a transactional outbox, and a Next.js operator dashboard.
+
+Every number quoted below is reproducible from committed artifacts under [`benchmark/results/`](benchmark/results/) — each run directory holds its reset, warmup, consistency snapshot, and summary row.
+
+![Operator control desk](screen-demo/07-admin-control-desk.png)
 
 > **🟢 Evidence status — July 2026**
 > Latest local validation: `REDIS_LUA_WITH_COMPENSATION` completed 5,000 attempts at 100 threads with **0 oversells** and **0 Redis/MySQL drift** (13 July 2026). Its local result was **142.1 req/s**, **643.16 ms** average, and **2,055 ms p95**. It is a single-strategy run, so it is not a replacement for the dated four-strategy comparison below.
@@ -467,13 +473,39 @@ The `IdempotencyService.getOrCreate(userId:idempotencyKey)` pattern ensures:
 
 ## 🔒 Resilience & Safety
 
-- **Rate Limiting:** Sliding-window rate limiter on order creation endpoint (configurable threshold)
-- **Circuit Breaker:** Redisson-backed distributed circuit breaker for external calls
+- **Rate Limiting:** Resilience4j `@RateLimiter` on `POST /orders` — sheds load with HTTP 429 before a request reaches stock deduction. Configurable via `ORDER_API_RATE_LIMIT` (default 20,000 req/s, deliberately above benchmark throughput so load tests measure the strategies, not the limiter).
 - **Virtual Threads:** Java 21 virtual threads on Tomcat — max 500, min-spare 50 — handle 100+ concurrent connections without platform-thread exhaustion
 - **Transactional Outbox:** Order + outbox event committed atomically; Kafka relay publishes with at-least-once semantics
-- **Flyway Migrations:** Versioned DB schema under `xxxx-start/src/main/resources/db/migration/`
+- **Distributed Locking:** Redisson locks guard the ticket-detail cache load path, so a cache miss under load does not stampede MySQL
 - **Idempotency:** in-memory `userId:idempotencyKey` deduplication prevents duplicate local order creation during a process lifetime
 - **Consistency Visibility:** `GET /admin/benchmarks/consistency` exposes Redis stock, DB stock, expected values, and drift in one endpoint
+
+---
+
+## 🧯 Failure Modes Handled
+
+Compensation is the usual answer to dual-write failure. The harder question is what happens when the compensation *itself* fails — each mode below has a distinct recovery path and a distinguishable metric.
+
+| # | Failure mode | When it happens | Mechanism | Metric emitted |
+|---|---|---|---|---|
+| 1 | **Stock unavailable** | Redis Lua returns negative remaining, or the conditional `UPDATE` affects 0 rows | Clean rejection before any order row is written | `flashsale.orders{result=failed}` |
+| 2 | **Order insert fails after Redis decrement** | DB rejects or throws once Redis stock is already reserved | Transaction marked rollback-only; Redis restored via compensating `INCR` | `flashsale.compensation{outcome=attempted}` |
+| 3 | **Double fault — compensation itself fails** | The compensating Redis write throws (Redis blip during recovery) | Logged as `COMPENSATION_FAILURE` with exact drift; handed to reconciliation | `flashsale.compensation{outcome=double_fault}` |
+| 4 | **JVM crash mid-transaction** | Process dies between the Redis decrement and the MySQL commit — no in-process handler can run | Scheduled reconciliation compares Redis against DB truth and repairs, bounded by a 30s cycle | `flashsale.reconciliation{action=repair}` |
+
+Implementation: `OrderCreationService` (modes 1–3), `OrderReconciliationService` (mode 4).
+
+---
+
+## ⚠️ Known Limitations
+
+This is a lab, and these are deliberate boundaries rather than oversights:
+
+- **Idempotency is in-memory.** `IdempotencyService` uses a `ConcurrentHashMap`, so it deduplicates within a single process only. Horizontal scaling needs Redis or a DB uniqueness constraint — this is the concrete blocker for multi-instance deployment.
+- **Reconciliation covers one SKU.** `OrderReconciliationService.DEFAULT_TICKET_ITEM_ID` is hardcoded to `4`. A real system would iterate active items and need leader election so instances do not contend over repairs.
+- **Benchmark hardware is not pinned.** All runs are local on a developer laptop with no CPU pinning or thermal control. The same strategy measured 443.03 req/s (31 May) and 142.10 req/s (13 July). **Treat throughput and latency as directional; the correctness columns — oversells and drift — are stable across all runs and are the real result.**
+- **Schema is applied from `environment/mysql/init`,** not a versioned migration tool. Fine for a reproducible lab, insufficient for production change management.
+- **Local lab credentials only.** `docker-compose-dev.yml`, `.env.example`, and CI use `root1234` against throwaway containers. No production secret has ever been in this repository; `.env` is gitignored.
 
 ---
 
