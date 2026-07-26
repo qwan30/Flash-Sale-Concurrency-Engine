@@ -6,6 +6,7 @@ import com.xxxx.ddd.application.model.order.CreateOrderResponse;
 import com.xxxx.ddd.application.service.order.TicketOrderAppService;
 import com.xxxx.ddd.controller.model.enums.ResultUtil;
 import com.xxxx.ddd.controller.model.vo.ResultMessage;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -32,10 +33,43 @@ public class TicketOrderController {
     @Autowired
     private TicketOrderAppService ticketOrderAppService;
 
+    /**
+     * Creates an order through the strategy selected in the request body.
+     *
+     * <p>The rate limiter is the outermost admission control: it sheds load before a request can
+     * reach stock deduction, so a burst beyond the configured ceiling is rejected with 429 rather
+     * than queuing on Redis or the database.
+     */
     @PostMapping("/orders")
+    @RateLimiter(name = "orderApi", fallbackMethod = "createOrderRateLimited")
     public ResponseEntity<ResultMessage<CreateOrderResponse>> createOrder(@RequestBody CreateOrderRequest request) {
         CreateOrderResponse response = ticketOrderAppService.createOrder(request);
         return ResponseEntity.status(statusFor(response)).body(message(response));
+    }
+
+    /**
+     * Fallback invoked when the order API rate limit is exceeded.
+     *
+     * <p>Returns 429 so clients can distinguish shed load from a sell-out rejection (409) or a
+     * malformed request (400).
+     */
+    public ResponseEntity<ResultMessage<CreateOrderResponse>> createOrderRateLimited(
+            CreateOrderRequest request,
+            Throwable throwable
+    ) {
+        log.warn("Order API rate limit exceeded | ticketItemId={}, userId={}",
+                request == null ? null : request.getTicketItemId(),
+                request == null ? null : request.getUserId());
+
+        CreateOrderResponse response = CreateOrderResponse.failure(
+                request, "RATE_LIMITED", "Order API rate limit exceeded, retry shortly");
+
+        ResultMessage<CreateOrderResponse> body = new ResultMessage<>();
+        body.setSuccess(false);
+        body.setCode(HttpStatus.TOO_MANY_REQUESTS.value());
+        body.setMessage(response.getMessage());
+        body.setResult(response);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(body);
     }
 
     @GetMapping("/orders")

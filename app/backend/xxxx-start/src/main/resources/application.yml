@@ -77,33 +77,23 @@ app:
 benchmark:
   results-dir: ${BENCHMARK_RESULTS_DIR:benchmark/results}
 
+# Admission control for the public order API. The ceiling sits well above the highest
+# throughput observed in the benchmark matrix (443 req/s), so load tests measure the
+# deduction strategies rather than the limiter. Lower ORDER_API_RATE_LIMIT to demonstrate
+# load shedding.
 resilience4j:
-  circuitbreaker:
-    instances:
-      checkRandom:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        permittedNumberOfCallsInHalfOpenState: 3
-        minimumNumberOfCalls: 5
-        waitDurationInOpenState: 5s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
   ratelimiter:
     instances:
-      backendA:
-        limitForPeriod: 2
-        limitRefreshPeriod: 10s
+      orderApi:
+        limitForPeriod: ${ORDER_API_RATE_LIMIT:20000}
+        limitRefreshPeriod: 1s
         timeoutDuration: 0
         registerHealthIndicator: true
         eventConsumerBufferSize: 100
-      backendB:
-        limitForPeriod: 5
-        limitRefreshPeriod: 10s
-        timeoutDuration: 3s
 
 management:
   health:
-    circuitbreakers:
+    ratelimiters:
       enabled: true
   endpoints:
     web:
