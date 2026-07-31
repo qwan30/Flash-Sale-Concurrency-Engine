@@ -228,7 +228,7 @@ Full benchmark methodology, artifact interpretation, and troubleshooting: [BENCH
 ```
  ┌─────────────────────────────────────────────────────────────────┐
  │                xxxx-start (Spring Boot Entry Point)              │
- │     Flyway Migrations · App Config · Scheduling · Actuator       │
+ │             App Config · Scheduling · Actuator                   │
  ├─────────────────────────────────────────────────────────────────┤
  │               xxxx-controller (HTTP + REST Layer)                │
  │   ┌──────────────────┬──────────────────┬──────────────────┐    │
@@ -329,6 +329,9 @@ cd app/frontend
 npm run lint
 npm run typecheck
 npm run build
+
+# Frontend — E2E Playwright tests
+npm run test:e2e
 ```
 
 | Quality Gate | Command | What It Verifies |
@@ -338,6 +341,7 @@ npm run build
 | **Smoke test** | `benchmark/smoke-local.ps1` | Reset → warmup → order → consistency end-to-end |
 | **JMeter benchmark** | `benchmark/run-jmeter.ps1` | Full 5,000-request load test with HTML report |
 | **Frontend gate** | `npm run lint && npm run typecheck && npm run build` | Dashboard code quality |
+| **E2E tests** | `npm run test:e2e` | Playwright browser tests covering user journeys |
 | **CI pipeline** | `.github/workflows/ci.yml` | Runs all above on push/PR |
 
 ---
@@ -519,7 +523,7 @@ This is a lab, and these are deliberate boundaries rather than oversights:
 │   │   │                         #   reconciliation, benchmark models
 │   │   ├── xxxx-infrastructure/  # Adapters: MySQL repos, Redis/Redisson, JPA mappers
 │   │   ├── xxxx-controller/      # HTTP controllers, ResultMessage<T> envelope
-│   │   └── xxxx-start/           # Spring Boot entry, Flyway, scheduling, actuator, OpenAPI
+│   │   └── xxxx-start/           # Spring Boot entry, scheduling, actuator, OpenAPI
 │   └── frontend/                 # Next.js 16 operator dashboard (optional)
 ├── benchmark/                    # JMeter plan (.jmx), smoke script, benchmark runner,
 │   ├── results/                  #   experiment contract (experiment-spec.json)
