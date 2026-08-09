@@ -1,6 +1,7 @@
 package com.xxxx.ddd.application.MQ;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,6 +29,7 @@ public class OutboxEvent {
     private String id;
 
     @Column(name = "event_id", length = 36, nullable = false, insertable = false, updatable = false)
+    @Setter(AccessLevel.NONE)
     private String eventId;
 
     @Column(name = "aggregate_type", length = 100, nullable = false)

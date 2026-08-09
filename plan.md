@@ -338,7 +338,7 @@ class FlywayMigrationIntegrationTest {
 - [x] **Step 2: Run the test and confirm RED**
 
 ```powershell
-mvn.cmd -pl app/backend/xxxx-start -Dtest=FlywayMigrationIntegrationTest test
+mvn.cmd -pl app/backend/xxxx-start -am -Dtest=FlywayMigrationIntegrationTest "-Dsurefire.failIfNoSpecifiedTests=false" test
 ```
 
 Expected: FAIL because Flyway and reservation tables do not exist.
@@ -370,9 +370,9 @@ spring:
     clean-disabled: true
 ```
 
-Existing non-empty volumes are baselined once with explicit environment override `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`; the default remains false.
+Existing non-empty volumes are baselined once with explicit environment override `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`; the application and production Compose defaults remain false.
 
-The production Compose stack mounts the legacy init schema and supplies that override through `SPRING_FLYWAY_BASELINE_ON_MIGRATE`. Set it to `false` only after `flyway_schema_history` exists and the database has completed the V2 migration; an unverified volume must not be silently baselined.
+The production Compose stack mounts the legacy init schema but does not silently opt into baseline adoption. Set `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` only after the target volume has been verified as that legacy database; leave it false for unknown or partially initialized volumes.
 
 - [x] **Step 5: Create reservation schema**
 
@@ -496,9 +496,11 @@ Also add `lease_owner`, `lease_until`, `next_attempt_at` and stable `event_id` s
 
 The CI observability smoke and the documented legacy-init development launch explicitly set `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`; the application default remains false so an unverified non-empty database is never silently baselined.
 
+Before creating `inventory_stock_account`, V2 validates every legacy `ticket_item` quantity in a temporary constrained table. Negative, oversold or otherwise malformed legacy stock fails the migration closed; it is not clamped or silently converted into a reservation account.
+
 The stock account's `fence_version` is the admission fence and `admission_state` is a durable `OPEN -> DRAINING -> CLOSED -> OPEN` state machine. A create journal claim and every conditional MySQL decrement require `admission_state = 'OPEN'` and the stored current fence; a repair owner claims `OPEN -> DRAINING` with one compare-and-set update, increments the fence, and creates an `inventory_repair_journal` row in the same transaction. Normal claims and terminal mutations are rejected unless the durable account is `OPEN` with the current fence. Redis stores the same fence and admission state. A fence-publication Lua script atomically accepts only a greater fence and writes the new fence/state; normal apply, compensate, and terminal-mirror Lua calls require Redis `admission_state = 'OPEN'`, compare both values, and return `STALE_FENCE` without mutation when they do not match. The repair owner publishes `DRAINING`, drains or rejects old-fence leases, waits for in-flight old-fence operations to quiesce, and only then CASes `DRAINING -> CLOSED`. While `CLOSED`, a repair-only maintenance script writes the MySQL-authoritative snapshot, verifies Redis/MySQL equality and zero old-fence operations, and records the disposition. Only a successful verification may publish `OPEN` and CAS `CLOSED -> OPEN`; failed verification leaves the account closed and the repair journal `FAILED`. Delayed operations carrying the old fence must therefore fail closed and cannot mutate after repair.
 
-- [ ] **Step 6: Run migration tests and refactor**
+- [x] **Step 6: Run migration tests and refactor**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=FlywayMigrationIntegrationTest test
@@ -507,14 +509,16 @@ mvn.cmd test
 
 Expected: PASS; Flyway validates all checksums.
 
-GREEN attempt on 2026-08-09 compiled the migration test and reached Testcontainers, but execution is currently blocked because the Docker Desktop Linux engine is unavailable. The migration test remains un-certified until it runs against MySQL.
+The first live MySQL attempt exposed unsupported `ADD COLUMN IF NOT EXISTS` syntax in MySQL 8.0; V2 now uses the Flyway one-time migration boundary with plain `ADD COLUMN`. The final run on 2026-08-09 passed all three cases: fresh schema, the actual `environment/mysql/init` legacy scripts with explicit baseline/history and second-run no-op, and fail-closed oversold-stock validation. Docker Desktop Linux was started locally for this verification.
 
-- [ ] **Step 7: Commit migration checkpoint**
+- [x] **Step 7: Commit migration checkpoint**
 
 ```powershell
 git add -- .github/workflows/ci.yml app/backend/xxxx-start/README.md app/backend/xxxx-start/pom.xml app/backend/xxxx-start/src/main/resources/application.yml app/backend/xxxx-start/src/main/resources/db/migration app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/FlywayMigrationIntegrationTest.java app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/MQ/OutboxEvent.java app/backend/xxxx-application/src/test/java/com/xxxx/ddd/application/MQ/OutboxEventTest.java environment/docker-compose.prod.yml plan.md
 git commit -m "feat: add reservation reliability migrations"
 ```
+
+The implementation and review-fix checkpoints are committed; the current branch remains unpushed and unrelated dirty paths remain outside these commits.
 
 ---
 

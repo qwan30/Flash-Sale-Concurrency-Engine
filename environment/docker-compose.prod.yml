@@ -75,9 +75,9 @@ services:
       MYSQL_URL: jdbc:mysql://mysql:3306/vetautet
       MYSQL_USER: root
       MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
-      # This stack mounts the legacy init schema. Override to false only after
-      # flyway_schema_history exists and the database is already migrated.
-      SPRING_FLYWAY_BASELINE_ON_MIGRATE: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:-true}
+      # This stack mounts the legacy init schema. Set this explicitly to true
+      # only after the target volume has been verified as a legacy database.
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:-false}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092

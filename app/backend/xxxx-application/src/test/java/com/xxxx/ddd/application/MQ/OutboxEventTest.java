@@ -1,6 +1,9 @@
 package com.xxxx.ddd.application.MQ;
 
+import jakarta.persistence.Column;
 import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Field;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,5 +23,15 @@ class OutboxEventTest {
         );
 
         assertThat(event.getEventId()).isEqualTo(id);
+    }
+
+    @Test
+    void eventIdentityIsReadOnlyThroughJpaMapping() throws NoSuchFieldException {
+        Field field = OutboxEvent.class.getDeclaredField("eventId");
+        Column mapping = field.getAnnotation(Column.class);
+
+        assertThat(mapping).isNotNull();
+        assertThat(mapping.insertable()).isFalse();
+        assertThat(mapping.updatable()).isFalse();
     }
 }

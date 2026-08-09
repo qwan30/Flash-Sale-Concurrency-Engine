@@ -1,3 +1,27 @@
+-- Fail closed on legacy oversold or malformed stock. An operator must repair
+-- and record the disposition before retrying this migration; the reservation
+-- account must never be initialized with an invalid quantity invariant.
+CREATE TEMPORARY TABLE reservation_legacy_stock_validation (
+    ticket_item_id BIGINT PRIMARY KEY,
+    initial_quantity INT NOT NULL,
+    available_quantity INT NOT NULL,
+    CONSTRAINT chk_legacy_stock_values CHECK (
+        initial_quantity >= 0
+        AND available_quantity >= 0
+        AND available_quantity <= initial_quantity
+    )
+) ENGINE=InnoDB;
+
+INSERT INTO reservation_legacy_stock_validation (
+    ticket_item_id,
+    initial_quantity,
+    available_quantity
+)
+SELECT id, stock_initial, stock_available
+FROM ticket_item;
+
+DROP TEMPORARY TABLE reservation_legacy_stock_validation;
+
 CREATE TABLE inventory_stock_account (
     ticket_item_id BIGINT PRIMARY KEY,
     initial_quantity INT NOT NULL,
@@ -114,9 +138,9 @@ CREATE TABLE reservation_order (
 -- key remains the only identity/uniqueness boundary for outbox rows, so legacy
 -- and direct SQL writers cannot create a null or divergent event identity.
 ALTER TABLE outbox_event
-    ADD COLUMN IF NOT EXISTS event_id VARCHAR(36) GENERATED ALWAYS AS (id) STORED,
-    ADD COLUMN IF NOT EXISTS lease_owner VARCHAR(64) NULL,
-    ADD COLUMN IF NOT EXISTS lease_until TIMESTAMP(3) NULL;
+    ADD COLUMN event_id VARCHAR(36) GENERATED ALWAYS AS (id) STORED,
+    ADD COLUMN lease_owner VARCHAR(64) NULL,
+    ADD COLUMN lease_until TIMESTAMP(3) NULL;
 
 INSERT INTO inventory_stock_account (
     ticket_item_id,
@@ -134,4 +158,4 @@ SELECT
     0,
     0
 FROM ticket_item
-ON DUPLICATE KEY UPDATE ticket_item_id = VALUES(ticket_item_id);
+;
