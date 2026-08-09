@@ -633,27 +633,33 @@ public interface FaultInjectionPort {
 }
 ```
 
-- [ ] **Step 1: Create compile-only contract test**
+- [x] **Step 1: Create compile-only contract test**
 
 Instantiate no-op implementations and verify method signatures compile.
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-application test
 ```
 
-- [ ] **Step 3: Implement ports and no-op adapters**
+Observed the expected test-compilation failure because the reservation port types and no-op adapters did not exist yet. The application-only invocation also resolved the previously installed domain artifact, so the first green run used the reactor-safe `-am` form to compile the new reservation domain types.
+
+- [x] **Step 3: Implement ports and no-op adapters**
 
 `NoOpReservationTelemetry` must return without side effects. `NoOpFaultInjection` must never throw.
 
-- [ ] **Step 4: Run and commit**
+The Redis result types and finite fault catalog are nested in their owning ports to keep the planned application-port boundary compact. Redis results require a bounded stock value for applied/replayed/sold-out outcomes and never expose stock for stale-fence or conflict outcomes. Persistence ports cover reservation lookup/transition, conditional inventory mutation, journal claims/transitions, and recovery leases.
+
+- [x] **Step 4: Run and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-application test
 git add -- app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/reservation
 git commit -m "feat: add reservation application ports"
 ```
+
+The reactor-safe verification command `mvn.cmd -pl app/backend/xxxx-application -am test` passed 19 application tests and 8 domain tests. The application-only command remains dependent on a locally installed matching domain artifact in this checkout.
 
 ---
 
