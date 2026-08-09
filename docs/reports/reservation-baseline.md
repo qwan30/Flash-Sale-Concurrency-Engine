@@ -22,7 +22,7 @@ Command:
 mvn.cmd test
 ```
 
-Result: `BUILD SUCCESS` in 1:21. Maven reported 39 executed tests, 0 failures, 0 errors, and 2 skipped tests. The skipped cases are the two Testcontainers cases in `FlashSaleConcurrencyIntegrationTest`; the default test invocation does not enable the planned mandatory integration profile.
+Result: `BUILD SUCCESS` in 1:21. Maven reported 39 executed tests, 0 failures, 0 errors, and 2 skipped tests. Exactly 0 integration tests executed in this run: the skipped cases are the two Testcontainers cases in `FlashSaleConcurrencyIntegrationTest`; the default test invocation does not enable the planned mandatory integration profile.
 
 This is a unit/controller/infrastructure baseline only. It is not evidence that MySQL, Redis, Kafka, Flyway, or the future reservation integration suite is healthy.
 
@@ -53,7 +53,7 @@ Commands:
 ./benchmark/run-jmeter.ps1
 ```
 
-Both stopped at their first `POST /admin/benchmarks/reset` request with `No connection could be made because the target machine actively refused it` for `localhost:1122`. The JMeter script therefore never invoked the local JMeter binary and produced no valid `run.json`, `results.jtl`, consistency result, or HTML report. The empty failed-attempt directory was removed and is not an evidence artifact.
+Both stopped at their first `POST /admin/benchmarks/reset` request with `No connection could be made because the target machine actively refused it` for `localhost:1122`. The JMeter script therefore never invoked the local JMeter binary and produced no valid `run.json`, `results.jtl`, consistency result, or HTML report. The exact attempted output directory was `benchmark/results/REDIS_LUA_WITH_COMPENSATION-20260809-101033/`; it contained only an empty `reset.json`, which was removed. That attempted directory is not a valid evidence artifact.
 
 Environment observations captured during the same baseline window:
 

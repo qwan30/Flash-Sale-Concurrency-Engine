@@ -412,18 +412,25 @@ CREATE TABLE inventory_operation_journal (
     state VARCHAR(32) NOT NULL,
     ticket_item_id BIGINT NOT NULL,
     quantity INT NOT NULL,
-    demo_actor_id CHAR(36) NOT NULL,
-    idempotency_key_hash BINARY(32) NOT NULL,
+    demo_actor_id CHAR(36) NULL,
+    idempotency_key_hash BINARY(32) NULL,
     request_fingerprint BINARY(32) NOT NULL,
+    fence_version BIGINT NOT NULL,
     lease_owner VARCHAR(64) NULL,
     lease_until DATETIME(6) NULL,
     attempts INT NOT NULL DEFAULT 0,
     next_attempt_at DATETIME(6) NULL,
     last_error_code VARCHAR(64) NULL,
+    result_code VARCHAR(64) NULL,
+    result_stock_after INT NULL,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-    UNIQUE KEY uk_journal_operation_claim (operation_type, demo_actor_id, idempotency_key_hash),
-    KEY idx_journal_recovery (state, next_attempt_at, lease_until)
+    UNIQUE KEY uk_journal_create_claim (demo_actor_id, idempotency_key_hash),
+    KEY idx_journal_recovery (state, next_attempt_at, lease_until),
+    CONSTRAINT chk_journal_create_claim CHECK (
+        (operation_type = 'CREATE' AND demo_actor_id IS NOT NULL AND idempotency_key_hash IS NOT NULL)
+        OR (operation_type <> 'CREATE' AND demo_actor_id IS NULL AND idempotency_key_hash IS NULL)
+    )
 );
 
 CREATE TABLE reservation_order (
@@ -440,6 +447,8 @@ CREATE TABLE reservation_order (
 ```
 
 Also add `lease_owner`, `lease_until`, `next_attempt_at` and stable `event_id` support to the existing outbox schema.
+
+The stock account's `fence_version` is the admission fence. A create journal claim stores the current fence and every conditional MySQL decrement requires both `admission_state = 'OPEN'` and the stored fence. Redis stock state stores the same fence; every apply, compensate, and terminal-mirror Lua call receives and checks `fenceVersion`, returning `STALE_FENCE` without mutation on mismatch. Repair first atomically moves the MySQL account to `DRAINING` and increments the fence, publishes that fence to Redis, drains/rejects stale leases, verifies no old operation can mutate, closes admission, repairs Redis from the MySQL snapshot, verifies equality, and only then reopens admission. The repair must not run concurrently with an in-flight old-fence operation.
 
 - [ ] **Step 6: Run migration tests and refactor**
 
@@ -551,9 +560,9 @@ git commit -m "feat: define reservation state machine"
 
 ```java
 public interface ReservationStockPort {
-    RedisApplyResult applyOnce(UUID operationId, long ticketItemId, int quantity);
-    RedisCompensationResult compensateOnce(UUID operationId, long ticketItemId, int quantity);
-    void mirrorTerminalOnce(UUID operationId, long ticketItemId, int delta);
+    RedisApplyResult applyOnce(UUID operationId, long ticketItemId, int quantity, long fenceVersion);
+    RedisCompensationResult compensateOnce(UUID operationId, long ticketItemId, int quantity, long fenceVersion);
+    void mirrorTerminalOnce(UUID operationId, long ticketItemId, int delta, long fenceVersion);
     Optional<RedisOperationState> operationState(UUID operationId);
 }
 
@@ -611,7 +620,7 @@ decrement succeeds only when available >= quantity and admission_state = OPEN
 one of concurrent confirm/expire transitions wins
 release/expire restores stock exactly once
 journal lease cannot be claimed by two workers
-same actor + idempotency hash is unique
+same actor + idempotency hash is unique for `CREATE` claims; terminal/mirror retries reuse the existing journal row
 ```
 
 - [ ] **Step 2: Run and confirm RED**
@@ -682,6 +691,7 @@ Prove:
 first apply decrements once
 second apply with same operation returns original result
 insufficient stock never decrements
+stale fence never mutates stock and returns STALE_FENCE
 compensation increments only from APPLIED
 second compensation is a no-op
 terminal mirror applies a delta once
@@ -701,6 +711,7 @@ The Lua script must return one of these bounded results:
 APPLIED:<stockAfter>
 REPLAYED:<stockAfter>
 SOLD_OUT:<stockCurrent>
+STALE_FENCE
 CONFLICT
 ```
 
@@ -728,7 +739,7 @@ git commit -m "feat: add idempotent reservation redis protocol"
 
 **Interfaces:**
 - Consumes: repositories, `ReservationStockPort`, `ReservationTelemetryPort`, `FaultInjectionPort`, existing `OutboxService`.
-- Produces: NEW, REPLAYED, PROCESSING, SOLD_OUT and CONFLICT outcomes.
+- Produces: NEW, REPLAYED, PROCESSING, SOLD_OUT, FENCE_STALE, REJECTED and CONFLICT outcomes.
 
 - [ ] **Step 1: Write failing service tests**
 
@@ -772,7 +783,7 @@ public record CreateReservationCommand(
 
 - [ ] **Step 4: Implement transaction boundaries**
 
-The service generates `operationId` and `reservationId` before the journal claim. The journal insert is committed before Redis and uniquely claims `(operation_type, demo_actor_id, idempotency_key_hash)`; an existing claim returns its durable operation state instead of admitting a second Redis operation. The reservation/outbox commit is a separate transaction. A crash after Redis is recoverable because the journal and Redis operation token share `operationId`.
+The service generates `operationId` and `reservationId` before the journal claim. The journal insert is committed before Redis and uniquely claims `(demo_actor_id, idempotency_key_hash)` for `operation_type=CREATE`; terminal/mirror retries reuse that journal row. An existing create claim returns its durable operation state instead of admitting a second Redis operation. The reservation/outbox commit is a separate transaction. A crash after Redis is recoverable because the journal, its `fence_version`, and the Redis operation token share `operationId`.
 
 - [ ] **Step 5: Run tests and commit**
 
@@ -830,7 +841,7 @@ reservation.expired
 
 - [ ] **Step 5: Mirror terminal deltas idempotently**
 
-Release/expire call `mirrorTerminalOnce(operationId, ticketItemId, quantity)` after DB commit. Mirror failure records `MIRROR_PENDING` in the same operation journal and does not roll back the durable transition. Compensation failure records `COMPENSATION_PENDING`; neither pending state may be treated as converged.
+Release/expire call `mirrorTerminalOnce(operationId, ticketItemId, quantity, fenceVersion)` after DB commit. Mirror failure records `MIRROR_PENDING` in the same operation journal and does not roll back the durable transition. Compensation failure records `COMPENSATION_PENDING`; neither pending state may be treated as converged.
 
 - [ ] **Step 6: Run tests and commit**
 
@@ -872,17 +883,19 @@ public void recover() {
 - [ ] **Step 3: Implement deterministic dispositions**
 
 ```text
-RECEIVED + no Redis token -> safely retry apply
+RECEIVED + no Redis token + current fence -> retry apply
+RECEIVED + no Redis token + stale fence -> REJECTED with FENCE_STALE; do not retry
 RECEIVED + APPLIED token -> finalize DB or enter COMPENSATION_PENDING
 REDIS_APPLIED + missing reservation -> finalize DB or enter COMPENSATION_PENDING
 COMMITTED + missing response -> replay reservation
+REJECTED -> stable persisted result; never retry
 COMPENSATED -> stable terminal journal state
 COMPENSATION_PENDING -> retry compensateOnce; on success mark COMPENSATED
 MIRROR_PENDING -> retry mirrorTerminalOnce; on success mark COMMITTED
 five failed repair attempts -> REPAIR_REQUIRED + alert metric and certification NO-GO
 ```
 
-`REPAIR_REQUIRED` is not a successful terminal state. A MySQL-authoritative repair job may clear it only after Redis is reachable and admission is closed for the affected ticket; the repair re-establishes the Redis mirror and records the disposition. A run with `COMPENSATION_PENDING`, `MIRROR_PENDING`, or `REPAIR_REQUIRED` is not allowed to satisfy the zero-pending convergence gate.
+`SOLD_OUT` and `FENCE_STALE` are persisted as non-retryable `REJECTED` results with `result_code` and `result_stock_after`; replay returns the stored bounded result without a new Redis operation. `REPAIR_REQUIRED` is not a successful terminal state. A MySQL-authoritative repair job may clear it only after an atomic admission fence has drained stale operations, Redis is reachable, and admission is closed for the affected ticket; the repair re-establishes the Redis mirror and records the disposition. A run with `COMPENSATION_PENDING`, `MIRROR_PENDING`, or `REPAIR_REQUIRED` is not allowed to satisfy the zero-pending convergence gate.
 
 - [ ] **Step 4: Run tests and commit**
 
@@ -940,7 +953,7 @@ GET  /api/v1/inventory/{ticketItemId}
 
 - [ ] **Step 1: Write failing MockMvc contract tests**
 
-Assert exact statuses: 201 new, 200 replay/transition, 202 recovering, 400 validation, 404 missing, 409 sold-out/conflict/late transition, 429 rate limit and 503 saturation.
+Assert exact statuses: 201 new, 200 replay/transition, 202 recovering journal states, 400 validation, 404 only when neither reservation nor journal exists, 409 initial sold-out/fence-stale/conflict/late transition and persisted rejected/compensated outcomes, 429 rate limit and 503 saturation or REPAIR_REQUIRED with `Retry-After`.
 
 - [ ] **Step 2: Define request contract**
 
@@ -959,7 +972,8 @@ public record ReservationErrorResponse(
         String code,
         String message,
         boolean retryable,
-        String traceId) {}
+        String traceId,
+        Integer stockAfter) {}
 ```
 
 Never return stack traces, SQL messages or raw keys.
@@ -1053,7 +1067,7 @@ final class ConfigurableFaultInjection implements FaultInjectionPort {
 
 - [ ] **Step 3: Add Toxiproxy-backed dependency faults**
 
-Network partition tests must interrupt Redis and Kafka at protocol boundaries through Toxiproxy; do not fake connection failures with mocks in integration evidence. If Toxiproxy is unavailable, the dependency-fault certification gate is failed rather than substituted with mock evidence.
+Network partition tests must first assert the Toxiproxy control endpoint and configured Redis/Kafka proxy paths are healthy, then interrupt Redis and Kafka at protocol boundaries through Toxiproxy and assert health/reachability after toxic removal; do not fake connection failures with mocks in integration evidence. If Toxiproxy or the proxy-path health checks are unavailable, the dependency-fault certification gate is failed rather than substituted with mock evidence.
 
 - [ ] **Step 4: Assert convergence**
 

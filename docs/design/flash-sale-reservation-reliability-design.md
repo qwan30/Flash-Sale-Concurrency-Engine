@@ -14,7 +14,9 @@ validate request, generate operation/reservation IDs, and derive SHA-256 fingerp
 durably claim actor + idempotency hash in operation journal (RECEIVED)
         |
 Redis Lua apply-once using operationId and stock key
-        |-- SOLD_OUT / CONFLICT / replay -> return bounded result
+        |-- SOLD_OUT -> persist REJECTED(SOLD_OUT, stockAfter) and return bounded result
+        |-- STALE_FENCE -> persist REJECTED(FENCE_STALE, stockAfter) and return bounded result
+        |-- CONFLICT / replay -> return the durable bounded result
         |
 MySQL transaction: conditional stock decrement
                    + RESERVED reservation
@@ -24,7 +26,9 @@ MySQL transaction: conditional stock decrement
 return durable reservation and converged stock snapshot
 ```
 
-The service generates `operationId` and `reservationId` before the claim. The journal insert commits before Redis and has a unique `(operation_type, demo_actor_id, idempotency_key_hash)` boundary. A duplicate claim returns the existing operation state and cannot admit a second Redis operation. The MySQL reservation transaction is separate from the Redis operation. If the database transaction fails after Redis returns `APPLIED`, the service invokes `compensateOnce`; a successful compensation records `COMPENSATED`, while a failed compensation records `COMPENSATION_PENDING` for recovery. A crash in any gap is recovered from the journal and the Redis operation token; the same `operationId` prevents a second Redis mutation.
+The service generates `operationId` and `reservationId` before the claim. For `operation_type=CREATE`, the journal has a unique `(demo_actor_id, idempotency_key_hash)` boundary; terminal and mirror work reuses the original create journal row and operation ID rather than claiming a new idempotency tuple. A duplicate claim returns the existing operation state and cannot admit a second Redis operation. The MySQL reservation transaction is separate from the Redis operation. If Redis returns `SOLD_OUT` or `STALE_FENCE`, the service durably records `REJECTED` with `result_code` and `result_stock_after` before returning; that result is stable and replay never starts a new Redis operation. If the database transaction fails after Redis returns `APPLIED`, the service invokes `compensateOnce`; a successful compensation records `COMPENSATED`, while a failed compensation records `COMPENSATION_PENDING` for recovery. A crash in any gap is recovered from the journal and the Redis operation token; the same `operationId` prevents a second Redis mutation.
+
+The stock account's `fence_version` is the admission fence. The create journal stores the fence observed at claim time, the MySQL decrement requires both `admission_state = OPEN` and that fence, and Redis stores the same fence beside its stock counter. Every apply, compensation, and terminal-mirror Lua call receives `fenceVersion`; a mismatch returns `STALE_FENCE` without mutating stock. Repair atomically changes the MySQL account to `DRAINING` and increments the fence, publishes the new fence to Redis, drains or rejects old-fence leases, and quiesces in-flight old-fence operations before closing admission. While admission is closed, repair uses the MySQL snapshot as authority, restores the Redis mirror, verifies equality and zero stale operations, then reopens admission. Delayed operations carrying the old fence must therefore fail closed and cannot mutate after repair.
 
 The canonical request fingerprint is:
 
@@ -51,21 +55,24 @@ Recovery workers claim journal rows with a 30-second lease, batch size 50, retry
 | Durable/journal observation | Recovery action |
 |---|---|
 | `RECEIVED` with no Redis operation token | Retry `applyOnce` |
+| `RECEIVED` with a stale fence | Persist `REJECTED(FENCE_STALE)` and do not retry |
 | `RECEIVED` with an `APPLIED` Redis token | Finalize the MySQL reservation or compensate |
 | `REDIS_APPLIED` with no reservation | Finalize the MySQL reservation or compensate |
 | `COMMITTED` with no response | Return/replay the durable reservation |
+| `REJECTED` with `SOLD_OUT` or `FENCE_STALE` | Return the stored bounded result; never retry Redis |
 | `COMPENSATED` | Keep the stable terminal journal state |
 | `COMPENSATION_PENDING` | Retry `compensateOnce`; only success can become `COMPENSATED` |
 | `MIRROR_PENDING` | Retry `mirrorTerminalOnce`; only success can return to converged `COMMITTED` |
+| `REPAIR_REQUIRED` | Close admission and run fenced MySQL-authoritative repair; never report success while uncleared |
 | five failed repair attempts | Mark `REPAIR_REQUIRED`, emit the alert metric, and fail certification |
 
-An expiry scheduler finds due `RESERVED` rows and executes the same conditional expiry service. A Redis mirror failure never rolls back a durable terminal transition; it creates a `MIRROR_PENDING` journal entry. `REPAIR_REQUIRED` is not a successful terminal state: a MySQL-authoritative repair job may clear it only after Redis is reachable and admission is closed for the affected ticket. Any pending or repair-required state fails the zero-pending convergence gate.
+An expiry scheduler finds due `RESERVED` rows and executes the same conditional expiry service. A Redis mirror failure never rolls back a durable terminal transition; it creates a `MIRROR_PENDING` journal entry. `REPAIR_REQUIRED` is not a successful terminal state: a MySQL-authoritative repair job may clear it only after the admission fence has drained stale leases, Redis is reachable, and admission is closed for the affected ticket. Any pending or repair-required state fails the zero-pending convergence gate.
 
 ## Admission and fault injection
 
 Reservation creation receives a fixed 40 permits/second per instance and a four-call create bulkhead. Terminal operations use a separate two-call bulkhead with a 100 ms wait, so create floods cannot consume all terminal capacity. Rejections map to 429 for rate limiting and 503 for saturation, each with `Retry-After: 1`.
 
-Fault injection exists only under the `chaos` profile and has a finite catalog: `AFTER_REDIS_BEFORE_DB`, `AFTER_DB_COMMIT_BEFORE_RESPONSE`, `REDIS_MIRROR_TIMEOUT`, `KAFKA_UNAVAILABLE`, and `CONFIRM_EXPIRE_RACE`. Redis and Kafka integration tests must use protocol-boundary faults through Toxiproxy, not mock-only failure evidence; if Toxiproxy is unavailable, the dependency-fault certification gate is failed. Every passing scenario must converge within 30 seconds after dependency recovery with no negative stock, duplicate order, invariant violation, or pending journal/outbox work.
+Fault injection exists only under the `chaos` profile and has a finite catalog: `AFTER_REDIS_BEFORE_DB`, `AFTER_DB_COMMIT_BEFORE_RESPONSE`, `REDIS_MIRROR_TIMEOUT`, `KAFKA_UNAVAILABLE`, and `CONFIRM_EXPIRE_RACE`. Before each dependency scenario, the integration test must assert the Toxiproxy control endpoint is healthy and the application is using the expected Redis/Kafka proxy path; after the toxic is removed it must assert proxy health and dependency reachability again. Redis and Kafka integration tests must use protocol-boundary faults through Toxiproxy, not mock-only failure evidence; if Toxiproxy or its proxy-path health checks are unavailable, the dependency-fault certification gate is failed. Every passing scenario must converge within 30 seconds after dependency recovery with no negative stock, duplicate order, invariant violation, or pending journal/outbox work.
 
 ## Observability
 
