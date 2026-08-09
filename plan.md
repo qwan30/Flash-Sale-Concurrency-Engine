@@ -536,7 +536,7 @@ The implementation and review-fix checkpoints are committed; the current branch 
 **Interfaces:**
 - Produces: immutable domain records and legal transition rules used by all application services.
 
-- [ ] **Step 1: Write failing transition tests**
+- [x] **Step 1: Write failing transition tests**
 
 ```java
 @ParameterizedTest
@@ -553,7 +553,7 @@ void enforcesTransitionMatrix(ReservationStatus from, ReservationStatus to, bool
 }
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-domain -Dtest=ReservationTest test
@@ -561,7 +561,9 @@ mvn.cmd -pl app/backend/xxxx-domain -Dtest=ReservationTest test
 
 Expected: compilation failure because reservation types do not exist.
 
-- [ ] **Step 3: Implement immutable contracts**
+Observed RED on 2026-08-09: `ReservationTest` failed during test compilation because `ReservationStatus` was not yet defined.
+
+- [x] **Step 3: Implement immutable contracts**
 
 ```java
 public enum ReservationStatus {
@@ -591,13 +593,15 @@ public final class ReservationTransition {
 }
 ```
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-domain test
 git add -- app/backend/xxxx-domain/src/main/java/com/xxxx/ddd/domain/reservation app/backend/xxxx-domain/src/test/java/com/xxxx/ddd/domain/reservation
 git commit -m "feat: define reservation state machine"
 ```
+
+The domain module passes 8 tests covering the transition matrix, inventory accounting invariant, immutable reservation shape, and quantity bounds. `InventorySnapshot` uses widened arithmetic for the accounting sum.
 
 ### Task 2.2: Define ports for persistence, Redis, telemetry and chaos
 
