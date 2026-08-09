@@ -37,6 +37,7 @@ public interface OperationJournalRepository {
             UUID reservationId,
             UUID demoActorId,
             String idempotencyKeyHash,
+            String requestFingerprint,
             long ticketItemId,
             int quantity,
             long fenceVersion,
@@ -50,6 +51,9 @@ public interface OperationJournalRepository {
             }
             if (idempotencyKeyHash == null || idempotencyKeyHash.isBlank()) {
                 throw new IllegalArgumentException("idempotencyKeyHash is required");
+            }
+            if (requestFingerprint == null || requestFingerprint.isBlank()) {
+                throw new IllegalArgumentException("requestFingerprint is required");
             }
             if (ticketItemId <= 0) {
                 throw new IllegalArgumentException("ticketItemId must be positive");

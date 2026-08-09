@@ -12,9 +12,14 @@ public interface ReservationRepository {
 
     Optional<Reservation> findById(UUID reservationId);
 
-    List<Reservation> findDueReserved(Instant databaseNow, int limit);
+    List<Reservation> findDueReserved(int limit);
 
-    boolean insertReserved(Reservation reservation, long fenceVersion);
+    boolean insertReserved(
+            Reservation reservation,
+            long fenceVersion,
+            String idempotencyKeyHash,
+            String requestFingerprint
+    );
 
     Optional<Reservation> transitionIfCurrent(
             UUID reservationId,

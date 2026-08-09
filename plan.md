@@ -675,7 +675,7 @@ The reactor-safe verification command `mvn.cmd -pl app/backend/xxxx-application 
 - Consumes: domain records and ports from Phase 2.
 - Produces: conditional stock decrement, conditional terminal transition, aggregate snapshot and journal lease/claim.
 
-- [ ] **Step 1: Write failing MySQL integration tests**
+- [x] **Step 1: Write failing MySQL integration tests**
 
 Tests must prove:
 
@@ -688,13 +688,15 @@ same actor + idempotency hash is unique for `CREATE` claims; terminal/mirror ret
 an old-fence operation cannot mutate MySQL after repair reopens admission
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=ReservationPersistenceIntegrationTest test
 ```
 
-- [ ] **Step 3: Implement SQL conditions**
+Observed the expected compilation failure because the new reservation ports and persistence adapters did not exist yet. The application-only classpath also required the reactor-safe `-am` form after the Phase 2 domain and port commits.
+
+- [x] **Step 3: Implement SQL conditions**
 
 Use parameterized queries equivalent to:
 
@@ -714,7 +716,9 @@ WHERE id = :reservationId
   AND expires_at > UTC_TIMESTAMP(6);
 ```
 
-- [ ] **Step 4: Implement durable idempotency decision**
+Implemented native JPA adapter queries for conditional inventory decrement/restore, database-time reservation transitions, expiry lookup, and journal claims/leases. Release/expire transitions restore inventory in the same transaction and fail closed if the conditional restore cannot complete. The journal lease uses one ordered conditional update, so concurrent workers cannot claim the same eligible row.
+
+- [x] **Step 4: Implement durable idempotency decision**
 
 Canonical fingerprint:
 
@@ -724,13 +728,17 @@ SHA-256("ticketItemId=<decimal>&quantity=<decimal>")
 
 Store SHA-256 of the idempotency key; never store or log the raw key.
 
-- [ ] **Step 5: Run tests and commit**
+`OperationJournalRepository` carries the idempotency-key digest and canonical request fingerprint. `claimCreate` uses the MySQL unique actor/digest boundary and returns the original journal row for replay or conflict comparison; reservation writes accept both digests and validate 64-character hexadecimal values.
+
+- [x] **Step 5: Run tests and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=ReservationPersistenceIntegrationTest test
 git add -- app/backend/xxxx-infrastructure/src/main/java/com/xxxx/ddd/infrastructure/reservation app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/ReservationPersistenceIntegrationTest.java
 git commit -m "feat: persist reservation inventory and journal"
 ```
+
+The reactor-safe verification command `mvn.cmd -pl app/backend/xxxx-start -am -Dtest=ReservationPersistenceIntegrationTest "-Dsurefire.failIfNoSpecifiedTests=false" test` passed all 6 MySQL/Testcontainers cases. The initial live runs caught an invalid over-limit test quantity, cross-test journal eligibility, and missing stock decrement before terminal restore; each was corrected before the final pass.
 
 ---
 
