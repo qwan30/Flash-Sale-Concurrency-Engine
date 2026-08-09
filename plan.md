@@ -809,7 +809,7 @@ git add -- app/backend/xxxx-infrastructure/src/main/resources/redis app/backend/
 git commit -m "feat: add idempotent reservation redis protocol"
 ```
 
-The reactor-safe command `mvn.cmd -pl app/backend/xxxx-start -am -Dtest=RedisReservationProtocolIntegrationTest "-Dsurefire.failIfNoSpecifiedTests=false" test` passed all 8 live Redis 7 Testcontainers cases. Committed as `67ea92b`.
+The reactor-safe command `mvn.cmd -pl app/backend/xxxx-start -am -Dtest=RedisReservationProtocolIntegrationTest "-Dsurefire.failIfNoSpecifiedTests=false" test` passed all 8 live Redis 7 Testcontainers cases. Committed as `8563afe`.
 
 ---
 
@@ -827,7 +827,7 @@ The reactor-safe command `mvn.cmd -pl app/backend/xxxx-start -am -Dtest=RedisRes
 - Consumes: repositories, `ReservationStockPort`, `ReservationTelemetryPort`, `FaultInjectionPort`, existing `OutboxService`.
 - Produces: NEW, REPLAYED, PROCESSING, SOLD_OUT, FENCE_STALE, REJECTED and CONFLICT outcomes.
 
-- [ ] **Step 1: Write failing service tests**
+- [x] **Step 1: Write failing service tests**
 
 Cover this exact sequence:
 
@@ -842,13 +842,17 @@ return stock snapshot
 
 Also test DB failure invokes `compensateOnce` and marks `COMPENSATED` when compensation succeeds; a failed compensation must remain `COMPENSATION_PENDING` and be retried by recovery.
 
-- [ ] **Step 2: Run and confirm RED**
+Implemented 9 focused service tests covering ordering, replay and idempotency conflict, sold-out and stale-fence rejections, successful and failed compensation, and both fault boundaries.
+
+- [x] **Step 2: Run and confirm RED**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-application -Dtest=CreateReservationServiceTest test
 ```
 
-- [ ] **Step 3: Implement the immutable command**
+The direct module command was RED because its installed `xxxx-domain` artifact predates the reservation types. The reactor-safe command with `-am` was used for GREEN verification.
+
+- [x] **Step 3: Implement the immutable command**
 
 ```java
 public record CreateReservationCommand(
@@ -867,17 +871,23 @@ public record CreateReservationCommand(
 }
 ```
 
-- [ ] **Step 4: Implement transaction boundaries**
+Implemented `CreateReservationCommand` with the specified immutable shape and boundary validation, plus a typed `CreateReservationResult` for the seven bounded outcomes.
+
+- [x] **Step 4: Implement transaction boundaries**
 
 The service generates `operationId` and `reservationId` before the journal claim. The journal insert is committed before Redis and uniquely claims `(demo_actor_id, idempotency_key_hash)` for `operation_type=CREATE`; terminal/mirror retries reuse that journal row. An existing create claim returns its durable operation state instead of admitting a second Redis operation. The reservation/outbox commit is a separate transaction. A crash after Redis is recoverable because the journal, its `fence_version`, and the Redis operation token share `operationId`.
 
-- [ ] **Step 5: Run tests and commit**
+Implemented explicit `REQUIRES_NEW` claim/transition transactions and a separate database transaction for durable decrement, reservation, outbox, and `COMMITTED`. The inventory port and JPA adapter now read the durable current fence version before Redis admission; a MySQL/Testcontainers test proves that lookup.
+
+- [x] **Step 5: Run tests and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-application -Dtest=CreateReservationServiceTest test
 git add -- app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/reservation app/backend/xxxx-application/src/test/java/com/xxxx/ddd/application/reservation/CreateReservationServiceTest.java
 git commit -m "feat: create durable redis-first reservations"
 ```
+
+The reactor-safe command `mvn.cmd -pl app/backend/xxxx-application -am -Dtest=CreateReservationServiceTest "-Dsurefire.failIfNoSpecifiedTests=false" test` passed all 9 service tests. The durable-fence persistence coverage also passed all 7 MySQL/Testcontainers cases through `ReservationPersistenceIntegrationTest`.
 
 ---
 

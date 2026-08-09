@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 
 @Repository
 public class JpaInventoryRepositoryAdapter implements InventoryRepository {
@@ -39,6 +40,19 @@ public class JpaInventoryRepositoryAdapter implements InventoryRepository {
                 ((Number) row[2]).intValue(),
                 ((Number) row[3]).intValue(),
                 ((Number) row[4]).intValue()));
+    }
+
+    @Override
+    public OptionalLong findFenceVersion(long ticketItemId) {
+        List<?> rows = entityManager.createNativeQuery(
+                        "SELECT fence_version FROM inventory_stock_account "
+                                + "WHERE ticket_item_id = :ticketItemId")
+                .setParameter("ticketItemId", ticketItemId)
+                .getResultList();
+        if (rows.isEmpty()) {
+            return OptionalLong.empty();
+        }
+        return OptionalLong.of(((Number) rows.get(0)).longValue());
     }
 
     @Override

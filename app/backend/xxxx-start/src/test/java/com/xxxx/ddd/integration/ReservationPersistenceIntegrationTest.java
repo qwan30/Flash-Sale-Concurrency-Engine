@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -93,6 +94,18 @@ class ReservationPersistenceIntegrationTest {
                 ticketItemId);
         assertThat((Boolean) inTransaction(entityManager -> inventory(entityManager)
                 .decrementIfAvailable(ticketItemId, 1, 0L))).isFalse();
+    }
+
+    @Test
+    void readsTheDurableFenceVersionUsedForRedisAdmission() {
+        long ticketItemId = seedStock(5);
+        jdbc.update("UPDATE inventory_stock_account SET fence_version = 9 WHERE ticket_item_id = ?", ticketItemId);
+
+        OptionalLong fenceVersion = inTransaction(entityManager -> inventory(entityManager)
+                .findFenceVersion(ticketItemId));
+
+        assertThat(fenceVersion.isPresent()).isTrue();
+        assertThat(fenceVersion.getAsLong()).isEqualTo(9L);
     }
 
     @Test
