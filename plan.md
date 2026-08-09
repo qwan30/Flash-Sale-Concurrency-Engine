@@ -759,7 +759,7 @@ The reactor-safe verification command `mvn.cmd -pl app/backend/xxxx-start -am -D
 - Implements: `ReservationStockPort`.
 - Redis keys: `flashsale:reservation:stock:{ticketItemId}` and `flashsale:reservation:op:{operationId}`.
 
-- [ ] **Step 1: Write failing Redis protocol tests**
+- [x] **Step 1: Write failing Redis protocol tests**
 
 Prove:
 
@@ -775,13 +775,17 @@ second compensation is a no-op
 terminal mirror applies a delta once
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+Implemented `RedisReservationProtocolIntegrationTest` with eight live Redis 7 Testcontainers cases covering the apply, replay, fence, repair, compensation, terminal-mirror, and argument-conflict contracts.
+
+- [x] **Step 2: Run and confirm RED**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=RedisReservationProtocolIntegrationTest test
 ```
 
-- [ ] **Step 3: Implement apply script contract**
+The direct module run was RED because the installed application/infrastructure artifacts did not yet contain the new reservation port and adapter types; the reactor-safe command below was required after implementation.
+
+- [x] **Step 3: Implement apply script contract**
 
 The Lua script must return one of these bounded results:
 
@@ -795,13 +799,17 @@ CONFLICT
 
 Operation records expire after 7 days, exceeding the recovery horizon.
 
-- [ ] **Step 4: Run tests and commit**
+Implemented the five Lua scripts and `RedisReservationStockAdapter`. All stock mutations and operation records are performed inside Redis scripts; stale fences do not expose stock, operation arguments are checked before replay, repair is limited to `CLOSED` snapshots with bounded dispositions, and terminal/compensation paths are apply-once.
+
+- [x] **Step 4: Run tests and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=RedisReservationProtocolIntegrationTest test
 git add -- app/backend/xxxx-infrastructure/src/main/resources/redis app/backend/xxxx-infrastructure/src/main/java/com/xxxx/ddd/infrastructure/reservation/redis app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/RedisReservationProtocolIntegrationTest.java
 git commit -m "feat: add idempotent reservation redis protocol"
 ```
+
+The reactor-safe command `mvn.cmd -pl app/backend/xxxx-start -am -Dtest=RedisReservationProtocolIntegrationTest "-Dsurefire.failIfNoSpecifiedTests=false" test` passed all 8 live Redis 7 Testcontainers cases. Committed as `67ea92b`.
 
 ---
 

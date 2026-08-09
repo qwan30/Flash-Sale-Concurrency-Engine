@@ -127,6 +127,8 @@ public interface ReservationStockPort {
         public enum Status {
             APPLIED,
             COMPENSATED,
+            MIRRORED,
+            REPAIRED,
             SOLD_OUT,
             STALE_FENCE,
             CONFLICT
