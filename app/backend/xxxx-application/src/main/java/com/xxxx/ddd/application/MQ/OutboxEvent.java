@@ -27,7 +27,7 @@ public class OutboxEvent {
     @Column(length = 36)
     private String id;
 
-    @Column(name = "event_id", length = 36, nullable = false, updatable = false)
+    @Column(name = "event_id", length = 36, nullable = false, insertable = false, updatable = false)
     private String eventId;
 
     @Column(name = "aggregate_type", length = 100, nullable = false)
@@ -74,13 +74,6 @@ public class OutboxEvent {
         this.eventVersion = eventVersion;
         this.payload = payload;
         this.createdAt = Instant.now();
-    }
-
-    @PrePersist
-    private void synchronizeEventId() {
-        if (eventId == null) {
-            eventId = id;
-        }
     }
 
     /**

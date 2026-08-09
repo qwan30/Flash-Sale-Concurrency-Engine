@@ -302,6 +302,8 @@ git commit -m "docs: capture reservation upgrade baseline"
 **Files:**
 - Modify: `app/backend/xxxx-start/pom.xml`
 - Modify: `app/backend/xxxx-start/src/main/resources/application.yml`
+- Modify: `app/backend/xxxx-start/README.md`
+- Modify: `.github/workflows/ci.yml`
 - Modify: `environment/docker-compose.prod.yml`
 - Create: `app/backend/xxxx-start/src/main/resources/db/migration/V1__legacy_schema.sql`
 - Create: `app/backend/xxxx-start/src/main/resources/db/migration/V2__reservation_reliability.sql`
@@ -490,7 +492,9 @@ CREATE TABLE reservation_order (
 );
 ```
 
-Also add `lease_owner`, `lease_until`, `next_attempt_at` and stable `event_id` support to the existing outbox schema. Legacy rows are backfilled from the existing primary key; `OutboxEvent` populates the same UUID into both `id` and `event_id` for every new write.
+Also add `lease_owner`, `lease_until`, `next_attempt_at` and stable `event_id` support to the existing outbox schema. `event_id` is a stored generated alias of the existing `id` primary key, so `id` remains the only identity and uniqueness boundary for legacy, JPA and direct SQL writers. `OutboxEvent` exposes that alias read-only while its constructor keeps the same UUID available to new application writes.
+
+The CI observability smoke and the documented legacy-init development launch explicitly set `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`; the application default remains false so an unverified non-empty database is never silently baselined.
 
 The stock account's `fence_version` is the admission fence and `admission_state` is a durable `OPEN -> DRAINING -> CLOSED -> OPEN` state machine. A create journal claim and every conditional MySQL decrement require `admission_state = 'OPEN'` and the stored current fence; a repair owner claims `OPEN -> DRAINING` with one compare-and-set update, increments the fence, and creates an `inventory_repair_journal` row in the same transaction. Normal claims and terminal mutations are rejected unless the durable account is `OPEN` with the current fence. Redis stores the same fence and admission state. A fence-publication Lua script atomically accepts only a greater fence and writes the new fence/state; normal apply, compensate, and terminal-mirror Lua calls require Redis `admission_state = 'OPEN'`, compare both values, and return `STALE_FENCE` without mutation when they do not match. The repair owner publishes `DRAINING`, drains or rejects old-fence leases, waits for in-flight old-fence operations to quiesce, and only then CASes `DRAINING -> CLOSED`. While `CLOSED`, a repair-only maintenance script writes the MySQL-authoritative snapshot, verifies Redis/MySQL equality and zero old-fence operations, and records the disposition. Only a successful verification may publish `OPEN` and CAS `CLOSED -> OPEN`; failed verification leaves the account closed and the repair journal `FAILED`. Delayed operations carrying the old fence must therefore fail closed and cannot mutate after repair.
 
@@ -508,7 +512,7 @@ GREEN attempt on 2026-08-09 compiled the migration test and reached Testcontaine
 - [ ] **Step 7: Commit migration checkpoint**
 
 ```powershell
-git add -- app/backend/xxxx-start/pom.xml app/backend/xxxx-start/src/main/resources/application.yml app/backend/xxxx-start/src/main/resources/db/migration app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/FlywayMigrationIntegrationTest.java app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/MQ/OutboxEvent.java app/backend/xxxx-application/src/test/java/com/xxxx/ddd/application/MQ/OutboxEventTest.java environment/docker-compose.prod.yml plan.md
+git add -- .github/workflows/ci.yml app/backend/xxxx-start/README.md app/backend/xxxx-start/pom.xml app/backend/xxxx-start/src/main/resources/application.yml app/backend/xxxx-start/src/main/resources/db/migration app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/FlywayMigrationIntegrationTest.java app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/MQ/OutboxEvent.java app/backend/xxxx-application/src/test/java/com/xxxx/ddd/application/MQ/OutboxEventTest.java environment/docker-compose.prod.yml plan.md
 git commit -m "feat: add reservation reliability migrations"
 ```
 

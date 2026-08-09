@@ -137,6 +137,7 @@ management.tracing.sampling.probability: 1.0
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9094` | Kafka brokers |
 | `KAFKA_TOPIC` | `flashsale.orders` | Kafka topic |
 | `REDISSON_MODE` | `single` | Redisson mode (single/sentinel) |
+| `SPRING_FLYWAY_BASELINE_ON_MIGRATE` | `false` | Set `true` when starting against the legacy init schema; once `flyway_schema_history` exists, the override is no longer needed |
 
 ---
 
@@ -189,14 +190,16 @@ mvn -pl app/backend/xxxx-start test -Dflashsale.integration=true
 docker compose up -d
 
 # Chạy ứng dụng
+$env:SPRING_FLYWAY_BASELINE_ON_MIGRATE="true"
 mvn -pl app/backend/xxxx-start spring-boot:run
 ```
 
 ### Với IDE:
 
-1. Chạy `StartApplication.main()` từ IDE
-2. Đảm bảo MySQL, Redis, Kafka đang chạy
-3. Truy cập: `http://localhost:1122/swagger-ui.html`
+1. Đặt biến môi trường `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true` khi database vẫn dùng legacy init schema.
+2. Chạy `StartApplication.main()` từ IDE
+3. Đảm bảo MySQL, Redis, Kafka đang chạy
+4. Truy cập: `http://localhost:1122/swagger-ui.html`
 
 ---
 

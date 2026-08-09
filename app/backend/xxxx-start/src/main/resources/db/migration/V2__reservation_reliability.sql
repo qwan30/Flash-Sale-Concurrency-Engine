@@ -110,15 +110,13 @@ CREATE TABLE reservation_order (
         REFERENCES inventory_reservation(id)
 ) ENGINE=InnoDB;
 
+-- event_id is a generated read alias of the existing primary key. The primary
+-- key remains the only identity/uniqueness boundary for outbox rows, so legacy
+-- and direct SQL writers cannot create a null or divergent event identity.
 ALTER TABLE outbox_event
-    -- Legacy rows are backfilled below; new OutboxEvent writes always populate event_id.
-    ADD COLUMN IF NOT EXISTS event_id VARCHAR(36) NULL,
+    ADD COLUMN IF NOT EXISTS event_id VARCHAR(36) GENERATED ALWAYS AS (id) STORED,
     ADD COLUMN IF NOT EXISTS lease_owner VARCHAR(64) NULL,
     ADD COLUMN IF NOT EXISTS lease_until TIMESTAMP(3) NULL;
-
-UPDATE outbox_event
-SET event_id = id
-WHERE event_id IS NULL;
 
 INSERT INTO inventory_stock_account (
     ticket_item_id,

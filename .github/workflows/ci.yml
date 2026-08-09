@@ -111,6 +111,8 @@ jobs:
     needs: backend-build
     env:
       KAFKA_BOOTSTRAP_SERVERS: localhost:9094
+      # docker-compose-dev.yml creates the legacy schema before the JAR starts.
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

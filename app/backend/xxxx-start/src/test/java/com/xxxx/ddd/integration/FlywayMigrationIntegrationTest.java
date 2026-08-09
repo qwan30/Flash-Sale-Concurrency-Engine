@@ -41,6 +41,8 @@ class FlywayMigrationIntegrationTest {
             assertThat(columnExists(connection, "outbox_event", "event_id")).isTrue();
             assertThat(columnExists(connection, "outbox_event", "lease_owner")).isTrue();
             assertThat(columnExists(connection, "outbox_event", "lease_until")).isTrue();
+            assertThat(generatedExpression(connection, "outbox_event", "event_id"))
+                    .contains("id");
             assertOutboxInsertWorks(connection);
         }
     }
@@ -92,10 +94,9 @@ class FlywayMigrationIntegrationTest {
         String id = "4dcf3d1d-b39c-4d5d-9ff9-12e19908a5fb";
         try (PreparedStatement statement = connection.prepareStatement(
                 "INSERT INTO outbox_event "
-                        + "(id, event_id, aggregate_type, aggregate_id, event_type, event_version, payload, status) "
-                        + "VALUES (?, ?, 'Order', 'order-1', 'ORDER_CREATED', 1, '{}', 'PENDING')")) {
+                        + "(id, aggregate_type, aggregate_id, event_type, event_version, payload, status) "
+                        + "VALUES (?, 'Order', 'order-1', 'ORDER_CREATED', 1, '{}', 'PENDING')")) {
             statement.setString(1, id);
-            statement.setString(2, id);
             assertThat(statement.executeUpdate()).isEqualTo(1);
         }
         try (PreparedStatement statement = connection.prepareStatement(
@@ -120,6 +121,20 @@ class FlywayMigrationIntegrationTest {
         try (ResultSet columns = connection.getMetaData().getColumns(
                 connection.getCatalog(), null, tableName, columnName)) {
             return columns.next();
+        }
+    }
+
+    private static String generatedExpression(Connection connection, String tableName, String columnName)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT generation_expression FROM information_schema.columns "
+                        + "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?")) {
+            statement.setString(1, tableName);
+            statement.setString(2, columnName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertThat(resultSet.next()).isTrue();
+                return resultSet.getString("generation_expression");
+            }
         }
     }
 }
