@@ -9,7 +9,7 @@ MySQL is the durable source of truth. Redis is a fast admission counter and a co
 ## Reservation creation sequence
 
 ```text
-validate request and derive SHA-256 fingerprint
+validate request, generate operation/reservation IDs, and derive SHA-256 fingerprint
         |
 durably claim actor + idempotency hash in operation journal (RECEIVED)
         |
@@ -24,7 +24,7 @@ MySQL transaction: conditional stock decrement
 return durable reservation and converged stock snapshot
 ```
 
-The journal insert/claim commits before Redis. The MySQL reservation transaction is separate from the Redis operation. If the database transaction fails after Redis returns `APPLIED`, the service invokes `compensateOnce` and records a terminal `COMPENSATED` disposition. A crash in any gap is recovered from the journal and the Redis operation token; the same `operationId` prevents a second Redis mutation.
+The service generates `operationId` and `reservationId` before the claim. The journal insert commits before Redis and has a unique `(operation_type, demo_actor_id, idempotency_key_hash)` boundary. A duplicate claim returns the existing operation state and cannot admit a second Redis operation. The MySQL reservation transaction is separate from the Redis operation. If the database transaction fails after Redis returns `APPLIED`, the service invokes `compensateOnce`; a successful compensation records `COMPENSATED`, while a failed compensation records `COMPENSATION_PENDING` for recovery. A crash in any gap is recovered from the journal and the Redis operation token; the same `operationId` prevents a second Redis mutation.
 
 The canonical request fingerprint is:
 
@@ -55,19 +55,33 @@ Recovery workers claim journal rows with a 30-second lease, batch size 50, retry
 | `REDIS_APPLIED` with no reservation | Finalize the MySQL reservation or compensate |
 | `COMMITTED` with no response | Return/replay the durable reservation |
 | `COMPENSATED` | Keep the stable terminal journal state |
-| five failed attempts | Mark `FAILED` and emit the alert metric |
+| `COMPENSATION_PENDING` | Retry `compensateOnce`; only success can become `COMPENSATED` |
+| `MIRROR_PENDING` | Retry `mirrorTerminalOnce`; only success can return to converged `COMMITTED` |
+| five failed repair attempts | Mark `REPAIR_REQUIRED`, emit the alert metric, and fail certification |
 
-An expiry scheduler finds due `RESERVED` rows and executes the same conditional expiry service. A Redis mirror failure never rolls back a durable terminal transition; it creates a retryable mirror journal entry.
+An expiry scheduler finds due `RESERVED` rows and executes the same conditional expiry service. A Redis mirror failure never rolls back a durable terminal transition; it creates a `MIRROR_PENDING` journal entry. `REPAIR_REQUIRED` is not a successful terminal state: a MySQL-authoritative repair job may clear it only after Redis is reachable and admission is closed for the affected ticket. Any pending or repair-required state fails the zero-pending convergence gate.
 
 ## Admission and fault injection
 
 Reservation creation receives a fixed 40 permits/second per instance and a four-call create bulkhead. Terminal operations use a separate two-call bulkhead with a 100 ms wait, so create floods cannot consume all terminal capacity. Rejections map to 429 for rate limiting and 503 for saturation, each with `Retry-After: 1`.
 
-Fault injection exists only under the `chaos` profile and has a finite catalog: `AFTER_REDIS_BEFORE_DB`, `AFTER_DB_COMMIT_BEFORE_RESPONSE`, `REDIS_MIRROR_TIMEOUT`, `KAFKA_UNAVAILABLE`, and `CONFIRM_EXPIRE_RACE`. Redis and Kafka integration tests use protocol-boundary faults (Toxiproxy where available), not mock-only failure evidence. Every scenario must converge within 30 seconds after dependency recovery with no negative stock, duplicate order, invariant violation, or pending journal/outbox work.
+Fault injection exists only under the `chaos` profile and has a finite catalog: `AFTER_REDIS_BEFORE_DB`, `AFTER_DB_COMMIT_BEFORE_RESPONSE`, `REDIS_MIRROR_TIMEOUT`, `KAFKA_UNAVAILABLE`, and `CONFIRM_EXPIRE_RACE`. Redis and Kafka integration tests must use protocol-boundary faults through Toxiproxy, not mock-only failure evidence; if Toxiproxy is unavailable, the dependency-fault certification gate is failed. Every passing scenario must converge within 30 seconds after dependency recovery with no negative stock, duplicate order, invariant violation, or pending journal/outbox work.
 
 ## Observability
 
 Telemetry uses fixed operation/outcome/reason/status/state labels only. The initial Brave/Micrometer path remains the default. Span names are fixed: `flashsale.reservation.create`, `flashsale.reservation.confirm`, `flashsale.reservation.release`, `flashsale.reservation.expire`, `flashsale.reservation.recover`, and `flashsale.outbox.publish`. The dashboard narrative is throughput/latency, admission, stock buckets, recovery, outbox, and Redis/MySQL convergence.
+
+## Contract ownership
+
+| Contract | First implementation phase | Primary verification |
+|---|---|---|
+| Schema and migration adoption | Phase 1 | `FlywayMigrationIntegrationTest` |
+| Domain transitions and invariant | Phase 2 | `ReservationTest` and integrated invariant assertions |
+| Durable claim, idempotency, and leases | Phase 3 | `ReservationPersistenceIntegrationTest` |
+| Redis apply/compensate/mirror protocol | Phase 4 | `RedisReservationProtocolIntegrationTest` |
+| Lifecycle, recovery, and repair dispositions | Phases 5–7 | focused service and recovery integration tests |
+| API status/error contract | Phase 8 | `ReservationControllerTest` |
+| Chaos, telemetry, UI, and evidence | Phases 9–14 | named chaos, telemetry, E2E, effectiveness, and browser artifacts |
 
 ## Verification gates
 

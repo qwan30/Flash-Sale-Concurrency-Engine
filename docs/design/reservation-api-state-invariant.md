@@ -4,11 +4,15 @@
 
 | Method | Route | Success behavior |
 |---|---|---|
-| `POST` | `/api/v1/reservations` | Creates or replays a reservation; new creates return 201, replay/terminal transition returns 200, recovery-in-progress returns 202 |
-| `GET` | `/api/v1/reservations/{reservationId}` | Returns the durable reservation and timeline state |
-| `POST` | `/api/v1/reservations/{reservationId}/confirm` | Conditionally confirms a live reservation and creates one order |
-| `POST` | `/api/v1/reservations/{reservationId}/release` | Conditionally releases a live reservation and restores stock once |
-| `GET` | `/api/v1/inventory/{ticketItemId}` | Returns available, reserved, confirmed, initial, and convergence state |
+| Method | Route | 2xx result and response body | 4xx/5xx result |
+|---|---|---|---|
+| `POST` | `/api/v1/reservations` | `201` with `ReservationResponse` for a new `RESERVED`; `200` with the same response for an idempotent replay; `202` with `ReservationProcessingResponse` when a claimed operation is still recoverable | `400` validation; `409` sold out or idempotency conflict; `429` rate limit; `503` saturation/dependency |
+| `GET` | `/api/v1/reservations/{reservationId}` | `200` with `ReservationResponse` for any durable state, including `CONFIRMED`, `RELEASED`, and `EXPIRED` | `404` when the reservation does not exist; `503` dependency saturation |
+| `POST` | `/api/v1/reservations/{reservationId}/confirm` | `200` with the confirmed reservation and one order; duplicate confirm replays the same order | `400` malformed request; `404` missing reservation; `409` expired/late or illegal transition; `429`/`503` admission/dependency rejection |
+| `POST` | `/api/v1/reservations/{reservationId}/release` | `200` with the released reservation; duplicate release replays the state without another increment | `400` malformed request; `404` missing reservation; `409` illegal transition; `429`/`503` admission/dependency rejection |
+| `GET` | `/api/v1/inventory/{ticketItemId}` | `200` with available, reserved, confirmed, initial, and convergence state | `404` unknown ticket item; `503` when the durable snapshot cannot be read |
+
+`ReservationResponse` contains `reservationId`, `ticketItemId`, `quantity`, `status`, `expiresAt`, `terminalAt`, an optional order identifier, a stock snapshot, and the API timeline. `ReservationProcessingResponse` contains the generated `reservationId`, `status=PROCESSING`, `retryAfterSeconds=1`, and a bounded trace ID; clients poll the GET route. `ReservationErrorResponse` is used for every error row.
 
 Create requires `Idempotency-Key` and `X-Demo-Actor-Id` UUID strings. The JSON body contains a positive `ticketItemId` and `quantity` from 1 through 4. Error responses are the bounded record:
 
@@ -21,7 +25,7 @@ Create requires `Idempotency-Key` and `X-Demo-Actor-Id` UUID strings. The JSON b
 }
 ```
 
-Errors never contain stack traces, SQL messages, raw idempotency keys, or unbounded user-controlled values. Validation is 400; missing resources are 404; sold-out, payload conflict, and late terminal transitions are 409; create rate-limit rejection is 429; dependency/bulkhead saturation is 503 with `Retry-After: 1`.
+Errors never contain stack traces, SQL messages, raw idempotency keys, or unbounded user-controlled values. Create replays of a terminal reservation are not new reservations: they return the original durable `ReservationResponse`; a confirm request at or after `expires_at` returns 409 and causes the conditional expiry transition to win. Rate-limit rejection is 429; dependency/bulkhead saturation is 503 with `Retry-After: 1`.
 
 ## Reservation transition matrix
 
@@ -44,9 +48,11 @@ The database conditional update is the winner for confirm-versus-expire and dupl
 | `REDIS_APPLIED` | Redis accepted the operation | finalize database or compensate |
 | `COMMITTED` | reservation and outbox are durable | replay response/mirror |
 | `COMPENSATED` | Redis admission was restored after DB failure | stable terminal result |
-| `FAILED` | five bounded attempts exhausted | alert and manual/controlled remediation |
+| `COMPENSATION_PENDING` | compensation has not completed | retry `compensateOnce`; not converged |
+| `MIRROR_PENDING` | durable terminal state exists but Redis mirror is not repaired | retry `mirrorTerminalOnce`; not converged |
+| `REPAIR_REQUIRED` | bounded retries exhausted without a safe repair | alert, close admission, and run MySQL-authoritative repair; certification is NO-GO until cleared |
 
-The journal lease is exclusive for the lease window. An expired lease can be reclaimed; `operationId` remains the idempotency token across retries.
+The journal lease is exclusive for the lease window. An expired lease can be reclaimed; `operationId` remains the idempotency token across retries. `REPAIR_REQUIRED` is not counted as convergence and cannot be silently acknowledged as success.
 
 ## Idempotency contract
 

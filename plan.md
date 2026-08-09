@@ -409,9 +409,11 @@ CREATE TABLE inventory_operation_journal (
     operation_id BINARY(16) PRIMARY KEY,
     reservation_id BINARY(16) NOT NULL,
     operation_type VARCHAR(24) NOT NULL,
-    state VARCHAR(24) NOT NULL,
+    state VARCHAR(32) NOT NULL,
     ticket_item_id BIGINT NOT NULL,
     quantity INT NOT NULL,
+    demo_actor_id CHAR(36) NOT NULL,
+    idempotency_key_hash BINARY(32) NOT NULL,
     request_fingerprint BINARY(32) NOT NULL,
     lease_owner VARCHAR(64) NULL,
     lease_until DATETIME(6) NULL,
@@ -420,6 +422,7 @@ CREATE TABLE inventory_operation_journal (
     last_error_code VARCHAR(64) NULL,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    UNIQUE KEY uk_journal_operation_claim (operation_type, demo_actor_id, idempotency_key_hash),
     KEY idx_journal_recovery (state, next_attempt_at, lease_until)
 );
 
@@ -740,7 +743,7 @@ fault point AFTER_DB_COMMIT_BEFORE_RESPONSE
 return stock snapshot
 ```
 
-Also test DB failure invokes `compensateOnce` and marks `COMPENSATED`.
+Also test DB failure invokes `compensateOnce` and marks `COMPENSATED` when compensation succeeds; a failed compensation must remain `COMPENSATION_PENDING` and be retried by recovery.
 
 - [ ] **Step 2: Run and confirm RED**
 
@@ -769,7 +772,7 @@ public record CreateReservationCommand(
 
 - [ ] **Step 4: Implement transaction boundaries**
 
-The journal insert is committed before Redis. The reservation/outbox commit is a separate transaction. A crash after Redis is recoverable because the journal and Redis operation token share `operationId`.
+The service generates `operationId` and `reservationId` before the journal claim. The journal insert is committed before Redis and uniquely claims `(operation_type, demo_actor_id, idempotency_key_hash)`; an existing claim returns its durable operation state instead of admitting a second Redis operation. The reservation/outbox commit is a separate transaction. A crash after Redis is recoverable because the journal and Redis operation token share `operationId`.
 
 - [ ] **Step 5: Run tests and commit**
 
@@ -827,7 +830,7 @@ reservation.expired
 
 - [ ] **Step 5: Mirror terminal deltas idempotently**
 
-Release/expire call `mirrorTerminalOnce(operationId, ticketItemId, quantity)` after DB commit. Mirror failure records a retryable journal item and does not roll back the durable transition.
+Release/expire call `mirrorTerminalOnce(operationId, ticketItemId, quantity)` after DB commit. Mirror failure records `MIRROR_PENDING` in the same operation journal and does not roll back the durable transition. Compensation failure records `COMPENSATION_PENDING`; neither pending state may be treated as converged.
 
 - [ ] **Step 6: Run tests and commit**
 
@@ -870,12 +873,16 @@ public void recover() {
 
 ```text
 RECEIVED + no Redis token -> safely retry apply
-RECEIVED + APPLIED token -> finalize DB or compensate
-REDIS_APPLIED + missing reservation -> finalize DB or compensate
+RECEIVED + APPLIED token -> finalize DB or enter COMPENSATION_PENDING
+REDIS_APPLIED + missing reservation -> finalize DB or enter COMPENSATION_PENDING
 COMMITTED + missing response -> replay reservation
 COMPENSATED -> stable terminal journal state
-five failed attempts -> FAILED + alert metric
+COMPENSATION_PENDING -> retry compensateOnce; on success mark COMPENSATED
+MIRROR_PENDING -> retry mirrorTerminalOnce; on success mark COMMITTED
+five failed repair attempts -> REPAIR_REQUIRED + alert metric and certification NO-GO
 ```
+
+`REPAIR_REQUIRED` is not a successful terminal state. A MySQL-authoritative repair job may clear it only after Redis is reachable and admission is closed for the affected ticket; the repair re-establishes the Redis mirror and records the disposition. A run with `COMPENSATION_PENDING`, `MIRROR_PENDING`, or `REPAIR_REQUIRED` is not allowed to satisfy the zero-pending convergence gate.
 
 - [ ] **Step 4: Run tests and commit**
 
@@ -1046,7 +1053,7 @@ final class ConfigurableFaultInjection implements FaultInjectionPort {
 
 - [ ] **Step 3: Add Toxiproxy-backed dependency faults**
 
-Network partition tests must interrupt Redis and Kafka at protocol boundaries; do not fake connection failures with mocks in integration evidence.
+Network partition tests must interrupt Redis and Kafka at protocol boundaries through Toxiproxy; do not fake connection failures with mocks in integration evidence. If Toxiproxy is unavailable, the dependency-fault certification gate is failed rather than substituted with mock evidence.
 
 - [ ] **Step 4: Assert convergence**
 
