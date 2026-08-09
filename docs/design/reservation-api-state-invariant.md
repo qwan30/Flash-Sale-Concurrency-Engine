@@ -10,7 +10,7 @@
 | `POST` | `/api/v1/reservations/{reservationId}/release` | `200` with the released reservation; duplicate release replays the state without another increment | `400` malformed request; `404` missing reservation; `409` illegal transition; `429`/`503` admission/dependency rejection |
 | `GET` | `/api/v1/inventory/{ticketItemId}` | `200` with available, reserved, confirmed, initial, and convergence state | `404` unknown ticket item; `503` when the durable snapshot cannot be read |
 
-`ReservationResponse` contains `reservationId`, `ticketItemId`, `quantity`, `status`, `expiresAt`, `terminalAt`, an optional order identifier, a stock snapshot, and the API timeline. `ReservationProcessingResponse` contains the generated `reservationId`, `status=PROCESSING`, `journalState`, `retryAfterSeconds=1`, and a bounded trace ID; clients poll the GET route. A journal row is addressable by its pre-generated `reservationId`, so polling a claimed operation never returns 404 merely because the reservation transaction has not committed. `ReservationErrorResponse` is used for every error row, including a persisted `code` and `stockAfter` for `REJECTED` outcomes.
+`ReservationResponse` contains `reservationId`, `ticketItemId`, `quantity`, `status`, `expiresAt`, `terminalAt`, an optional order identifier, a stock snapshot, and the API timeline. `ReservationProcessingResponse` contains the generated `reservationId`, `status=PROCESSING`, `journalState`, `retryAfterSeconds=1`, and a bounded trace ID; clients poll the GET route. A journal row is addressable by its pre-generated `reservationId`, so polling a claimed operation never returns 404 merely because the reservation transaction has not committed. `ReservationErrorResponse` is used for every error row; `stockAfter` is populated only for the bounded `SOLD_OUT` result and is `null` for `FENCE_STALE` because Redis is not authoritative across a fence mismatch.
 
 Create requires `Idempotency-Key` and `X-Demo-Actor-Id` UUID strings. The JSON body contains a positive `ticketItemId` and `quantity` from 1 through 4. Error responses are the bounded record:
 
@@ -19,7 +19,8 @@ Create requires `Idempotency-Key` and `X-Demo-Actor-Id` UUID strings. The JSON b
   "code": "SOLD_OUT",
   "message": "No inventory is available for this request",
   "retryable": false,
-  "traceId": "bounded-trace-id"
+  "traceId": "bounded-trace-id",
+  "stockAfter": 0
 }
 ```
 
@@ -47,11 +48,11 @@ The database conditional update is the winner for confirm-versus-expire and dupl
 | `REDIS_APPLIED` | Redis accepted the operation | finalize database or compensate |
 | `COMMITTED` | reservation and outbox are durable | replay response/mirror |
 | `COMPENSATED` | Redis admission was restored after DB failure | stable terminal result |
-| `COMPENSATION_PENDING` | compensation has not completed | retry `compensateOnce`; not converged |
-| `MIRROR_PENDING` | durable terminal state exists but Redis mirror is not repaired | retry `mirrorTerminalOnce`; not converged |
+| `COMPENSATION_PENDING` | compensation has not completed | retry `compensateOnce` only with the current fence; stale fence enters `REPAIR_REQUIRED` |
+| `MIRROR_PENDING` | durable terminal state exists but Redis mirror is not repaired | retry `mirrorTerminalOnce` only with the current fence; stale fence enters `REPAIR_REQUIRED` |
 | `REPAIR_REQUIRED` | bounded retries exhausted without a safe repair | alert, close admission, and run MySQL-authoritative repair; certification is NO-GO until cleared |
 
-The journal lease is exclusive for the lease window. An expired lease can be reclaimed; `operationId` remains the idempotency token across retries. `REPAIR_REQUIRED` is not counted as convergence and cannot be silently acknowledged as success. `COMPENSATION_PENDING` and `MIRROR_PENDING` are processing responses, not successful terminal responses; `COMPENSATED` and `REJECTED` are stable 409 outcomes when no durable reservation exists.
+The journal lease is exclusive for the lease window. An expired lease can be reclaimed; `operationId` remains the idempotency token across retries. `REPAIR_REQUIRED` is not counted as convergence and cannot be silently acknowledged as success. A fenced repair records `REPAIR_REQUIRED -> COMPENSATED`, `REPAIR_REQUIRED -> COMMITTED`, or `REPAIR_REQUIRED -> REJECTED` with a `repairId` and disposition only after the admission state is closed, old-fence work is quiescent, and Redis equals the MySQL snapshot. `COMPENSATION_PENDING` and `MIRROR_PENDING` are processing responses, not successful terminal responses; `COMPENSATED` and `REJECTED` are stable 409 outcomes when no durable reservation exists.
 
 ## Idempotency contract
 

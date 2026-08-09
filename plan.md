@@ -380,6 +380,7 @@ CREATE TABLE inventory_stock_account (
     version BIGINT NOT NULL DEFAULT 0,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT chk_inventory_admission_state CHECK (admission_state IN ('OPEN', 'DRAINING', 'CLOSED')),
     CONSTRAINT chk_inventory_quantities CHECK (
         initial_quantity >= 0 AND available_quantity >= 0 AND available_quantity <= initial_quantity
     )
@@ -423,6 +424,7 @@ CREATE TABLE inventory_operation_journal (
     last_error_code VARCHAR(64) NULL,
     result_code VARCHAR(64) NULL,
     result_stock_after INT NULL,
+    repair_id BINARY(16) NULL,
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     UNIQUE KEY uk_journal_create_claim (demo_actor_id, idempotency_key_hash),
@@ -431,6 +433,22 @@ CREATE TABLE inventory_operation_journal (
         (operation_type = 'CREATE' AND demo_actor_id IS NOT NULL AND idempotency_key_hash IS NOT NULL)
         OR (operation_type <> 'CREATE' AND demo_actor_id IS NULL AND idempotency_key_hash IS NULL)
     )
+);
+
+CREATE TABLE inventory_repair_journal (
+    repair_id BINARY(16) PRIMARY KEY,
+    ticket_item_id BIGINT NOT NULL,
+    previous_fence_version BIGINT NOT NULL,
+    new_fence_version BIGINT NOT NULL,
+    state VARCHAR(16) NOT NULL,
+    disposition VARCHAR(64) NULL,
+    mysql_available_snapshot INT NULL,
+    started_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    completed_at DATETIME(6) NULL,
+    UNIQUE KEY uk_repair_ticket_fence (ticket_item_id, new_fence_version),
+    CONSTRAINT fk_repair_stock FOREIGN KEY (ticket_item_id)
+        REFERENCES inventory_stock_account(ticket_item_id),
+    CONSTRAINT chk_repair_state CHECK (state IN ('STARTED', 'VERIFIED', 'COMPLETED', 'FAILED'))
 );
 
 CREATE TABLE reservation_order (
@@ -448,7 +466,7 @@ CREATE TABLE reservation_order (
 
 Also add `lease_owner`, `lease_until`, `next_attempt_at` and stable `event_id` support to the existing outbox schema.
 
-The stock account's `fence_version` is the admission fence. A create journal claim stores the current fence and every conditional MySQL decrement requires both `admission_state = 'OPEN'` and the stored fence. Redis stock state stores the same fence; every apply, compensate, and terminal-mirror Lua call receives and checks `fenceVersion`, returning `STALE_FENCE` without mutation on mismatch. Repair first atomically moves the MySQL account to `DRAINING` and increments the fence, publishes that fence to Redis, drains/rejects stale leases, verifies no old operation can mutate, closes admission, repairs Redis from the MySQL snapshot, verifies equality, and only then reopens admission. The repair must not run concurrently with an in-flight old-fence operation.
+The stock account's `fence_version` is the admission fence and `admission_state` is a durable `OPEN -> DRAINING -> CLOSED -> OPEN` state machine. A create journal claim and every conditional MySQL decrement require `admission_state = 'OPEN'` and the stored current fence; a repair owner claims `OPEN -> DRAINING` with one compare-and-set update, increments the fence, and creates an `inventory_repair_journal` row in the same transaction. Normal claims and terminal mutations are rejected unless the durable account is `OPEN` with the current fence. Redis stores the same fence and admission state. A fence-publication Lua script atomically accepts only a greater fence and writes the new fence/state; normal apply, compensate, and terminal-mirror Lua calls require Redis `admission_state = 'OPEN'`, compare both values, and return `STALE_FENCE` without mutation when they do not match. The repair owner publishes `DRAINING`, drains or rejects old-fence leases, waits for in-flight old-fence operations to quiesce, and only then CASes `DRAINING -> CLOSED`. While `CLOSED`, a repair-only maintenance script writes the MySQL-authoritative snapshot, verifies Redis/MySQL equality and zero old-fence operations, and records the disposition. Only a successful verification may publish `OPEN` and CAS `CLOSED -> OPEN`; failed verification leaves the account closed and the repair journal `FAILED`. Delayed operations carrying the old fence must therefore fail closed and cannot mutate after repair.
 
 - [ ] **Step 6: Run migration tests and refactor**
 
@@ -616,11 +634,12 @@ git commit -m "feat: add reservation application ports"
 Tests must prove:
 
 ```text
-decrement succeeds only when available >= quantity and admission_state = OPEN
+decrement succeeds only when available >= quantity, admission_state = OPEN and fence_version matches
 one of concurrent confirm/expire transitions wins
 release/expire restores stock exactly once
 journal lease cannot be claimed by two workers
 same actor + idempotency hash is unique for `CREATE` claims; terminal/mirror retries reuse the existing journal row
+an old-fence operation cannot mutate MySQL after repair reopens admission
 ```
 
 - [ ] **Step 2: Run and confirm RED**
@@ -639,6 +658,7 @@ SET available_quantity = available_quantity - :quantity,
     version = version + 1
 WHERE ticket_item_id = :ticketItemId
   AND admission_state = 'OPEN'
+  AND fence_version = :fenceVersion
   AND available_quantity >= :quantity;
 
 UPDATE inventory_reservation
@@ -676,6 +696,8 @@ git commit -m "feat: persist reservation inventory and journal"
 - Create: `app/backend/xxxx-infrastructure/src/main/resources/redis/reservation-apply-once.lua`
 - Create: `app/backend/xxxx-infrastructure/src/main/resources/redis/reservation-compensate-once.lua`
 - Create: `app/backend/xxxx-infrastructure/src/main/resources/redis/reservation-terminal-mirror-once.lua`
+- Create: `app/backend/xxxx-infrastructure/src/main/resources/redis/reservation-fence-publish.lua`
+- Create: `app/backend/xxxx-infrastructure/src/main/resources/redis/reservation-repair-mirror.lua`
 - Create: `app/backend/xxxx-infrastructure/src/main/java/com/xxxx/ddd/infrastructure/reservation/redis/RedisReservationStockAdapter.java`
 - Test: `app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/RedisReservationProtocolIntegrationTest.java`
 
@@ -691,7 +713,9 @@ Prove:
 first apply decrements once
 second apply with same operation returns original result
 insufficient stock never decrements
-stale fence never mutates stock and returns STALE_FENCE
+stale fence never mutates stock and returns STALE_FENCE without a stock value
+fence publication accepts only a greater version and publishes admission state atomically
+repair mirror writes the MySQL snapshot only while CLOSED and records a bounded disposition
 compensation increments only from APPLIED
 second compensation is a no-op
 terminal mirror applies a delta once
@@ -868,7 +892,7 @@ git commit -m "feat: add reservation terminal lifecycle"
 
 - [ ] **Step 1: Write failing crash-window tests**
 
-Test crash before Redis, after Redis/before DB, after DB commit/before response, and during terminal Redis mirror.
+Test crash before Redis, after Redis/before DB, after DB commit/before response, and during terminal Redis mirror. Test stale-fence compensation/mirror transitions stop retrying the old token and resolve through a new fenced repair ID.
 
 - [ ] **Step 2: Implement claim loop**
 
@@ -890,12 +914,15 @@ REDIS_APPLIED + missing reservation -> finalize DB or enter COMPENSATION_PENDING
 COMMITTED + missing response -> replay reservation
 REJECTED -> stable persisted result; never retry
 COMPENSATED -> stable terminal journal state
-COMPENSATION_PENDING -> retry compensateOnce; on success mark COMPENSATED
-MIRROR_PENDING -> retry mirrorTerminalOnce; on success mark COMMITTED
+COMPENSATION_PENDING + current fence -> retry compensateOnce; on success mark COMPENSATED
+COMPENSATION_PENDING + stale fence -> REPAIR_REQUIRED; never retry old token
+MIRROR_PENDING + current fence -> retry mirrorTerminalOnce; on success mark COMMITTED
+MIRROR_PENDING + stale fence -> REPAIR_REQUIRED; never retry old token
+REPAIR_REQUIRED -> fenced repair; resolve to COMPENSATED, COMMITTED or REJECTED after verification
 five failed repair attempts -> REPAIR_REQUIRED + alert metric and certification NO-GO
 ```
 
-`SOLD_OUT` and `FENCE_STALE` are persisted as non-retryable `REJECTED` results with `result_code` and `result_stock_after`; replay returns the stored bounded result without a new Redis operation. `REPAIR_REQUIRED` is not a successful terminal state. A MySQL-authoritative repair job may clear it only after an atomic admission fence has drained stale operations, Redis is reachable, and admission is closed for the affected ticket; the repair re-establishes the Redis mirror and records the disposition. A run with `COMPENSATION_PENDING`, `MIRROR_PENDING`, or `REPAIR_REQUIRED` is not allowed to satisfy the zero-pending convergence gate.
+`SOLD_OUT` is persisted as `REJECTED` with `result_code=SOLD_OUT` and the bounded Redis `stockCurrent`. `FENCE_STALE` is persisted as `REJECTED` with `result_code=FENCE_STALE` and `result_stock_after=NULL`, because a stale Redis value is not authoritative; the API returns `stockAfter=null` and the later repair snapshot is the source of truth. Replay returns the stored bounded result without a new Redis operation. If a `COMPENSATION_PENDING` or `MIRROR_PENDING` operation receives `STALE_FENCE`, recovery must stop retrying the old operation token and transition it to `REPAIR_REQUIRED`. A fenced repair uses a new repair ID and maintenance write, then resolves `REPAIR_REQUIRED -> COMPENSATED` when no reservation remains, `REPAIR_REQUIRED -> COMMITTED` when the durable terminal reservation is mirrored, or `REPAIR_REQUIRED -> REJECTED` for an unadmitted stale-fence create. Each transition stores the `repair_id` and disposition in the journal and repair journal, and HTTP 503 remains until the repair is verified. A run with `COMPENSATION_PENDING`, `MIRROR_PENDING`, or `REPAIR_REQUIRED` is not allowed to satisfy the zero-pending convergence gate.
 
 - [ ] **Step 4: Run tests and commit**
 

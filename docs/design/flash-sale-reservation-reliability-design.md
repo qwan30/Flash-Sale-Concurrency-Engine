@@ -15,7 +15,7 @@ durably claim actor + idempotency hash in operation journal (RECEIVED)
         |
 Redis Lua apply-once using operationId and stock key
         |-- SOLD_OUT -> persist REJECTED(SOLD_OUT, stockAfter) and return bounded result
-        |-- STALE_FENCE -> persist REJECTED(FENCE_STALE, stockAfter) and return bounded result
+        |-- STALE_FENCE -> persist REJECTED(FENCE_STALE, stockAfter=null) and return bounded result
         |-- CONFLICT / replay -> return the durable bounded result
         |
 MySQL transaction: conditional stock decrement
@@ -28,7 +28,7 @@ return durable reservation and converged stock snapshot
 
 The service generates `operationId` and `reservationId` before the claim. For `operation_type=CREATE`, the journal has a unique `(demo_actor_id, idempotency_key_hash)` boundary; terminal and mirror work reuses the original create journal row and operation ID rather than claiming a new idempotency tuple. A duplicate claim returns the existing operation state and cannot admit a second Redis operation. The MySQL reservation transaction is separate from the Redis operation. If Redis returns `SOLD_OUT` or `STALE_FENCE`, the service durably records `REJECTED` with `result_code` and `result_stock_after` before returning; that result is stable and replay never starts a new Redis operation. If the database transaction fails after Redis returns `APPLIED`, the service invokes `compensateOnce`; a successful compensation records `COMPENSATED`, while a failed compensation records `COMPENSATION_PENDING` for recovery. A crash in any gap is recovered from the journal and the Redis operation token; the same `operationId` prevents a second Redis mutation.
 
-The stock account's `fence_version` is the admission fence. The create journal stores the fence observed at claim time, the MySQL decrement requires both `admission_state = OPEN` and that fence, and Redis stores the same fence beside its stock counter. Every apply, compensation, and terminal-mirror Lua call receives `fenceVersion`; a mismatch returns `STALE_FENCE` without mutating stock. Repair atomically changes the MySQL account to `DRAINING` and increments the fence, publishes the new fence to Redis, drains or rejects old-fence leases, and quiesces in-flight old-fence operations before closing admission. While admission is closed, repair uses the MySQL snapshot as authority, restores the Redis mirror, verifies equality and zero stale operations, then reopens admission. Delayed operations carrying the old fence must therefore fail closed and cannot mutate after repair.
+The stock account has a durable `OPEN -> DRAINING -> CLOSED -> OPEN` admission state and a monotonically increasing `fence_version`. A repair owner claims `OPEN -> DRAINING` with one compare-and-set update, increments the fence, and records an `inventory_repair_journal` row in the same transaction. Create claims, the MySQL decrement, and normal terminal mutations require durable `OPEN` plus the current fence. Redis stores the fence and admission state; a fence-publication Lua call accepts only a greater fence, and normal apply/compensate/terminal-mirror calls require Redis `admission_state = OPEN`, compare both values, and return `STALE_FENCE` without mutation when they do not match. The repair publishes `DRAINING`, drains or rejects old-fence leases, waits for old-fence operations to quiesce, and only then changes `DRAINING -> CLOSED`. While `CLOSED`, a repair-only maintenance write copies the MySQL-authoritative snapshot to Redis, verifies equality and zero old-fence operations, and records the disposition. Only a verified repair publishes `OPEN` and changes `CLOSED -> OPEN`; failed verification leaves admission closed. Delayed operations carrying the old fence cannot mutate after repair.
 
 The canonical request fingerprint is:
 
@@ -55,18 +55,20 @@ Recovery workers claim journal rows with a 30-second lease, batch size 50, retry
 | Durable/journal observation | Recovery action |
 |---|---|
 | `RECEIVED` with no Redis operation token | Retry `applyOnce` |
-| `RECEIVED` with a stale fence | Persist `REJECTED(FENCE_STALE)` and do not retry |
+| `RECEIVED` with a stale fence | Persist `REJECTED(FENCE_STALE, stockAfter=null)` and do not retry |
 | `RECEIVED` with an `APPLIED` Redis token | Finalize the MySQL reservation or compensate |
 | `REDIS_APPLIED` with no reservation | Finalize the MySQL reservation or compensate |
 | `COMMITTED` with no response | Return/replay the durable reservation |
 | `REJECTED` with `SOLD_OUT` or `FENCE_STALE` | Return the stored bounded result; never retry Redis |
 | `COMPENSATED` | Keep the stable terminal journal state |
-| `COMPENSATION_PENDING` | Retry `compensateOnce`; only success can become `COMPENSATED` |
-| `MIRROR_PENDING` | Retry `mirrorTerminalOnce`; only success can return to converged `COMMITTED` |
-| `REPAIR_REQUIRED` | Close admission and run fenced MySQL-authoritative repair; never report success while uncleared |
+| `COMPENSATION_PENDING` with current fence | Retry `compensateOnce`; only success can become `COMPENSATED` |
+| `COMPENSATION_PENDING` with stale fence | Stop retrying the old token and transition to `REPAIR_REQUIRED` |
+| `MIRROR_PENDING` with current fence | Retry `mirrorTerminalOnce`; only success can return to converged `COMMITTED` |
+| `MIRROR_PENDING` with stale fence | Stop retrying the old token and transition to `REPAIR_REQUIRED` |
+| `REPAIR_REQUIRED` | Run fenced MySQL-authoritative repair; resolve to `COMPENSATED`, `COMMITTED`, or `REJECTED` only after verification |
 | five failed repair attempts | Mark `REPAIR_REQUIRED`, emit the alert metric, and fail certification |
 
-An expiry scheduler finds due `RESERVED` rows and executes the same conditional expiry service. A Redis mirror failure never rolls back a durable terminal transition; it creates a `MIRROR_PENDING` journal entry. `REPAIR_REQUIRED` is not a successful terminal state: a MySQL-authoritative repair job may clear it only after the admission fence has drained stale leases, Redis is reachable, and admission is closed for the affected ticket. Any pending or repair-required state fails the zero-pending convergence gate.
+An expiry scheduler finds due `RESERVED` rows and executes the same conditional expiry service. A Redis mirror failure never rolls back a durable terminal transition; it creates a `MIRROR_PENDING` journal entry. A fence rotation never retries an old-fence compensation or mirror token: the operation becomes `REPAIR_REQUIRED`, and the repair-only maintenance write uses a new `repair_id` and the MySQL snapshot. After `OPEN -> DRAINING -> CLOSED`, quiescence, mirror equality, and zero old-fence operations are verified, the repair records `REPAIR_REQUIRED -> COMPENSATED` when no reservation remains, `REPAIR_REQUIRED -> COMMITTED` when a durable terminal reservation is mirrored, or `REPAIR_REQUIRED -> REJECTED` for an unadmitted stale-fence create. HTTP 503 remains until this disposition is durable. Any pending or repair-required state fails the zero-pending convergence gate.
 
 ## Admission and fault injection
 

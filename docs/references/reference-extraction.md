@@ -8,7 +8,7 @@ The following order is locked for any later reuse or logic port. The target impl
 4. Target repo: rewrite the lifecycle around single-ticket Redis-first behavior.
 5. OpenTelemetry Demo `src/flagd/demo.flagd.json` and `src/ad/src/main/java/oteldemo/AdService.java`: finite fault catalog and trace-correlated injection.
 6. OpenTelemetry telemetry schema and Collector sanitizer: bounded naming/cardinality.
-7. OpenTelemetry load generator `src/load-generator/script.js`: workload manifest and trace propagation; keep JMeter as target v1 runner.
+7. OpenTelemetry Demo k6 load generator `src/load-generator/script.js`: workload manifest and trace propagation; keep JMeter as target v1 runner.
 
 ## Mapping ledger
 
