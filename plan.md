@@ -241,7 +241,7 @@ git commit -m "docs: lock reservation reliability source references"
 - Consumes: current `/orders` behavior and existing test/benchmark tooling.
 - Produces: baseline SHA, test counts, skipped tests and evidence artifact paths.
 
-- [ ] **Step 1: Run backend baseline**
+- [x] **Step 1: Run backend baseline**
 
 ```powershell
 mvn.cmd test
@@ -249,7 +249,7 @@ mvn.cmd test
 
 Expected: Maven reports `BUILD SUCCESS`; record exact test/pass/skip counts and command duration. A wrapper timeout is not a pass unless Maven output itself reached `BUILD SUCCESS`.
 
-- [ ] **Step 2: Run frontend static baseline**
+- [x] **Step 2: Run frontend static baseline**
 
 ```powershell
 Push-Location app/frontend
@@ -261,7 +261,7 @@ Pop-Location
 
 Expected: all three commands exit `0`.
 
-- [ ] **Step 3: Run local smoke and existing JMeter harness**
+- [x] **Step 3: Run local smoke and existing JMeter harness**
 
 ```powershell
 ./benchmark/smoke-local.ps1
@@ -270,7 +270,7 @@ Expected: all three commands exit `0`.
 
 Expected: new timestamped artifact bundle with raw results, consistency result and run metadata. Do not treat historical figures as current output.
 
-- [ ] **Step 4: Write baseline report**
+- [x] **Step 4: Write baseline report**
 
 The report must distinguish:
 
@@ -286,7 +286,7 @@ Local throughput/latency, explicitly labeled environment-specific
 Known contract: /orders business reject uses envelope code 409 over HTTP 200
 ```
 
-- [ ] **Step 5: Commit baseline checkpoint**
+- [x] **Step 5: Commit baseline checkpoint**
 
 ```powershell
 git add -- docs/reports/reservation-baseline.md
