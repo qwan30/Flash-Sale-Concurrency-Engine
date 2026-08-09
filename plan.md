@@ -302,9 +302,11 @@ git commit -m "docs: capture reservation upgrade baseline"
 **Files:**
 - Modify: `app/backend/xxxx-start/pom.xml`
 - Modify: `app/backend/xxxx-start/src/main/resources/application.yml`
+- Modify: `environment/docker-compose.prod.yml`
 - Create: `app/backend/xxxx-start/src/main/resources/db/migration/V1__legacy_schema.sql`
 - Create: `app/backend/xxxx-start/src/main/resources/db/migration/V2__reservation_reliability.sql`
 - Test: `app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/FlywayMigrationIntegrationTest.java`
+- Test: `app/backend/xxxx-application/src/test/java/com/xxxx/ddd/application/MQ/OutboxEventTest.java`
 
 **Interfaces:**
 - Consumes: existing `environment/mysql/init/ticket_init.sql` and `outbox_init.sql` schemas.
@@ -368,6 +370,8 @@ spring:
 
 Existing non-empty volumes are baselined once with explicit environment override `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`; the default remains false.
 
+The production Compose stack mounts the legacy init schema and supplies that override through `SPRING_FLYWAY_BASELINE_ON_MIGRATE`. Set it to `false` only after `flyway_schema_history` exists and the database has completed the V2 migration; an unverified volume must not be silently baselined.
+
 - [x] **Step 5: Create reservation schema**
 
 `V2__reservation_reliability.sql` must define:
@@ -383,9 +387,12 @@ CREATE TABLE inventory_stock_account (
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT chk_inventory_admission_state CHECK (admission_state IN ('OPEN', 'DRAINING', 'CLOSED')),
+    CONSTRAINT chk_inventory_versions CHECK (fence_version >= 0 AND version >= 0),
     CONSTRAINT chk_inventory_quantities CHECK (
         initial_quantity >= 0 AND available_quantity >= 0 AND available_quantity <= initial_quantity
-    )
+    ),
+    CONSTRAINT fk_stock_ticket_item FOREIGN KEY (ticket_item_id)
+        REFERENCES ticket_item(id)
 );
 
 CREATE TABLE inventory_reservation (
@@ -404,6 +411,7 @@ CREATE TABLE inventory_reservation (
     UNIQUE KEY uk_reservation_actor_key (demo_actor_id, idempotency_key_hash),
     KEY idx_reservation_expiry (ticket_item_id, status, expires_at),
     CONSTRAINT chk_reservation_quantity CHECK (quantity BETWEEN 1 AND 4),
+    CONSTRAINT chk_reservation_status CHECK (status IN ('RESERVED', 'CONFIRMED', 'RELEASED', 'EXPIRED')),
     CONSTRAINT fk_reservation_stock FOREIGN KEY (ticket_item_id)
         REFERENCES inventory_stock_account(ticket_item_id)
 );
@@ -431,6 +439,18 @@ CREATE TABLE inventory_operation_journal (
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     UNIQUE KEY uk_journal_create_claim (demo_actor_id, idempotency_key_hash),
     KEY idx_journal_recovery (state, next_attempt_at, lease_until),
+    CONSTRAINT chk_journal_operation_type CHECK (
+        operation_type IN ('CREATE', 'CONFIRM', 'RELEASE', 'EXPIRE', 'COMPENSATE', 'MIRROR', 'REPAIR')
+    ),
+    CONSTRAINT chk_journal_state CHECK (
+        state IN (
+            'RECEIVED', 'REJECTED', 'REDIS_APPLIED', 'COMMITTED', 'COMPENSATED',
+            'COMPENSATION_PENDING', 'MIRROR_PENDING', 'REPAIR_REQUIRED'
+        )
+    ),
+    CONSTRAINT chk_journal_numbers CHECK (
+        quantity BETWEEN 1 AND 4 AND fence_version >= 0 AND attempts >= 0
+    ),
     CONSTRAINT chk_journal_create_claim CHECK (
         (operation_type = 'CREATE' AND demo_actor_id IS NOT NULL AND idempotency_key_hash IS NOT NULL)
         OR (operation_type <> 'CREATE' AND demo_actor_id IS NULL AND idempotency_key_hash IS NULL)
@@ -450,7 +470,8 @@ CREATE TABLE inventory_repair_journal (
     UNIQUE KEY uk_repair_ticket_fence (ticket_item_id, new_fence_version),
     CONSTRAINT fk_repair_stock FOREIGN KEY (ticket_item_id)
         REFERENCES inventory_stock_account(ticket_item_id),
-    CONSTRAINT chk_repair_state CHECK (state IN ('STARTED', 'VERIFIED', 'COMPLETED', 'FAILED'))
+    CONSTRAINT chk_repair_state CHECK (state IN ('STARTED', 'VERIFIED', 'COMPLETED', 'FAILED')),
+    CONSTRAINT chk_repair_fence CHECK (previous_fence_version >= 0 AND new_fence_version > previous_fence_version)
 );
 
 CREATE TABLE reservation_order (
@@ -461,12 +482,15 @@ CREATE TABLE reservation_order (
     quantity INT NOT NULL,
     confirmed_at DATETIME(6) NOT NULL,
     UNIQUE KEY uk_order_reservation (reservation_id),
+    CONSTRAINT chk_order_quantity CHECK (quantity BETWEEN 1 AND 4),
+    CONSTRAINT fk_order_stock FOREIGN KEY (ticket_item_id)
+        REFERENCES inventory_stock_account(ticket_item_id),
     CONSTRAINT fk_order_reservation FOREIGN KEY (reservation_id)
         REFERENCES inventory_reservation(id)
 );
 ```
 
-Also add `lease_owner`, `lease_until`, `next_attempt_at` and stable `event_id` support to the existing outbox schema.
+Also add `lease_owner`, `lease_until`, `next_attempt_at` and stable `event_id` support to the existing outbox schema. Legacy rows are backfilled from the existing primary key; `OutboxEvent` populates the same UUID into both `id` and `event_id` for every new write.
 
 The stock account's `fence_version` is the admission fence and `admission_state` is a durable `OPEN -> DRAINING -> CLOSED -> OPEN` state machine. A create journal claim and every conditional MySQL decrement require `admission_state = 'OPEN'` and the stored current fence; a repair owner claims `OPEN -> DRAINING` with one compare-and-set update, increments the fence, and creates an `inventory_repair_journal` row in the same transaction. Normal claims and terminal mutations are rejected unless the durable account is `OPEN` with the current fence. Redis stores the same fence and admission state. A fence-publication Lua script atomically accepts only a greater fence and writes the new fence/state; normal apply, compensate, and terminal-mirror Lua calls require Redis `admission_state = 'OPEN'`, compare both values, and return `STALE_FENCE` without mutation when they do not match. The repair owner publishes `DRAINING`, drains or rejects old-fence leases, waits for in-flight old-fence operations to quiesce, and only then CASes `DRAINING -> CLOSED`. While `CLOSED`, a repair-only maintenance script writes the MySQL-authoritative snapshot, verifies Redis/MySQL equality and zero old-fence operations, and records the disposition. Only a successful verification may publish `OPEN` and CAS `CLOSED -> OPEN`; failed verification leaves the account closed and the repair journal `FAILED`. Delayed operations carrying the old fence must therefore fail closed and cannot mutate after repair.
 
@@ -484,7 +508,7 @@ GREEN attempt on 2026-08-09 compiled the migration test and reached Testcontaine
 - [ ] **Step 7: Commit migration checkpoint**
 
 ```powershell
-git add -- app/backend/xxxx-start/pom.xml app/backend/xxxx-start/src/main/resources/application.yml app/backend/xxxx-start/src/main/resources/db/migration app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/FlywayMigrationIntegrationTest.java
+git add -- app/backend/xxxx-start/pom.xml app/backend/xxxx-start/src/main/resources/application.yml app/backend/xxxx-start/src/main/resources/db/migration app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/FlywayMigrationIntegrationTest.java app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/MQ/OutboxEvent.java app/backend/xxxx-application/src/test/java/com/xxxx/ddd/application/MQ/OutboxEventTest.java environment/docker-compose.prod.yml plan.md
 git commit -m "feat: add reservation reliability migrations"
 ```
 

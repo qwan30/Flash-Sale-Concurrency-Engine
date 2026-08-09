@@ -8,9 +8,12 @@ CREATE TABLE inventory_stock_account (
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT chk_inventory_admission_state CHECK (admission_state IN ('OPEN', 'DRAINING', 'CLOSED')),
+    CONSTRAINT chk_inventory_versions CHECK (fence_version >= 0 AND version >= 0),
     CONSTRAINT chk_inventory_quantities CHECK (
         initial_quantity >= 0 AND available_quantity >= 0 AND available_quantity <= initial_quantity
-    )
+    ),
+    CONSTRAINT fk_stock_ticket_item FOREIGN KEY (ticket_item_id)
+        REFERENCES ticket_item(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE inventory_reservation (
@@ -29,6 +32,7 @@ CREATE TABLE inventory_reservation (
     UNIQUE KEY uk_reservation_actor_key (demo_actor_id, idempotency_key_hash),
     KEY idx_reservation_expiry (ticket_item_id, status, expires_at),
     CONSTRAINT chk_reservation_quantity CHECK (quantity BETWEEN 1 AND 4),
+    CONSTRAINT chk_reservation_status CHECK (status IN ('RESERVED', 'CONFIRMED', 'RELEASED', 'EXPIRED')),
     CONSTRAINT fk_reservation_stock FOREIGN KEY (ticket_item_id)
         REFERENCES inventory_stock_account(ticket_item_id)
 ) ENGINE=InnoDB;
@@ -56,6 +60,18 @@ CREATE TABLE inventory_operation_journal (
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     UNIQUE KEY uk_journal_create_claim (demo_actor_id, idempotency_key_hash),
     KEY idx_journal_recovery (state, next_attempt_at, lease_until),
+    CONSTRAINT chk_journal_operation_type CHECK (
+        operation_type IN ('CREATE', 'CONFIRM', 'RELEASE', 'EXPIRE', 'COMPENSATE', 'MIRROR', 'REPAIR')
+    ),
+    CONSTRAINT chk_journal_state CHECK (
+        state IN (
+            'RECEIVED', 'REJECTED', 'REDIS_APPLIED', 'COMMITTED', 'COMPENSATED',
+            'COMPENSATION_PENDING', 'MIRROR_PENDING', 'REPAIR_REQUIRED'
+        )
+    ),
+    CONSTRAINT chk_journal_numbers CHECK (
+        quantity BETWEEN 1 AND 4 AND fence_version >= 0 AND attempts >= 0
+    ),
     CONSTRAINT chk_journal_create_claim CHECK (
         (operation_type = 'CREATE' AND demo_actor_id IS NOT NULL AND idempotency_key_hash IS NOT NULL)
         OR (operation_type <> 'CREATE' AND demo_actor_id IS NULL AND idempotency_key_hash IS NULL)
@@ -75,7 +91,8 @@ CREATE TABLE inventory_repair_journal (
     UNIQUE KEY uk_repair_ticket_fence (ticket_item_id, new_fence_version),
     CONSTRAINT fk_repair_stock FOREIGN KEY (ticket_item_id)
         REFERENCES inventory_stock_account(ticket_item_id),
-    CONSTRAINT chk_repair_state CHECK (state IN ('STARTED', 'VERIFIED', 'COMPLETED', 'FAILED'))
+    CONSTRAINT chk_repair_state CHECK (state IN ('STARTED', 'VERIFIED', 'COMPLETED', 'FAILED')),
+    CONSTRAINT chk_repair_fence CHECK (previous_fence_version >= 0 AND new_fence_version > previous_fence_version)
 ) ENGINE=InnoDB;
 
 CREATE TABLE reservation_order (
@@ -86,11 +103,15 @@ CREATE TABLE reservation_order (
     quantity INT NOT NULL,
     confirmed_at DATETIME(6) NOT NULL,
     UNIQUE KEY uk_order_reservation (reservation_id),
+    CONSTRAINT chk_order_quantity CHECK (quantity BETWEEN 1 AND 4),
+    CONSTRAINT fk_order_stock FOREIGN KEY (ticket_item_id)
+        REFERENCES inventory_stock_account(ticket_item_id),
     CONSTRAINT fk_order_reservation FOREIGN KEY (reservation_id)
         REFERENCES inventory_reservation(id)
 ) ENGINE=InnoDB;
 
 ALTER TABLE outbox_event
+    -- Legacy rows are backfilled below; new OutboxEvent writes always populate event_id.
     ADD COLUMN IF NOT EXISTS event_id VARCHAR(36) NULL,
     ADD COLUMN IF NOT EXISTS lease_owner VARCHAR(64) NULL,
     ADD COLUMN IF NOT EXISTS lease_until TIMESTAMP(3) NULL;
@@ -98,10 +119,6 @@ ALTER TABLE outbox_event
 UPDATE outbox_event
 SET event_id = id
 WHERE event_id IS NULL;
-
-ALTER TABLE outbox_event
-    MODIFY COLUMN event_id VARCHAR(36) NOT NULL,
-    ADD UNIQUE KEY uk_outbox_event_id (event_id);
 
 INSERT INTO inventory_stock_account (
     ticket_item_id,
