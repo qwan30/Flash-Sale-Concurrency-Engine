@@ -310,7 +310,7 @@ git commit -m "docs: capture reservation upgrade baseline"
 - Consumes: existing `environment/mysql/init/ticket_init.sql` and `outbox_init.sql` schemas.
 - Produces: repeatable fresh-install and existing-volume migration contract.
 
-- [ ] **Step 1: Write the failing migration integration test**
+- [x] **Step 1: Write the failing migration integration test**
 
 ```java
 @Testcontainers
@@ -331,7 +331,7 @@ class FlywayMigrationIntegrationTest {
 }
 ```
 
-- [ ] **Step 2: Run the test and confirm RED**
+- [x] **Step 2: Run the test and confirm RED**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=FlywayMigrationIntegrationTest test
@@ -339,7 +339,9 @@ mvn.cmd -pl app/backend/xxxx-start -Dtest=FlywayMigrationIntegrationTest test
 
 Expected: FAIL because Flyway and reservation tables do not exist.
 
-- [ ] **Step 3: Add Flyway dependencies**
+Observed RED on 2026-08-09: Maven test compilation failed because `org.flywaydb.core` is not yet on the `xxxx-start` test classpath.
+
+- [x] **Step 3: Add Flyway dependencies**
 
 ```xml
 <dependency>
@@ -352,7 +354,7 @@ Expected: FAIL because Flyway and reservation tables do not exist.
 </dependency>
 ```
 
-- [ ] **Step 4: Configure safe migration adoption**
+- [x] **Step 4: Configure safe migration adoption**
 
 ```yaml
 spring:
@@ -366,7 +368,7 @@ spring:
 
 Existing non-empty volumes are baselined once with explicit environment override `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`; the default remains false.
 
-- [ ] **Step 5: Create reservation schema**
+- [x] **Step 5: Create reservation schema**
 
 `V2__reservation_reliability.sql` must define:
 
@@ -476,6 +478,8 @@ mvn.cmd test
 ```
 
 Expected: PASS; Flyway validates all checksums.
+
+GREEN attempt on 2026-08-09 compiled the migration test and reached Testcontainers, but execution is currently blocked because the Docker Desktop Linux engine is unavailable. The migration test remains un-certified until it runs against MySQL.
 
 - [ ] **Step 7: Commit migration checkpoint**
 
