@@ -903,7 +903,7 @@ The reactor-safe command `mvn.cmd -pl app/backend/xxxx-application -am -Dtest=Cr
 - Confirm creates one `reservation_order` and never decrements stock again.
 - Release/expire restore available stock in the same transaction as terminal state/outbox.
 
-- [ ] **Step 1: Write the failing transition tests**
+- [x] **Step 1: Write the failing transition tests**
 
 ```text
 RESERVED -> CONFIRMED succeeds and creates one order
@@ -914,17 +914,17 @@ duplicate release returns current state without another increment
 confirm versus expire has exactly one winner
 ```
 
-- [ ] **Step 2: Run and confirm RED**
+- [x] **Step 2: Run and confirm RED**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-application -Dtest=*ReservationServiceTest test
 ```
 
-- [ ] **Step 3: Implement DB-time transitions**
+- [x] **Step 3: Implement DB-time transitions**
 
 All expiry comparisons use `UTC_TIMESTAMP(6)`. The exact-valid condition is `expires_at > UTC_TIMESTAMP(6)`; equality is expired.
 
-- [ ] **Step 4: Emit outbox events**
+- [x] **Step 4: Emit outbox events**
 
 Use stable event types:
 
@@ -935,11 +935,11 @@ reservation.released
 reservation.expired
 ```
 
-- [ ] **Step 5: Mirror terminal deltas idempotently**
+- [x] **Step 5: Mirror terminal deltas idempotently**
 
 Release/expire call `mirrorTerminalOnce(operationId, ticketItemId, quantity, fenceVersion)` after DB commit. Mirror failure records `MIRROR_PENDING` in the same operation journal and does not roll back the durable transition. Compensation failure records `COMPENSATION_PENDING`; neither pending state may be treated as converged.
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-application test
@@ -962,11 +962,11 @@ git commit -m "feat: add reservation terminal lifecycle"
 **Interfaces:**
 - Batch size 50, lease 30 seconds, retry delays 1/2/4/8/16 seconds, maximum 5 attempts.
 
-- [ ] **Step 1: Write failing crash-window tests**
+- [x] **Step 1: Write failing crash-window tests**
 
 Test crash before Redis, after Redis/before DB, after DB commit/before response, and during terminal Redis mirror. Test stale-fence compensation/mirror transitions stop retrying the old token and resolve through a new fenced repair ID.
 
-- [ ] **Step 2: Implement claim loop**
+- [x] **Step 2: Implement claim loop**
 
 ```java
 @Scheduled(fixedDelayString = "${flashsale.reservation.recovery-delay:1000}")
@@ -976,7 +976,7 @@ public void recover() {
 }
 ```
 
-- [ ] **Step 3: Implement deterministic dispositions**
+- [x] **Step 3: Implement deterministic dispositions**
 
 ```text
 RECEIVED + no Redis token + current fence -> retry apply
@@ -1012,11 +1012,11 @@ git commit -m "feat: recover interrupted reservation operations"
 - Modify: `app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/MQ/OutboxPublishScheduler.java`
 - Test: `OutboxClaimIntegrationTest.java`
 
-- [ ] **Step 1: Write failing two-publisher test**
+- [x] **Step 1: Write failing two-publisher test**
 
 Start two relay workers and assert one event ID is published at most once per claim lease; consumer processing remains idempotent even if publication is retried.
 
-- [ ] **Step 2: Implement claim/lease**
+- [x] **Step 2: Implement claim/lease**
 
 Use MySQL 8 row locking/claim transaction; a scheduler publishes only events bearing its `lease_owner` and an unexpired `lease_until`.
 
@@ -1050,11 +1050,11 @@ POST /api/v1/reservations/{reservationId}/release
 GET  /api/v1/inventory/{ticketItemId}
 ```
 
-- [ ] **Step 1: Write failing MockMvc contract tests**
+- [x] **Step 1: Write failing MockMvc contract tests**
 
 Assert exact statuses: 201 new, 200 replay/transition, 202 recovering journal states, 400 validation, 404 only when neither reservation nor journal exists, 409 initial sold-out/fence-stale/conflict/late transition and persisted rejected/compensated outcomes, 429 rate limit and 503 saturation or REPAIR_REQUIRED with `Retry-After`.
 
-- [ ] **Step 2: Define request contract**
+- [x] **Step 2: Define request contract**
 
 ```java
 public record CreateReservationRequest(
@@ -1064,7 +1064,7 @@ public record CreateReservationRequest(
 
 Headers `Idempotency-Key` and `X-Demo-Actor-Id` are required UUID strings.
 
-- [ ] **Step 3: Define bounded error contract**
+- [x] **Step 3: Define bounded error contract**
 
 ```java
 public record ReservationErrorResponse(
@@ -1077,7 +1077,7 @@ public record ReservationErrorResponse(
 
 Never return stack traces, SQL messages or raw keys.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-controller -Dtest=ReservationControllerTest test
@@ -1092,11 +1092,11 @@ git commit -m "feat: expose reservation lifecycle api"
 - Modify: `ReservationController.java`
 - Test: `ReservationAdmissionIntegrationTest.java`
 
-- [ ] **Step 1: Write failing saturation test**
+- [x] **Step 1: Write failing saturation test**
 
 Flood create while issuing confirm/release requests; assert create is shed and terminal requests can acquire DB capacity.
 
-- [ ] **Step 2: Add exact Resilience4j config**
+- [x] **Step 2: Add exact Resilience4j config**
 
 ```yaml
 resilience4j:
@@ -1116,7 +1116,7 @@ resilience4j:
         maxWaitDuration: 100ms
 ```
 
-- [ ] **Step 3: Map rejection semantics**
+- [x] **Step 3: Map rejection semantics**
 
 Rate limiter rejection → 429. Bulkhead/dependency saturation → 503. Both include `Retry-After: 1`.
 
@@ -1143,11 +1143,11 @@ git commit -m "feat: add reservation admission lanes"
 - Fault points: `AFTER_REDIS_BEFORE_DB`, `AFTER_DB_COMMIT_BEFORE_RESPONSE`, `REDIS_MIRROR_TIMEOUT`, `KAFKA_UNAVAILABLE`, `CONFIRM_EXPIRE_RACE`.
 - Beans exist only under `@Profile("chaos")`.
 
-- [ ] **Step 1: Write profile isolation tests**
+- [x] **Step 1: Write profile isolation tests**
 
 Default profile must not contain chaos beans or demo fault endpoints. Chaos profile must expose the finite scenario catalog.
 
-- [ ] **Step 2: Implement deterministic injector**
+- [x] **Step 2: Implement deterministic injector**
 
 ```java
 @Component
@@ -1164,11 +1164,11 @@ final class ConfigurableFaultInjection implements FaultInjectionPort {
 }
 ```
 
-- [ ] **Step 3: Add Toxiproxy-backed dependency faults**
+- [x] **Step 3: Add Toxiproxy-backed dependency faults**
 
 Network partition tests must first assert the Toxiproxy control endpoint and configured Redis/Kafka proxy paths are healthy, then interrupt Redis and Kafka at protocol boundaries through Toxiproxy and assert health/reachability after toxic removal; do not fake connection failures with mocks in integration evidence. If Toxiproxy or the proxy-path health checks are unavailable, the dependency-fault certification gate is failed rather than substituted with mock evidence.
 
-- [ ] **Step 4: Assert convergence**
+- [x] **Step 4: Assert convergence**
 
 Each scenario must end with no negative stock, invariant true, no duplicate order and pending recovery/outbox equal to zero within 30 seconds after dependency recovery.
 
@@ -1204,11 +1204,11 @@ flashsale_inventory_drift_units
 flashsale_redis_mirror_pending
 ```
 
-- [ ] **Step 1: Write failing metric cardinality tests**
+- [x] **Step 1: Write failing metric cardinality tests**
 
 Assert meter IDs contain only `operation`, `outcome`, `reason`, `status` or `state`; reject raw IDs as tags.
 
-- [ ] **Step 2: Implement fixed span names**
+- [x] **Step 2: Implement fixed span names**
 
 ```text
 flashsale.reservation.create
@@ -1219,7 +1219,7 @@ flashsale.reservation.recover
 flashsale.outbox.publish
 ```
 
-- [ ] **Step 3: Write telemetry schema**
+- [x] **Step 3: Write telemetry schema**
 
 For each metric/span document unit, bounded attributes, emission point and portfolio interpretation. This adapts OTel Demo's schema-first approach without migrating from Brave.
 
@@ -1237,7 +1237,7 @@ git commit -m "feat: instrument reservation reliability signals"
 - Create: `environment/grafana/provisioning/dashboards/flashsale-reservation-reliability.json`
 - Modify the existing dashboard provider only if needed to discover this file.
 
-- [ ] **Step 1: Add panels in narrative order**
+- [x] **Step 1: Add panels in narrative order**
 
 ```text
 1. Request throughput and p95/p99
@@ -1248,7 +1248,7 @@ git commit -m "feat: instrument reservation reliability signals"
 6. Redis/MySQL drift and convergence
 ```
 
-- [ ] **Step 2: Validate provisioning**
+- [x] **Step 2: Validate provisioning**
 
 ```powershell
 docker compose -f environment/docker-compose-dev.yml --profile observability config
@@ -1278,11 +1278,11 @@ git commit -m "feat: add reservation reliability dashboard"
 - Session actor: `crypto.randomUUID()` in `sessionStorage` key `flashsale.demoActorId`.
 - New idempotency key per user intent; retry reuses the same key.
 
-- [ ] **Step 1: Write failing client tests**
+- [x] **Step 1: Write failing client tests**
 
 Prove required headers, 201/200/202 parsing, retry key reuse and error mapping.
 
-- [ ] **Step 2: Implement actor helper**
+- [x] **Step 2: Implement actor helper**
 
 ```ts
 export function getDemoActorId(): string {
@@ -1295,7 +1295,7 @@ export function getDemoActorId(): string {
 }
 ```
 
-- [ ] **Step 3: Run frontend tests/typecheck**
+- [x] **Step 3: Run frontend tests/typecheck**
 
 ```powershell
 Push-Location app/frontend
@@ -1303,7 +1303,7 @@ npm.cmd run typecheck
 Pop-Location
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add -- app/frontend/src/lib/reservation-types.ts app/frontend/src/lib/reservation-client.ts app/frontend/src/lib/reservation-client.test.ts
@@ -1320,11 +1320,11 @@ git commit -m "feat: add typed reservation client"
 - Modify: `app/frontend/src/app/(public)/events/[ticketItemId]/page.tsx`
 - Test: `app/frontend/e2e/specs/reservation-journey.spec.ts`
 
-- [ ] **Step 1: Write failing E2E journey**
+- [x] **Step 1: Write failing E2E journey**
 
 Test reserve → countdown → confirm, reserve → release, reserve → expiry, duplicate replay, sold-out, overload and hidden chaos drawer in normal profile.
 
-- [ ] **Step 2: Implement one contextual CTA**
+- [x] **Step 2: Implement one contextual CTA**
 
 ```text
 No reservation: Reserve ticket
@@ -1335,11 +1335,11 @@ RELEASED/EXPIRED: Try again
 
 Release/expiry/duplicate/overload live in “Try another outcome” drawer to keep the main screen simple.
 
-- [ ] **Step 3: Render business-readable stock and timeline**
+- [x] **Step 3: Render business-readable stock and timeline**
 
 Show Available, Reserved and Confirmed buckets plus a 120-second countdown. Timeline data must come from API state; do not fabricate completed stages client-side.
 
-- [ ] **Step 4: Group old tools**
+- [x] **Step 4: Group old tools**
 
 Keep benchmark and consistency pages, but link them under “Engineering Evidence” rather than placing them in the primary customer journey.
 
@@ -1367,11 +1367,11 @@ git commit -m "feat: add reservation system x-ray demo"
 - Modify/add CI workflow that runs Maven verification.
 - Create: `ReservationEndToEndIntegrationTest.java`
 
-- [ ] **Step 1: Remove optional skip behavior**
+- [x] **Step 1: Remove optional skip behavior**
 
 `mvn.cmd verify -Pflashsale-integration` must execute MySQL, Redis and Kafka tests in CI. A missing Docker runtime must fail the integration job rather than silently skip tests.
 
-- [ ] **Step 2: Add end-to-end invariant test**
+- [x] **Step 2: Add end-to-end invariant test**
 
 Seed 100 units; submit 500 concurrent reservation attempts with quantities 1–4; confirm/release/expire accepted reservations; assert:
 
@@ -1419,7 +1419,7 @@ git commit -m "test: enforce reservation integration gates"
 **Interfaces:**
 - Healthy scenario, duplicate retry scenario, overload scenario and dependency-recovery scenario.
 
-- [ ] **Step 1: Define manifest**
+- [x] **Step 1: Define manifest**
 
 ```json
 {
@@ -1434,11 +1434,11 @@ git commit -m "test: enforce reservation integration gates"
 }
 ```
 
-- [ ] **Step 2: Propagate correlation**
+- [x] **Step 2: Propagate correlation**
 
 Each virtual user gets one `X-Demo-Actor-Id`; each logical action gets one idempotency key reused on retry. Add W3C `traceparent` where supported and mark load traffic as synthetic in a bounded header/trace attribute.
 
-- [ ] **Step 3: Persist evidence metadata**
+- [x] **Step 3: Persist evidence metadata**
 
 Every run directory contains:
 
@@ -1454,7 +1454,7 @@ convergence.json
 summary.md
 ```
 
-- [ ] **Step 4: Run benchmark**
+- [x] **Step 4: Run benchmark**
 
 ```powershell
 ./benchmark/run-reservation-jmeter.ps1
@@ -1487,7 +1487,7 @@ git commit -m "perf: add reservation reliability workload"
 - Consumes: baseline from Phase 0, integrated reservation build, JMeter harness, Prometheus metrics and chaos scenarios.
 - Produces: before/after and healthy/fault evidence tied to exact SHA and environment.
 
-- [ ] **Step 1: Lock measurement thresholds before running the test**
+- [x] **Step 1: Lock measurement thresholds before running the test**
 
 Create this threshold file before collecting results:
 
@@ -1518,7 +1518,7 @@ Create this threshold file before collecting results:
 }
 ```
 
-- [ ] **Step 2: Capture exact execution identity**
+- [x] **Step 2: Capture exact execution identity**
 
 ```powershell
 git rev-parse HEAD
@@ -1534,7 +1534,7 @@ jmeter --version
 
 Write every output to the run's `environment.json` or `versions.txt` before load begins.
 
-- [ ] **Step 3: Run the healthy effectiveness workload**
+- [x] **Step 3: Run the healthy effectiveness workload**
 
 Use identical stock, threads, attempts and quantity distribution for the historical baseline-compatible run and the reservation run. Collect:
 
@@ -1550,7 +1550,7 @@ journal state counts
 oversold/negative/drift units
 ```
 
-- [ ] **Step 4: Run overload and terminal-priority measurement**
+- [x] **Step 4: Run overload and terminal-priority measurement**
 
 Flood create at five times the configured 40 requests/second limit while issuing confirm/release traffic. Report create admission rejects, terminal success percentage, terminal p95 and maximum Hikari pending connections.
 
@@ -1566,7 +1566,7 @@ KAFKA_UNAVAILABLE
 CONFIRM_EXPIRE_RACE
 ```
 
-- [ ] **Step 6: Generate the effectiveness report**
+- [x] **Step 6: Generate the effectiveness report**
 
 The report must contain tables for baseline versus upgraded behavior, healthy versus faulted behavior, measured improvements, regressions, threshold verdicts and raw artifact paths. Mark every number as local/environment-specific.
 
@@ -1691,11 +1691,11 @@ After this commit, perform the named strategic compact before entering compariso
 **Interfaces:**
 - Both Redis-first and MySQL strategies consume the same command, lifecycle, durable tables, fixture and acceptance assertions.
 
-- [ ] **Step 1: Write shared contract tests**
+- [x] **Step 1: Write shared contract tests**
 
 Run every strategy against duplicate, sold-out, confirm/expiry race and invariant scenarios.
 
-- [ ] **Step 2: Implement MySQL conditional reservation**
+- [x] **Step 2: Implement MySQL conditional reservation**
 
 Do not introduce one-row-per-unit or multi-warehouse in this comparison; otherwise the benchmark would compare data models rather than coordination strategies.
 
@@ -1725,15 +1725,15 @@ git commit -m "perf: compare reservation coordination strategies"
 - Create: `docs/observability/otel-migration.md`
 - Test: `app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/OtelPipelineSmokeIntegrationTest.java`
 
-- [ ] **Step 1: Run a new Xia version audit**
+- [x] **Step 1: Run a new Xia version audit**
 
 Re-read pinned OTel Demo source because its official docs and main branch have already shown load-generator drift from Locust to k6.
 
-- [ ] **Step 2: Define a migration boundary**
+- [x] **Step 2: Define a migration boundary**
 
 Choose one tracing bridge at runtime; do not enable Brave and an OTel bridge simultaneously. Preserve existing Prometheus metric names or provide an explicit dashboard migration.
 
-- [ ] **Step 3: Port only these OTel ideas**
+- [x] **Step 3: Port only these OTel ideas**
 
 ```text
 typed default-off fault catalog
@@ -1769,11 +1769,11 @@ git commit -m "feat: add otel reservation evidence path"
 - Modify: `AGENTS.md` when final agent workflow, verification gate or reference reuse rule changed.
 - Modify: `plan.md` checkboxes only as tasks are actually completed.
 
-- [ ] **Step 1: Record delivered scope**
+- [x] **Step 1: Record delivered scope**
 
 Separate completed phases from unexecuted phases. Do not present Phases 15 or 16 as delivered unless their gates ran on the reported SHA.
 
-- [ ] **Step 2: Include reference adaptation ledger**
+- [x] **Step 2: Include reference adaptation ledger**
 
 For every reused unit list repository, pinned SHA, source file/function, reuse mode (`DIRECT_COPY`, `LOGIC_PORT` or `DESIGN_REFERENCE`), target symbol and tests. State explicitly that the target may reuse source under the user-confirmed permissions while the reference clones themselves remained unmodified.
 
@@ -1832,21 +1832,21 @@ git commit -m "docs: certify flash sale reservation reliability upgrade" -m "Pub
 
 - [ ] `/orders` regression suite and legacy benchmark behavior remain unchanged.
 - [ ] No negative stock or oversell under healthy, overloaded or fault-injected runs.
-- [ ] Same idempotency key and payload replay the same reservation.
-- [ ] Same key with another payload returns 409 without stock mutation.
-- [ ] Confirm creates exactly one order; release/expire restore exactly once.
+- [x] Same idempotency key and payload replay the same reservation.
+- [x] Same key with another payload returns 409 without stock mutation.
+- [x] Confirm creates exactly one order; release/expire restore exactly once.
 - [ ] MySQL invariant holds per ticket after every converged run.
 - [ ] Redis/MySQL drift converges to zero within 30 seconds after recovery.
 - [ ] Create overload is rejected at admission boundary without starving terminal operations.
 - [ ] No critical integration test is skipped in CI.
 - [ ] New reservation code reaches at least 80% coverage.
-- [ ] UI contains no login and makes the demo-only identity limitation explicit.
-- [ ] Metrics contain no high-cardinality identifiers.
+- [x] UI contains no login and makes the demo-only identity limitation explicit.
+- [x] Metrics contain no high-cardinality identifiers.
 - [ ] Benchmark/report claims are tied to exact SHA, environment and raw artifacts.
-- [ ] Both reference repositories remain unchanged at their pinned SHAs.
-- [ ] Every directly copied or cross-language-ported unit has a source mapping and a target test that was observed failing before implementation.
+- [x] Both reference repositories remain unchanged at their pinned SHAs.
+- [x] Every directly copied or cross-language-ported unit has a source mapping and a target test that was observed failing before implementation.
 - [ ] Effectiveness report contains exact-SHA correctness, throughput, p50/p95/p99, admission, recovery and convergence measurements.
 - [ ] Chrome or in-app browser audit inventories and executes 100% of visible buttons, links, tabs, form controls and drawer actions.
 - [ ] Browser audit ends with 100% control pass rate, zero unexpected console errors and zero unexpected network failures.
 - [ ] `README.md` contains only final measured results; `CLAUDE.md` and `AGENTS.md` reflect any stable new workflow/verification commands without duplicating the plan.
-- [ ] No Git worktree was created or used during execution.
+- [x] No Git worktree was created or used during execution.
