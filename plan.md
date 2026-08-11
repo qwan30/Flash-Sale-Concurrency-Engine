@@ -996,7 +996,7 @@ five failed repair attempts -> REPAIR_REQUIRED + alert metric and certification 
 
 `SOLD_OUT` is persisted as `REJECTED` with `result_code=SOLD_OUT` and the bounded Redis `stockCurrent`. `FENCE_STALE` is persisted as `REJECTED` with `result_code=FENCE_STALE` and `result_stock_after=NULL`, because a stale Redis value is not authoritative; the API returns `stockAfter=null` and the later repair snapshot is the source of truth. Replay returns the stored bounded result without a new Redis operation. If a `COMPENSATION_PENDING` or `MIRROR_PENDING` operation receives `STALE_FENCE`, recovery must stop retrying the old operation token and transition it to `REPAIR_REQUIRED`. A fenced repair uses a new repair ID and maintenance write, then resolves `REPAIR_REQUIRED -> COMPENSATED` when no reservation remains, `REPAIR_REQUIRED -> COMMITTED` when the durable terminal reservation is mirrored, or `REPAIR_REQUIRED -> REJECTED` for an unadmitted stale-fence create. Each transition stores the `repair_id` and disposition in the journal and repair journal, and HTTP 503 remains until the repair is verified. A run with `COMPENSATION_PENDING`, `MIRROR_PENDING`, or `REPAIR_REQUIRED` is not allowed to satisfy the zero-pending convergence gate.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=ReservationRecoveryIntegrationTest test
