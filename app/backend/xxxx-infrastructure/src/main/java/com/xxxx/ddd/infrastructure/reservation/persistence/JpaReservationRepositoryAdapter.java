@@ -94,9 +94,11 @@ public class JpaReservationRepositoryAdapter implements ReservationRepository {
             throw new IllegalArgumentException("unsupported reservation transition");
         }
 
-        String expiryCondition = targetStatus == ReservationStatus.CONFIRMED
-                ? "AND r.expires_at > UTC_TIMESTAMP(6) "
-                : "";
+        String expiryCondition = switch (targetStatus) {
+            case CONFIRMED, RELEASED -> "AND r.expires_at > UTC_TIMESTAMP(6) ";
+            case EXPIRED -> "AND r.expires_at <= UTC_TIMESTAMP(6) ";
+            default -> "";
+        };
         int transitioned = entityManager.createNativeQuery(
                         "UPDATE inventory_reservation r "
                                 + "JOIN inventory_stock_account s ON s.ticket_item_id = r.ticket_item_id "
