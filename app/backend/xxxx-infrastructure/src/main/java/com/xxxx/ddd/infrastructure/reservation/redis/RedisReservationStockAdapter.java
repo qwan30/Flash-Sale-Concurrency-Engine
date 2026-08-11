@@ -30,6 +30,7 @@ public class RedisReservationStockAdapter implements ReservationStockPort {
     private final DefaultRedisScript<String> compensateScript;
     private final DefaultRedisScript<String> terminalMirrorScript;
     private final DefaultRedisScript<String> fencePublishScript;
+    private final DefaultRedisScript<String> fenceRollbackScript;
     private final DefaultRedisScript<String> repairMirrorScript;
 
     public RedisReservationStockAdapter(StringRedisTemplate redis) {
@@ -38,6 +39,7 @@ public class RedisReservationStockAdapter implements ReservationStockPort {
         this.compensateScript = script("redis/reservation-compensate-once.lua");
         this.terminalMirrorScript = script("redis/reservation-terminal-mirror-once.lua");
         this.fencePublishScript = script("redis/reservation-fence-publish.lua");
+        this.fenceRollbackScript = script("redis/reservation-fence-rollback.lua");
         this.repairMirrorScript = script("redis/reservation-repair-mirror.lua");
     }
 
@@ -100,6 +102,9 @@ public class RedisReservationStockAdapter implements ReservationStockPort {
 
         String state = value(fields, "state");
         Integer stockAfter = optionalInteger(fields, "stock_after");
+        Long ticketItemId = optionalLong(fields, "ticket_item_id");
+        Integer quantity = optionalInteger(fields, "quantity");
+        Long fenceVersion = optionalLong(fields, "fence");
         ReservationStockPort.RedisOperationState.Status status = switch (state) {
             case "APPLIED" -> ReservationStockPort.RedisOperationState.Status.APPLIED;
             case "COMPENSATED" -> ReservationStockPort.RedisOperationState.Status.COMPENSATED;
@@ -110,9 +115,11 @@ public class RedisReservationStockAdapter implements ReservationStockPort {
             case "CONFLICT" -> ReservationStockPort.RedisOperationState.Status.CONFLICT;
             default -> throw new IllegalStateException("unknown Redis operation state");
         };
-        return Optional.of(new RedisOperationState(status, stockAfter));
+        return Optional.of(new RedisOperationState(
+                status, stockAfter, ticketItemId, quantity, fenceVersion));
     }
 
+    @Override
     public String publishFence(long ticketItemId, long fenceVersion, String admissionState) {
         if (ticketItemId <= 0 || fenceVersion < 0 || admissionState == null
                 || !Set.of("OPEN", "DRAINING", "CLOSED").contains(admissionState)) {
@@ -125,6 +132,19 @@ public class RedisReservationStockAdapter implements ReservationStockPort {
                 admissionState);
     }
 
+    @Override
+    public String rollbackFence(long ticketItemId, long previousFenceVersion, long fencedVersion) {
+        if (ticketItemId <= 0 || previousFenceVersion < 0 || fencedVersion <= previousFenceVersion) {
+            throw new IllegalArgumentException("invalid fence rollback");
+        }
+        return execute(
+                fenceRollbackScript,
+                List.of(stockKey(ticketItemId)),
+                Long.toString(previousFenceVersion),
+                Long.toString(fencedVersion));
+    }
+
+    @Override
     public String repairMirror(
             UUID repairId,
             long ticketItemId,
@@ -232,6 +252,18 @@ public class RedisReservationStockAdapter implements ReservationStockPort {
     private static Integer optionalInteger(Map<Object, Object> fields, String key) {
         Object value = fields.get(key);
         return value == null ? null : parseStock(value.toString());
+    }
+
+    private static Long optionalLong(Map<Object, Object> fields, String key) {
+        Object value = fields.get(key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException exception) {
+            throw new IllegalStateException("Redis operation returned invalid " + key, exception);
+        }
     }
 
     private static void validateOperation(UUID operationId, long ticketItemId, int quantity, long fenceVersion) {

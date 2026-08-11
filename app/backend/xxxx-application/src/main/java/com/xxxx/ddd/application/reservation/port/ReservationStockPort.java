@@ -6,6 +6,27 @@ import java.util.UUID;
 
 public interface ReservationStockPort {
 
+    default String publishFence(long ticketItemId, long fenceVersion, String admissionState) {
+        throw new UnsupportedOperationException("fence publication is not supported");
+    }
+
+    default String rollbackFence(long ticketItemId, long previousFenceVersion, long fencedVersion) {
+        throw new UnsupportedOperationException("fence rollback is not supported");
+    }
+
+    default String repairMirror(
+            UUID repairId,
+            long ticketItemId,
+            long fenceVersion,
+            int initial,
+            int available,
+            int reserved,
+            int confirmed,
+            String disposition
+    ) {
+        throw new UnsupportedOperationException("repair mirror is not supported");
+    }
+
     RedisApplyResult applyOnce(UUID operationId, long ticketItemId, int quantity, long fenceVersion);
 
     RedisCompensationResult compensateOnce(UUID operationId, long ticketItemId, int quantity, long fenceVersion);
@@ -106,12 +127,27 @@ public interface ReservationStockPort {
         }
     }
 
-    record RedisOperationState(Status status, Integer stockAfter) {
+    record RedisOperationState(
+            Status status,
+            Integer stockAfter,
+            Long ticketItemId,
+            Integer quantity,
+            Long fenceVersion
+    ) {
 
         public RedisOperationState {
             Objects.requireNonNull(status, "status must not be null");
             if (stockAfter != null && stockAfter < 0) {
                 throw new IllegalArgumentException("stockAfter must not be negative");
+            }
+            if (ticketItemId != null && ticketItemId <= 0) {
+                throw new IllegalArgumentException("ticketItemId must be positive");
+            }
+            if (quantity != null && (quantity < 1 || quantity > 4)) {
+                throw new IllegalArgumentException("quantity must be between 1 and 4");
+            }
+            if (fenceVersion != null && fenceVersion < 0) {
+                throw new IllegalArgumentException("fenceVersion must not be negative");
             }
             if (status == Status.STALE_FENCE || status == Status.CONFLICT) {
                 if (stockAfter != null) {
@@ -120,8 +156,22 @@ public interface ReservationStockPort {
             }
         }
 
+        public RedisOperationState(Status status, Integer stockAfter) {
+            this(status, stockAfter, null, null, null);
+        }
+
         public static RedisOperationState applied(int stockAfter) {
             return new RedisOperationState(Status.APPLIED, stockAfter);
+        }
+
+        public static RedisOperationState applied(
+                long ticketItemId,
+                int quantity,
+                long fenceVersion,
+                int stockAfter
+        ) {
+            return new RedisOperationState(
+                    Status.APPLIED, stockAfter, ticketItemId, quantity, fenceVersion);
         }
 
         public enum Status {

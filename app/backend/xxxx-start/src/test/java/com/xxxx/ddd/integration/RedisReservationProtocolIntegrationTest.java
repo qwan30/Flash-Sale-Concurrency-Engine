@@ -6,6 +6,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisCallback;
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
+@EnabledIfSystemProperty(named = "flashsale.integration", matches = "true")
 class RedisReservationProtocolIntegrationTest {
 
     private static final long TICKET_ITEM_ID = 42L;
@@ -73,7 +75,8 @@ class RedisReservationProtocolIntegrationTest {
         assertThat(stockField("available")).isEqualTo("8");
         assertThat(redis.getExpire(operationKey(operationId), TimeUnit.SECONDS)).isBetween(1L, 604800L);
         assertThat(adapter.operationState(operationId))
-                .contains(ReservationStockPort.RedisOperationState.applied(8));
+                .contains(ReservationStockPort.RedisOperationState.applied(
+                        TICKET_ITEM_ID, 2, 0L, 8));
     }
 
     @Test
@@ -83,6 +86,19 @@ class RedisReservationProtocolIntegrationTest {
         ReservationStockPort.RedisApplyResult result = adapter.applyOnce(UUID.randomUUID(), TICKET_ITEM_ID, 4, 0L);
 
         assertThat(result).isEqualTo(ReservationStockPort.RedisApplyResult.soldOut(3));
+        assertThat(stockField("available")).isEqualTo("3");
+    }
+
+    @Test
+    void insufficientStockReplayRetainsTheSoldOutDisposition() {
+        seedStock(3, 3, 0, "OPEN");
+        UUID operationId = UUID.randomUUID();
+
+        ReservationStockPort.RedisApplyResult first = adapter.applyOnce(operationId, TICKET_ITEM_ID, 4, 0L);
+        ReservationStockPort.RedisApplyResult replay = adapter.applyOnce(operationId, TICKET_ITEM_ID, 4, 0L);
+
+        assertThat(first).isEqualTo(ReservationStockPort.RedisApplyResult.soldOut(3));
+        assertThat(replay).isEqualTo(ReservationStockPort.RedisApplyResult.soldOut(3));
         assertThat(stockField("available")).isEqualTo("3");
     }
 
@@ -97,7 +113,11 @@ class RedisReservationProtocolIntegrationTest {
         assertThat(stockField("available")).isEqualTo("10");
         assertThat(adapter.operationState(operationId))
                 .contains(new ReservationStockPort.RedisOperationState(
-                        ReservationStockPort.RedisOperationState.Status.STALE_FENCE, null));
+                        ReservationStockPort.RedisOperationState.Status.STALE_FENCE,
+                        null,
+                        TICKET_ITEM_ID,
+                        2,
+                        3L));
     }
 
     @Test
@@ -105,11 +125,40 @@ class RedisReservationProtocolIntegrationTest {
         seedStock(10, 10, 0, "OPEN");
 
         assertThat(adapter.publishFence(TICKET_ITEM_ID, 1L, "DRAINING")).isEqualTo("PUBLISHED");
-        assertThat(adapter.publishFence(TICKET_ITEM_ID, 1L, "CLOSED")).isEqualTo("STALE_FENCE");
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 1L, "CLOSED")).isEqualTo("PUBLISHED");
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 1L, "DRAINING")).isEqualTo("REPLAYED");
         assertThat(adapter.publishFence(TICKET_ITEM_ID, 0L, "OPEN")).isEqualTo("STALE_FENCE");
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 2L, "OPEN")).isEqualTo("CONFLICT");
 
         assertThat(stockField("fence")).isEqualTo("1");
-        assertThat(stockField("admission_state")).isEqualTo("DRAINING");
+        assertThat(stockField("admission_state")).isEqualTo("CLOSED");
+    }
+
+    @Test
+    void fencePublicationReplaysWhenTheFenceAndAdmissionStateAlreadyMatch() {
+        seedStock(10, 10, 3, "CLOSED");
+
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 3L, "CLOSED")).isEqualTo("REPLAYED");
+
+        assertThat(stockField("fence")).isEqualTo("3");
+        assertThat(stockField("admission_state")).isEqualTo("CLOSED");
+    }
+
+    @Test
+    void fenceRollbackOnlyRestoresTheFenceItOwns() {
+        seedStock(10, 10, 0, "OPEN");
+
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 8L, "DRAINING")).isEqualTo("PUBLISHED");
+        assertThat(adapter.rollbackFence(TICKET_ITEM_ID, 7L, 8L)).isEqualTo("ROLLED_BACK");
+        assertThat(adapter.rollbackFence(TICKET_ITEM_ID, 7L, 8L)).isEqualTo("REPLAYED");
+        assertThat(stockField("fence")).isEqualTo("7");
+        assertThat(stockField("admission_state")).isEqualTo("OPEN");
+
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 8L, "DRAINING")).isEqualTo("PUBLISHED");
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 8L, "CLOSED")).isEqualTo("PUBLISHED");
+        assertThat(adapter.rollbackFence(TICKET_ITEM_ID, 7L, 8L)).isEqualTo("CONFLICT");
+        assertThat(stockField("fence")).isEqualTo("8");
+        assertThat(stockField("admission_state")).isEqualTo("CLOSED");
     }
 
     @Test
@@ -125,6 +174,8 @@ class RedisReservationProtocolIntegrationTest {
         assertThat(redis.opsForHash().get(operationKey(repairId), "disposition"))
                 .isEqualTo("VERIFIED");
 
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 3L, "DRAINING")).isEqualTo("PUBLISHED");
+        assertThat(adapter.publishFence(TICKET_ITEM_ID, 3L, "CLOSED")).isEqualTo("PUBLISHED");
         assertThat(adapter.publishFence(TICKET_ITEM_ID, 3L, "OPEN")).isEqualTo("PUBLISHED");
         assertThat(adapter.repairMirror(UUID.randomUUID(), TICKET_ITEM_ID, 2L, 10, 8, 1, 1, "VERIFIED"))
                 .isEqualTo("REPAIR_REQUIRED");
@@ -148,13 +199,48 @@ class RedisReservationProtocolIntegrationTest {
 
     @Test
     void terminalMirrorAppliesDeltaExactlyOnce() {
+        seedStock(10, 10, 0, "OPEN");
+        UUID operationId = UUID.randomUUID();
+
+        assertThat(adapter.applyOnce(operationId, TICKET_ITEM_ID, 3, 0L))
+                .isEqualTo(ReservationStockPort.RedisApplyResult.applied(7));
+
+        adapter.mirrorTerminalOnce(operationId, TICKET_ITEM_ID, 3, 0L);
+        adapter.mirrorTerminalOnce(operationId, TICKET_ITEM_ID, 3, 0L);
+
+        assertThat(stockField("available")).isEqualTo("10");
+    }
+
+    @Test
+    void terminalMirrorWithoutAppliedEvidenceDoesNotMutateStock() {
         seedStock(10, 5, 0, "OPEN");
         UUID operationId = UUID.randomUUID();
 
-        adapter.mirrorTerminalOnce(operationId, TICKET_ITEM_ID, 3, 0L);
-        adapter.mirrorTerminalOnce(operationId, TICKET_ITEM_ID, 3, 0L);
+        assertThatThrownBy(() -> adapter.mirrorTerminalOnce(operationId, TICKET_ITEM_ID, 3, 0L))
+                .isInstanceOf(IllegalStateException.class);
 
-        assertThat(stockField("available")).isEqualTo("8");
+        assertThat(stockField("available")).isEqualTo("5");
+    }
+
+    @Test
+    void terminalMirrorFinalizesTheSameAppliedCreateOperation() {
+        seedStock(10, 10, 0, "OPEN");
+        UUID operationId = UUID.randomUUID();
+
+        assertThat(adapter.applyOnce(operationId, TICKET_ITEM_ID, 2, 0L))
+                .isEqualTo(ReservationStockPort.RedisApplyResult.applied(8));
+
+        adapter.mirrorTerminalOnce(operationId, TICKET_ITEM_ID, 2, 0L);
+        adapter.mirrorTerminalOnce(operationId, TICKET_ITEM_ID, 2, 0L);
+
+        assertThat(stockField("available")).isEqualTo("10");
+        assertThat(adapter.operationState(operationId))
+                .contains(new ReservationStockPort.RedisOperationState(
+                        ReservationStockPort.RedisOperationState.Status.MIRRORED,
+                        10,
+                        TICKET_ITEM_ID,
+                        2,
+                        0L));
     }
 
     @Test

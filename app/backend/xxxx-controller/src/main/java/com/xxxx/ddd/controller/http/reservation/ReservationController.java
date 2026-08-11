@@ -142,17 +142,19 @@ public class ReservationController {
             @PathVariable("reservationId") UUID reservationId,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId
     ) {
-        Optional<OperationJournalRepository.JournalEntry> journalEntry = journal.findByReservationId(reservationId);
-        if (journalEntry.isPresent() && isUnconverged(journalEntry.orElseThrow().state())) {
-            return journalResponse(journalEntry.orElseThrow(), traceId);
-        }
-        Optional<Reservation> reservation = reservations.findById(reservationId);
-        if (reservation.isPresent()) {
-            return ResponseEntity.ok(toResponse(reservation.orElseThrow(), null, null, null, null, null));
-        }
-        return journalEntry
-                .map(entry -> journalResponse(entry, traceId))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return admission.executeRead(() -> {
+            Optional<OperationJournalRepository.JournalEntry> journalEntry = journal.findByReservationId(reservationId);
+            if (journalEntry.isPresent() && isUnconverged(journalEntry.orElseThrow().state())) {
+                return journalResponse(journalEntry.orElseThrow(), traceId);
+            }
+            Optional<Reservation> reservation = reservations.findById(reservationId);
+            if (reservation.isPresent()) {
+                return ResponseEntity.ok(toResponse(reservation.orElseThrow(), null, null, null, null, null));
+            }
+            return journalEntry
+                    .map(entry -> journalResponse(entry, traceId))
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        });
     }
 
     @PostMapping("/reservations/{reservationId}/confirm")
@@ -175,9 +177,9 @@ public class ReservationController {
 
     @GetMapping("/inventory/{ticketItemId}")
     public ResponseEntity<InventoryResponse> inventory(@PathVariable("ticketItemId") long ticketItemId) {
-        return inventory.findSnapshot(ticketItemId)
+        return admission.executeRead(() -> inventory.findSnapshot(ticketItemId)
                 .map(snapshot -> ResponseEntity.ok(toResponse(snapshot)))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .orElseGet(() -> ResponseEntity.notFound().build()));
     }
 
     private static HttpStatus createStatus(CreateReservationResult.Outcome outcome) {

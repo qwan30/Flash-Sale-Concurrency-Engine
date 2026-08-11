@@ -79,6 +79,10 @@ public class ReservationAdmissionControl {
         }
     }
 
+    public <T> T executeRead(Supplier<T> operation) {
+        return fixtureGate.withReservationOperation(operation);
+    }
+
     private void recordRejection(String operation, String reason) {
         if (meterRegistry != null) {
             Counter.builder("flashsale.admission.rejections")

@@ -88,6 +88,10 @@ class ReservationControllerTest {
             Supplier<ReservationLifecycleResult> operation = invocation.getArgument(0);
             return operation.get();
         });
+        when(admission.executeRead(any())).thenAnswer(invocation -> {
+            Supplier<?> operation = invocation.getArgument(0);
+            return operation.get();
+        });
     }
 
     @Test
@@ -445,6 +449,18 @@ class ReservationControllerTest {
 
         mvc.perform(get("/api/v1/reservations/{id}", RESERVATION_ID))
                 .andExpect(status().isNotFound());
+
+        verify(admission).executeRead(any());
+    }
+
+    @Test
+    void missingInventoryIsReadThroughFixtureGate() throws Exception {
+        when(inventory.findSnapshot(42L)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/v1/inventory/{ticketItemId}", 42L))
+                .andExpect(status().isNotFound());
+
+        verify(admission).executeRead(any());
     }
 
     @Test
