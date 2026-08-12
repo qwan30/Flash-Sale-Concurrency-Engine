@@ -1,0 +1,30 @@
+networks:
+  pre-event-network:
+    name: environment_pre-event-network
+    external: true
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: pre-event-jaeger
+    profiles: ["otel"]
+    ports:
+      - "16686:16686"
+    networks:
+      - pre-event-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.109.0
+    container_name: pre-event-otel-collector
+    profiles: ["otel"]
+    command: ["--config=/etc/otelcol-contrib/otel-collector.yml"]
+    volumes:
+      - ./otel/otel-collector.yml:/etc/otelcol-contrib/otel-collector.yml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    depends_on:
+      - jaeger
+    networks:
+      - pre-event-network
