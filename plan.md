@@ -1020,7 +1020,7 @@ Start two relay workers and assert one event ID is published at most once per cl
 
 Use MySQL 8 row locking/claim transaction; a scheduler publishes only events bearing its `lease_owner` and an unexpired `lease_until`.
 
-- [ ] **Step 3: Run and commit**
+- [x] **Step 3: Run and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=OutboxClaimIntegrationTest test
