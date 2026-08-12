@@ -1385,7 +1385,7 @@ pending journal = 0
 pending outbox = 0 after Kafka recovery
 ```
 
-- [ ] **Step 3: Run full backend verification**
+- [x] **Step 3: Run full backend verification**
 
 ```powershell
 mvn.cmd clean verify -Pflashsale-integration
@@ -1393,11 +1393,11 @@ mvn.cmd clean verify -Pflashsale-integration
 
 Expected: all unit/integration tests pass and no critical test is skipped.
 
-- [ ] **Step 4: Check coverage**
+- [x] **Step 4: Check coverage**
 
 Expected: line coverage for newly added reservation packages is at least 80%; correctness services/state transitions target at least 90% branch coverage.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add -- app/backend/xxxx-start/pom.xml app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/ReservationEndToEndIntegrationTest.java .github/workflows/ci.yml

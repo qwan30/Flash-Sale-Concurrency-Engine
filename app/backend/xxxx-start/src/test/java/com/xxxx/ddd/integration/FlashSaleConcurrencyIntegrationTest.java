@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
@@ -228,6 +229,20 @@ class FlashSaleConcurrencyIntegrationTest {
         if (!Files.isRegularFile(initScript)) {
             initScript = Path.of("environment/mysql/init/ticket_init.sql").normalize();
         }
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        // The same Testcontainers database is shared by both methods. Reset the legacy fixture
+        // before replaying its deterministic INSERT script so test order cannot create duplicate
+        // order numbers or move the explicit ticket-item ids.
+        jdbc.execute("DELETE FROM reservation_order");
+        jdbc.execute("DELETE FROM inventory_repair_journal");
+        jdbc.execute("DELETE FROM inventory_reservation");
+        jdbc.execute("DELETE FROM inventory_operation_journal");
+        jdbc.execute("DELETE FROM inventory_stock_account");
+        jdbc.execute("DELETE FROM ticket_order_details_202502");
+        jdbc.execute("DELETE FROM ticket_order_202502");
+        jdbc.execute("DELETE FROM ticket_item");
+        jdbc.execute("ALTER TABLE ticket_item AUTO_INCREMENT = 1");
+        jdbc.execute("DELETE FROM ticket");
         new ResourceDatabasePopulator(new FileSystemResource(initScript)).execute(dataSource);
     }
 
@@ -235,4 +250,3 @@ class FlashSaleConcurrencyIntegrationTest {
         return Boolean.parseBoolean(System.getProperty("flashsale.integration", "false"));
     }
 }
-

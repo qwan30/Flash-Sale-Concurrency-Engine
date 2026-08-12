@@ -4,6 +4,7 @@ import com.xxxx.ddd.application.MQ.OutboxEvent;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.support.EncodedResource;
 import org.springframework.core.io.FileSystemResource;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
+@EnabledIfSystemProperty(named = "flashsale.integration", matches = "true")
 class FlywayMigrationIntegrationTest {
 
     @Container
@@ -101,12 +103,12 @@ class FlywayMigrationIntegrationTest {
                 assertThat(resultSet.getInt("initial_quantity")).isEqualTo(10);
                 assertThat(resultSet.getInt("available_quantity")).isEqualTo(7);
                 assertThat(tableExists(connection, "flyway_schema_history")).isTrue();
-                assertThat(latestMigrationVersion(connection)).isEqualTo("2");
+                assertThat(latestMigrationVersion(connection)).isEqualTo("3");
                 assertOutboxEventIdentity(connection, "legacy-event-424242");
                 assertOutboxInsertWorks(connection);
             }
 
-            // A second invocation must be a no-op after baseline + V2 are recorded.
+            // A second invocation must be a no-op after baseline + V2 + V3 are recorded.
             flyway.migrate();
         } finally {
             legacy.stop();
