@@ -89,7 +89,7 @@ CREATE TABLE inventory_operation_journal (
     ),
     CONSTRAINT chk_journal_state CHECK (
         state IN (
-            'RECEIVED', 'REJECTED', 'REDIS_APPLIED', 'COMMITTED', 'COMPENSATED',
+            'RECEIVED', 'REDIS_APPLYING', 'REJECTED', 'REDIS_APPLIED', 'COMMITTED', 'COMPENSATED',
             'COMPENSATION_PENDING', 'MIRROR_PENDING', 'REPAIR_REQUIRED'
         )
     ),

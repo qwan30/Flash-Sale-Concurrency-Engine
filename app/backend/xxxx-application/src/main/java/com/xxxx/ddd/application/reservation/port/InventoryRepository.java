@@ -11,6 +11,10 @@ public interface InventoryRepository {
 
     OptionalLong findFenceVersion(long ticketItemId);
 
+    default Optional<String> findAdmissionState(long ticketItemId) {
+        return Optional.empty();
+    }
+
     boolean decrementIfAvailable(long ticketItemId, int quantity, long fenceVersion);
 
     boolean restoreIfAdmitted(long ticketItemId, int quantity, long fenceVersion);

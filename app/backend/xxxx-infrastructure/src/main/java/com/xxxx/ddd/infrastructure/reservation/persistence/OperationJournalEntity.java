@@ -65,6 +65,10 @@ public class OperationJournalEntity {
     @Column(name = "result_stock_after")
     private Integer resultStockAfter;
 
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(name = "repair_id", columnDefinition = "BINARY(16)")
+    private UUID repairId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

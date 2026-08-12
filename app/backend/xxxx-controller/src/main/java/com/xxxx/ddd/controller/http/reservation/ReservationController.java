@@ -3,13 +3,13 @@ package com.xxxx.ddd.controller.http.reservation;
 import com.xxxx.ddd.application.reservation.ConfirmReservationService;
 import com.xxxx.ddd.application.reservation.CreateReservationCommand;
 import com.xxxx.ddd.application.reservation.CreateReservationResult;
+import com.xxxx.ddd.application.reservation.CreateReservationService;
 import com.xxxx.ddd.application.reservation.ReleaseReservationService;
 import com.xxxx.ddd.application.reservation.ReservationLifecycleResult;
 import com.xxxx.ddd.application.reservation.port.InventoryRepository;
 import com.xxxx.ddd.application.reservation.port.OperationJournalRepository;
 import com.xxxx.ddd.application.reservation.port.ReservationRepository;
-import com.xxxx.ddd.application.reservation.strategy.ReservationCoordinationStrategy;
-import com.xxxx.ddd.application.reservation.strategy.ReservationStrategy;
+
 import com.xxxx.ddd.domain.reservation.InventorySnapshot;
 import com.xxxx.ddd.domain.reservation.Reservation;
 import jakarta.validation.Valid;
@@ -33,8 +33,7 @@ import java.util.Optional;
 @RequestMapping("/api/v1")
 public class ReservationController {
 
-    private final Map<ReservationStrategy, ReservationCoordinationStrategy> creationStrategies;
-    private final List<ReservationCoordinationStrategy> creationCandidates;
+    private final CreateReservationService createService;
     private final ConfirmReservationService confirmation;
     private final ReleaseReservationService release;
     private final ReservationRepository reservations;
@@ -43,7 +42,7 @@ public class ReservationController {
     private final ReservationAdmissionControl admission;
 
     public ReservationController(
-            List<ReservationCoordinationStrategy> creationStrategies,
+            CreateReservationService createService,
             ConfirmReservationService confirmation,
             ReleaseReservationService release,
             ReservationRepository reservations,
@@ -51,23 +50,7 @@ public class ReservationController {
             InventoryRepository inventory,
             ReservationAdmissionControl admission
     ) {
-        EnumMap<ReservationStrategy, ReservationCoordinationStrategy> resolvedStrategies =
-                new EnumMap<>(ReservationStrategy.class);
-        ReservationCoordinationStrategy unidentified = null;
-        for (ReservationCoordinationStrategy candidate : creationStrategies) {
-            ReservationStrategy key = candidate.strategy();
-            if (key == null) {
-                unidentified = candidate;
-            }
-            if (key != null) {
-                resolvedStrategies.put(key, candidate);
-            }
-        }
-        if (!resolvedStrategies.containsKey(ReservationStrategy.REDIS_FIRST) && unidentified != null) {
-            resolvedStrategies.put(ReservationStrategy.REDIS_FIRST, unidentified);
-        }
-        this.creationStrategies = Map.copyOf(resolvedStrategies);
-        this.creationCandidates = List.copyOf(creationStrategies);
+        this.createService = createService;
         this.confirmation = confirmation;
         this.release = release;
         this.reservations = reservations;
@@ -84,16 +67,7 @@ public class ReservationController {
             @RequestHeader(value = "X-Reservation-Strategy", defaultValue = "REDIS_FIRST") String strategyName,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId
     ) {
-        ReservationCoordinationStrategy creation = strategy(strategyName);
-        if (creation == null) {
-            return ResponseEntity.badRequest().body(new ReservationErrorResponse(
-                    "INVALID_STRATEGY",
-                    "Unknown reservation coordination strategy",
-                    false,
-                    boundedTraceId(traceId),
-                    null));
-        }
-        CreateReservationResult result = admission.executeCreate(() -> creation.create(new CreateReservationCommand(
+        CreateReservationResult result = admission.executeCreate(() -> createService.create(new CreateReservationCommand(
                 request.ticketItemId(), request.quantity(), demoActorId, idempotencyKey.toString())));
         if (result.journalState().filter(state -> state == OperationJournalRepository.JournalState.REPAIR_REQUIRED).isPresent()) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
@@ -123,19 +97,6 @@ public class ReservationController {
         return ResponseEntity.status(createStatus(result.outcome())).body(toResponse(result));
     }
 
-    private ReservationCoordinationStrategy strategy(String strategyName) {
-        try {
-            ReservationStrategy requested = ReservationStrategy.valueOf(strategyName.trim().toUpperCase());
-            for (ReservationCoordinationStrategy candidate : creationCandidates) {
-                if (requested == candidate.strategy()) {
-                    return candidate;
-                }
-            }
-            return creationStrategies.get(requested);
-        } catch (RuntimeException exception) {
-            return null;
-        }
-    }
 
     @GetMapping("/reservations/{reservationId}")
     public ResponseEntity<?> get(

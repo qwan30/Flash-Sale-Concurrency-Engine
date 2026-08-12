@@ -13,7 +13,8 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
-    url: ${MYSQL_URL:jdbc:mysql://localhost:3316/vetautet}
+      connection-init-sql: SET time_zone = '+00:00'
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3316/vetautet?serverTimezone=UTC}
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:root1234}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -23,6 +24,8 @@ spring:
     show-sql: true
     hibernate:
       ddl-auto: none
+    properties:
+      hibernate.jdbc.time_zone: UTC
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -77,11 +80,16 @@ app:
     topic: ${KAFKA_TOPIC:flashsale.orders}
   outbox:
     publish-batch-size: 50
+    publish-lease: 30s
     retry-delay: 10s
     max-attempts: 5
+  reservation:
+    recovery-delay: 1s
+    expiry-delay: 1s
 
 benchmark:
   results-dir: ${BENCHMARK_RESULTS_DIR:benchmark/results}
+  fixture-reset-token: ${BENCHMARK_FIXTURE_RESET_TOKEN:}
 
 # Admission control for the public order API. The ceiling sits well above the highest
 # throughput observed in the benchmark matrix (443 req/s), so load tests measure the

@@ -98,11 +98,17 @@ class CreateReservationServiceTest {
         var order = inOrder(inventory, journal, stock, faults, reservations, outbox);
         order.verify(inventory).findFenceVersion(TICKET_ITEM_ID);
         order.verify(journal).claimCreate(any(OperationJournalRepository.JournalEntry.class));
+        order.verify(journal).transition(
+                any(),
+                eq(OperationJournalRepository.JournalState.RECEIVED),
+                eq(OperationJournalRepository.JournalState.REDIS_APPLYING),
+                eq("REDIS_APPLYING"),
+                eq(null));
         order.verify(stock).applyOnce(any(), eq(TICKET_ITEM_ID), eq(QUANTITY), eq(FENCE_VERSION));
         order.verify(faults).hit(eq(FaultInjectionPort.FaultPoint.AFTER_REDIS_BEFORE_DB), any());
         order.verify(journal).transition(
                 any(),
-                eq(OperationJournalRepository.JournalState.RECEIVED),
+                eq(OperationJournalRepository.JournalState.REDIS_APPLYING),
                 eq(OperationJournalRepository.JournalState.REDIS_APPLIED),
                 eq("REDIS_APPLIED"),
                 eq(8));
@@ -116,6 +122,19 @@ class CreateReservationServiceTest {
                 eq("NEW"),
                 eq(8));
         verify(faults).hit(eq(FaultInjectionPort.FaultPoint.AFTER_DB_COMMIT_BEFORE_RESPONSE), any());
+    }
+
+    @Test
+    void closedTicketAdmissionReturnsRepairRequiredBeforeClaimingANewOperation() {
+        when(inventory.findAdmissionState(TICKET_ITEM_ID)).thenReturn(Optional.of("CLOSED"));
+
+        CreateReservationResult result = service.create(command("create-during-repair", TICKET_ITEM_ID, QUANTITY));
+
+        assertThat(result.outcome()).isEqualTo(CreateReservationResult.Outcome.PROCESSING);
+        assertThat(result.journalState())
+                .contains(OperationJournalRepository.JournalState.REPAIR_REQUIRED);
+        assertThat(result.resultCode()).isEqualTo("REPAIR_REQUIRED");
+        verifyNoInteractions(journal, stock, reservations, outbox, faults);
     }
 
     @Test
@@ -176,7 +195,7 @@ class CreateReservationServiceTest {
         assertThat(result.stockAfter()).hasValue(0);
         verify(journal).transition(
                 any(),
-                eq(OperationJournalRepository.JournalState.RECEIVED),
+                eq(OperationJournalRepository.JournalState.REDIS_APPLYING),
                 eq(OperationJournalRepository.JournalState.REJECTED),
                 eq("SOLD_OUT"),
                 eq(0));
@@ -196,7 +215,7 @@ class CreateReservationServiceTest {
         assertThat(result.stockAfter()).isEmpty();
         verify(journal).transition(
                 any(),
-                eq(OperationJournalRepository.JournalState.RECEIVED),
+                eq(OperationJournalRepository.JournalState.REDIS_APPLYING),
                 eq(OperationJournalRepository.JournalState.REJECTED),
                 eq("FENCE_STALE"),
                 eq(null));
@@ -226,6 +245,28 @@ class CreateReservationServiceTest {
                 eq("DATABASE_FAILURE"),
                 eq(10));
         verifyNoInteractions(outbox);
+    }
+
+    @Test
+    void databaseFailureWithDurableReservationDoesNotCompensateRedisAgain() {
+        CreateReservationCommand command = command("create-db-commit-ambiguous", TICKET_ITEM_ID, QUANTITY);
+        UUID reservationId = UUID.randomUUID();
+        Reservation persisted = reservation(reservationId, TICKET_ITEM_ID, QUANTITY);
+        when(stock.applyOnce(any(), eq(TICKET_ITEM_ID), eq(QUANTITY), eq(FENCE_VERSION)))
+                .thenReturn(ReservationStockPort.RedisApplyResult.applied(8));
+        when(inventory.decrementIfAvailable(TICKET_ITEM_ID, QUANTITY, FENCE_VERSION))
+                .thenThrow(new IllegalStateException("database commit result is ambiguous"));
+        when(reservations.findById(any())).thenReturn(Optional.of(persisted));
+        when(inventory.findSnapshot(TICKET_ITEM_ID))
+                .thenReturn(Optional.of(new InventorySnapshot(TICKET_ITEM_ID, 10, 8, 2, 0)));
+
+        CreateReservationResult result = service.create(command);
+
+        assertThat(result.outcome()).isEqualTo(CreateReservationResult.Outcome.NEW);
+        assertThat(result.reservation()).contains(persisted);
+        assertThat(result.journalState()).contains(OperationJournalRepository.JournalState.COMMITTED);
+        verify(stock, org.mockito.Mockito.never())
+                .compensateOnce(any(), eq(TICKET_ITEM_ID), eq(QUANTITY), eq(FENCE_VERSION));
     }
 
     @Test
@@ -264,7 +305,12 @@ class CreateReservationServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("injected fault");
         verifyNoInteractions(reservations, outbox);
-        verify(journal, org.mockito.Mockito.never()).transition(any(), any(), any(), any(), any());
+        verify(journal).transition(
+                any(),
+                eq(OperationJournalRepository.JournalState.RECEIVED),
+                eq(OperationJournalRepository.JournalState.REDIS_APPLYING),
+                eq("REDIS_APPLYING"),
+                eq(null));
     }
 
     @Test
@@ -293,7 +339,7 @@ class CreateReservationServiceTest {
                 eq(OperationJournalRepository.JournalState.COMMITTED),
                 eq("NEW"),
                 eq(8));
-        verify(transactionManager, times(3)).commit(transactionStatus);
+        verify(transactionManager, times(4)).commit(transactionStatus);
         verify(stock, org.mockito.Mockito.never()).compensateOnce(any(), anyLong(), anyInt(), anyLong());
     }
 

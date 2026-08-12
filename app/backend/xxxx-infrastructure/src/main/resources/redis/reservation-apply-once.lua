@@ -17,8 +17,11 @@ if existing_state then
     end
 
     local stock_after = redis.call('HGET', KEYS[2], 'stock_after')
-    if existing_state == 'APPLIED' or existing_state == 'SOLD_OUT' then
+    if existing_state == 'APPLIED' then
         return 'REPLAYED:' .. stock_after
+    end
+    if existing_state == 'SOLD_OUT' then
+        return 'SOLD_OUT:' .. stock_after
     end
     if existing_state == 'STALE_FENCE' then
         return 'STALE_FENCE'

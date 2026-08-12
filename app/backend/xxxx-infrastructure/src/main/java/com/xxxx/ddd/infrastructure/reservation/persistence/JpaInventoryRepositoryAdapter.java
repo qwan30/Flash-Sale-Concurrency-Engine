@@ -56,6 +56,16 @@ public class JpaInventoryRepositoryAdapter implements InventoryRepository {
     }
 
     @Override
+    public Optional<String> findAdmissionState(long ticketItemId) {
+        List<?> rows = entityManager.createNativeQuery(
+                        "SELECT admission_state FROM inventory_stock_account "
+                                + "WHERE ticket_item_id = :ticketItemId")
+                .setParameter("ticketItemId", ticketItemId)
+                .getResultList();
+        return rows.stream().findFirst().map(String::valueOf);
+    }
+
+    @Override
     public boolean decrementIfAvailable(long ticketItemId, int quantity, long fenceVersion) {
         requireQuantity(quantity);
         int updated = entityManager.createNativeQuery(

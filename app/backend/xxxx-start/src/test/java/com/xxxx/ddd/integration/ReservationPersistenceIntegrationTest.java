@@ -5,14 +5,18 @@ import com.xxxx.ddd.application.reservation.port.OperationJournalRepository;
 import com.xxxx.ddd.application.reservation.port.ReservationRepository;
 import com.xxxx.ddd.domain.reservation.InventorySnapshot;
 import com.xxxx.ddd.domain.reservation.Reservation;
+import com.xxxx.ddd.domain.reservation.ReservationOrder;
 import com.xxxx.ddd.domain.reservation.ReservationStatus;
 import com.xxxx.ddd.infrastructure.reservation.persistence.JpaInventoryRepositoryAdapter;
 import com.xxxx.ddd.infrastructure.reservation.persistence.JpaOperationJournalRepositoryAdapter;
+import com.xxxx.ddd.infrastructure.reservation.persistence.JpaReservationOrderRepositoryAdapter;
 import com.xxxx.ddd.infrastructure.reservation.persistence.JpaReservationRepositoryAdapter;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
@@ -41,6 +45,7 @@ import java.util.function.Function;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
+@EnabledIfSystemProperty(named = "flashsale.integration", matches = "true")
 class ReservationPersistenceIntegrationTest {
 
     @Container
@@ -48,6 +53,7 @@ class ReservationPersistenceIntegrationTest {
             .withDatabaseName("vetautet");
 
     private static final AtomicLong IDS = new AtomicLong(800_000L);
+    private static final long TEST_ITEM_ID_FLOOR = 800_000L;
     private static EntityManagerFactory entityManagerFactory;
     private static JdbcTemplate jdbc;
 
@@ -69,9 +75,20 @@ class ReservationPersistenceIntegrationTest {
         factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
         Properties properties = new Properties();
         properties.setProperty("hibernate.hbm2ddl.auto", "none");
+        properties.setProperty("hibernate.jdbc.time_zone", "UTC");
         factory.setJpaProperties(properties);
         factory.afterPropertiesSet();
         entityManagerFactory = factory.getObject();
+    }
+
+    @BeforeEach
+    void clearFixtureRows() {
+        jdbc.update("DELETE FROM reservation_order WHERE ticket_item_id >= ?", TEST_ITEM_ID_FLOOR);
+        jdbc.update("DELETE FROM inventory_operation_journal WHERE ticket_item_id >= ?", TEST_ITEM_ID_FLOOR);
+        jdbc.update("DELETE FROM inventory_repair_journal WHERE ticket_item_id >= ?", TEST_ITEM_ID_FLOOR);
+        jdbc.update("DELETE FROM inventory_reservation WHERE ticket_item_id >= ?", TEST_ITEM_ID_FLOOR);
+        jdbc.update("DELETE FROM inventory_stock_account WHERE ticket_item_id >= ?", TEST_ITEM_ID_FLOOR);
+        jdbc.update("DELETE FROM ticket_item WHERE id >= ?", TEST_ITEM_ID_FLOOR);
     }
 
     @AfterAll
@@ -109,7 +126,7 @@ class ReservationPersistenceIntegrationTest {
     }
 
     @Test
-    void oneOfConcurrentConfirmAndExpireTransitionsWins() throws Exception {
+    void confirmWinsWhileExpiryIsStillEarlyEvenWhenBothTransitionsRace() throws Exception {
         long ticketItemId = seedStock(10);
         UUID reservationId = UUID.randomUUID();
         insertReservation(reservationId, ticketItemId, 1, ReservationStatus.RESERVED,
@@ -120,6 +137,8 @@ class ReservationPersistenceIntegrationTest {
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
+        boolean confirmWon = false;
+        boolean expireWon = false;
         try {
             Future<Optional<Reservation>> confirm = executor.submit(() -> transitionAfter(start, ready,
                     reservationId, ReservationStatus.CONFIRMED, ticketItemId));
@@ -128,8 +147,8 @@ class ReservationPersistenceIntegrationTest {
             ready.await();
             start.countDown();
 
-            boolean confirmWon = confirm.get().isPresent();
-            boolean expireWon = expire.get().isPresent();
+            confirmWon = confirm.get().isPresent();
+            expireWon = expire.get().isPresent();
             assertThat(confirmWon ^ expireWon).isTrue();
         } finally {
             executor.shutdownNow();
@@ -137,7 +156,86 @@ class ReservationPersistenceIntegrationTest {
 
         Reservation persisted = inTransaction(entityManager -> reservation(entityManager)
                 .findById(reservationId)).orElseThrow();
-        assertThat(persisted.status()).isIn(ReservationStatus.CONFIRMED, ReservationStatus.EXPIRED);
+        assertThat(confirmWon).isTrue();
+        assertThat(expireWon).isFalse();
+        assertThat(persisted.status()).isEqualTo(ReservationStatus.CONFIRMED);
+    }
+
+    @Test
+    void databaseTimeTreatsExpiryEqualityAsExpiredAndRestoresTheHeldStock() {
+        long ticketItemId = seedStock(10);
+        UUID reservationId = UUID.randomUUID();
+        insertReservation(reservationId, ticketItemId, 2, ReservationStatus.RESERVED,
+                Instant.now().plusSeconds(120));
+        assertThat((Boolean) inTransaction(entityManager -> inventory(entityManager)
+                .decrementIfAvailable(ticketItemId, 2, 0L))).isTrue();
+        jdbc.update("UPDATE inventory_reservation SET expires_at = UTC_TIMESTAMP(6) WHERE id = UUID_TO_BIN(?)",
+                reservationId.toString());
+
+        Optional<Reservation> confirmed = inTransaction(entityManager -> reservation(entityManager)
+                .transitionIfCurrent(reservationId, ReservationStatus.RESERVED, ReservationStatus.CONFIRMED,
+                        Instant.now(), 0L));
+        Optional<Reservation> expired = inTransaction(entityManager -> reservation(entityManager)
+                .transitionIfCurrent(reservationId, ReservationStatus.RESERVED, ReservationStatus.EXPIRED,
+                        Instant.now(), 0L));
+
+        assertThat(confirmed).isEmpty();
+        assertThat(expired).isPresent();
+        InventorySnapshot snapshot = inTransaction(entityManager -> inventory(entityManager)
+                .findSnapshot(ticketItemId)).orElseThrow();
+        assertThat(snapshot.available()).isEqualTo(10);
+    }
+
+    @Test
+    void confirmedReservationCreatesOneDedicatedReservationOrder() {
+        long ticketItemId = seedStock(10);
+        UUID reservationId = UUID.randomUUID();
+        insertReservation(reservationId, ticketItemId, 2, ReservationStatus.RESERVED,
+                Instant.now().plusSeconds(120));
+        assertThat((Boolean) inTransaction(entityManager -> inventory(entityManager)
+                .decrementIfAvailable(ticketItemId, 2, 0L))).isTrue();
+        Reservation confirmed = inTransaction(entityManager -> reservation(entityManager)
+                .transitionIfCurrent(reservationId, ReservationStatus.RESERVED, ReservationStatus.CONFIRMED,
+                        Instant.now(), 0L)).orElseThrow();
+
+        ReservationOrder created = inTransaction(entityManager -> reservationOrder(entityManager)
+                .create(UUID.randomUUID(), confirmed));
+        Optional<ReservationOrder> replay = inTransaction(entityManager -> reservationOrder(entityManager)
+                .findByReservationId(reservationId));
+
+        assertThat(created.reservationId()).isEqualTo(reservationId);
+        assertThat(created.ticketItemId()).isEqualTo(ticketItemId);
+        assertThat(replay).contains(created);
+    }
+
+    @Test
+    void terminalJournalRowsKeepTheirOperationTypeAndNoCreateIdentity() {
+        long ticketItemId = seedStock(10);
+        UUID reservationId = UUID.randomUUID();
+        insertReservation(reservationId, ticketItemId, 1, ReservationStatus.RESERVED,
+                Instant.now().plusSeconds(120));
+        UUID operationId = UUID.randomUUID();
+        OperationJournalRepository.JournalEntry terminal = OperationJournalRepository.JournalEntry.terminal(
+                operationId,
+                reservationId,
+                OperationJournalRepository.OperationType.RELEASE,
+                digest("deadbeef"),
+                ticketItemId,
+                1,
+                0L,
+                OperationJournalRepository.JournalState.MIRROR_PENDING);
+
+        inTransaction(entityManager -> {
+            journal(entityManager).recordTerminal(terminal);
+            return null;
+        });
+        OperationJournalRepository.JournalEntry stored = inTransaction(entityManager -> journal(entityManager)
+                .findByOperationId(operationId)).orElseThrow();
+
+        assertThat(stored.operationType()).isEqualTo(OperationJournalRepository.OperationType.RELEASE);
+        assertThat(stored.state()).isEqualTo(OperationJournalRepository.JournalState.MIRROR_PENDING);
+        assertThat(stored.demoActorId()).isNull();
+        assertThat(stored.idempotencyKeyHash()).isNull();
     }
 
     @Test
@@ -266,6 +364,10 @@ class ReservationPersistenceIntegrationTest {
 
     private static JpaOperationJournalRepositoryAdapter journal(EntityManager entityManager) {
         return new JpaOperationJournalRepositoryAdapter(entityManager);
+    }
+
+    private static JpaReservationOrderRepositoryAdapter reservationOrder(EntityManager entityManager) {
+        return new JpaReservationOrderRepositoryAdapter(entityManager);
     }
 
     private static long seedStock(int stock) {

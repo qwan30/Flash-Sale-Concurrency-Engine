@@ -98,19 +98,6 @@ public class CreateReservationService {
                     null);
         }
 
-        Optional<String> admissionState = inventory.findAdmissionState(command.ticketItemId());
-        if (admissionState.isPresent() && !"OPEN".equals(admissionState.orElseThrow())) {
-            return result(
-                    CreateReservationResult.Outcome.PROCESSING,
-                    operationId,
-                    reservationId,
-                    null,
-                    null,
-                    OperationJournalRepository.JournalState.REPAIR_REQUIRED,
-                    "REPAIR_REQUIRED",
-                    null);
-        }
-
         OperationJournalRepository.JournalEntry candidate = new OperationJournalRepository.JournalEntry(
                 operationId,
                 reservationId,
@@ -131,20 +118,13 @@ public class CreateReservationService {
             return replayClaim(command, claimed, requestFingerprint);
         }
 
-        transitionInNewTransactionOrThrow(
-                operationId,
-                OperationJournalRepository.JournalState.RECEIVED,
-                OperationJournalRepository.JournalState.REDIS_APPLYING,
-                "REDIS_APPLYING",
-                null);
         ReservationStockPort.RedisApplyResult applied = stock.applyOnce(
                 operationId,
                 command.ticketItemId(),
                 command.quantity(),
                 fence.getAsLong());
         if (applied.status() == ReservationStockPort.RedisApplyResult.Status.SOLD_OUT) {
-            persistRejected(operationId, OperationJournalRepository.JournalState.REDIS_APPLYING,
-                    "SOLD_OUT", applied.stockAfter());
+            persistRejected(operationId, "SOLD_OUT", applied.stockAfter());
             return result(
                     CreateReservationResult.Outcome.SOLD_OUT,
                     operationId,
@@ -156,8 +136,7 @@ public class CreateReservationService {
                     applied.stockAfter());
         }
         if (applied.status() == ReservationStockPort.RedisApplyResult.Status.STALE_FENCE) {
-            persistRejected(operationId, OperationJournalRepository.JournalState.REDIS_APPLYING,
-                    "FENCE_STALE", null);
+            persistRejected(operationId, "FENCE_STALE", null);
             return result(
                     CreateReservationResult.Outcome.FENCE_STALE,
                     operationId,
@@ -169,8 +148,7 @@ public class CreateReservationService {
                     null);
         }
         if (applied.status() == ReservationStockPort.RedisApplyResult.Status.CONFLICT) {
-            persistRejected(operationId, OperationJournalRepository.JournalState.REDIS_APPLYING,
-                    "CONFLICT", null);
+            persistRejected(operationId, "CONFLICT", null);
             return result(
                     CreateReservationResult.Outcome.CONFLICT,
                     operationId,
@@ -185,7 +163,7 @@ public class CreateReservationService {
         faults.hit(FaultInjectionPort.FaultPoint.AFTER_REDIS_BEFORE_DB, operationId);
         transitionInNewTransactionOrThrow(
                 operationId,
-                OperationJournalRepository.JournalState.REDIS_APPLYING,
+                OperationJournalRepository.JournalState.RECEIVED,
                 OperationJournalRepository.JournalState.REDIS_APPLIED,
                 "REDIS_APPLIED",
                 applied.stockAfter());
@@ -270,14 +248,6 @@ public class CreateReservationService {
             UUID reservationId,
             long fenceVersion
     ) {
-        Optional<CreateReservationResult> committed = reconcileDurableReservation(
-                command,
-                operationId,
-                reservationId);
-        if (committed.isPresent()) {
-            return committed.orElseThrow();
-        }
-
         try {
             ReservationStockPort.RedisCompensationResult compensation = stock.compensateOnce(
                     operationId,
@@ -323,27 +293,6 @@ public class CreateReservationService {
                 null);
     }
 
-    private Optional<CreateReservationResult> reconcileDurableReservation(
-            CreateReservationCommand command,
-            UUID operationId,
-            UUID reservationId
-    ) {
-        Optional<Reservation> persisted = reservations.findById(reservationId);
-        if (persisted.isEmpty()) {
-            return Optional.empty();
-        }
-        InventorySnapshot snapshot = inventory.findSnapshot(command.ticketItemId()).orElse(null);
-        return Optional.of(result(
-                CreateReservationResult.Outcome.NEW,
-                operationId,
-                reservationId,
-                persisted.orElseThrow(),
-                snapshot,
-                OperationJournalRepository.JournalState.COMMITTED,
-                "NEW",
-                snapshot == null ? null : snapshot.available()));
-    }
-
     private CreateReservationResult replayClaim(
             CreateReservationCommand command,
             OperationJournalRepository.JournalEntry claimed,
@@ -381,7 +330,7 @@ public class CreateReservationService {
                     Optional.of(claimed.state()),
                     "REPAIR_REQUIRED",
                     null);
-            case RECEIVED, REDIS_APPLYING, REDIS_APPLIED, COMPENSATION_PENDING, MIRROR_PENDING -> resultWithState(
+            case RECEIVED, REDIS_APPLIED, COMPENSATION_PENDING, MIRROR_PENDING -> resultWithState(
                     CreateReservationResult.Outcome.PROCESSING,
                     claimed.operationId(),
                     claimed.reservationId(),
@@ -423,15 +372,10 @@ public class CreateReservationService {
                 claimed.resultStockAfter());
     }
 
-    private void persistRejected(
-            UUID operationId,
-            OperationJournalRepository.JournalState expectedState,
-            String code,
-            Integer stockAfter
-    ) {
+    private void persistRejected(UUID operationId, String code, Integer stockAfter) {
         transitionInNewTransactionOrThrow(
                 operationId,
-                expectedState,
+                OperationJournalRepository.JournalState.RECEIVED,
                 OperationJournalRepository.JournalState.REJECTED,
                 code,
                 stockAfter);
@@ -545,7 +489,7 @@ public class CreateReservationService {
     private record DatabaseCommit(Reservation reservation, InventorySnapshot snapshot) {
     }
 
-    record ReservationCreatedPayload(
+    private record ReservationCreatedPayload(
             UUID reservationId,
             long ticketItemId,
             UUID demoActorId,
