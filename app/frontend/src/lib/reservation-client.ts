@@ -339,10 +339,10 @@ export function createReservation(
   );
 }
 
-export function getReservation(reservationId: string) {
+export function getReservation(reservationId: string, signal?: AbortSignal) {
   return request<ReservationResponse | ReservationProcessingResponse>(
     `/api/v1/reservations/${encodeURIComponent(reservationId)}`,
-    { method: "GET" },
+    { method: "GET", signal },
     (status, body) => parseReservationResult(status, body, [200, 202], true),
   );
 }
@@ -355,10 +355,10 @@ export function confirmReservation(reservationId: string) {
   );
 }
 
-export function releaseReservation(reservationId: string) {
+export function releaseReservation(reservationId: string, signal?: AbortSignal) {
   return request<ReservationResponse | ReservationProcessingResponse>(
     `/api/v1/reservations/${encodeURIComponent(reservationId)}/release`,
-    { method: "POST" },
+    { method: "POST", signal },
     (status, body) => parseReservationResult(status, body, [200, 202], true),
   );
 }
