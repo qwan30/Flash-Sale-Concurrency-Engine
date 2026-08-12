@@ -1,0 +1,14 @@
+{
+  "surface": "pending-browser-execution",
+  "browser": "chrome",
+  "targetSha": "",
+  "controls": [
+    { "id": "btn-reserve", "status": "PENDING" }
+  ],
+  "requiredResult": {
+    "passPercent": 100,
+    "unexpectedConsoleErrors": 0,
+    "unexpectedNetworkFailures": 0
+  },
+  "verdict": "PENDING"
+}

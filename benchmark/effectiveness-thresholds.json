@@ -1,0 +1,25 @@
+{
+  "correctness": {
+    "maxOversoldUnits": 0,
+    "maxNegativeStockObservations": 0,
+    "maxDuplicateReservations": 0,
+    "maxDuplicateOrders": 0,
+    "maxFinalDriftUnits": 0
+  },
+  "recovery": {
+    "maxConvergenceSeconds": 30,
+    "maxPendingJournalAfterConvergence": 0,
+    "maxPendingOutboxAfterConvergence": 0
+  },
+  "performance": {
+    "maxHealthyP95RegressionPercent": 20,
+    "minTerminalSuccessPercentDuringCreateFlood": 99,
+    "minTerminalCoveragePercent": 100,
+    "maxUnexpectedHttpFailurePercent": 0
+  },
+  "ui": {
+    "requiredControlPassPercent": 100,
+    "maxUnexpectedConsoleErrors": 0,
+    "maxUnexpectedNetworkFailures": 0
+  }
+}

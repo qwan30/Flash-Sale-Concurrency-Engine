@@ -1,0 +1,9 @@
+{
+  "evidence": {
+    "invariantPass": true,
+    "parityPass": true,
+    "finalDriftUnits": 0,
+    "pendingJournal": 0,
+    "pendingOutbox": 0
+  }
+}
