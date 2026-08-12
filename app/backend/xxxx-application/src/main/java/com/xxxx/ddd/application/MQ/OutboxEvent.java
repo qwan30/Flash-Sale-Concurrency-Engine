@@ -66,6 +66,12 @@ public class OutboxEvent {
     @Column(name = "next_attempt_at")
     private Instant nextAttemptAt;
 
+    @Column(name = "lease_owner", length = 64)
+    private String leaseOwner;
+
+    @Column(name = "lease_until")
+    private Instant leaseUntil;
+
     public OutboxEvent(String id, String aggregateType, String aggregateId,
                        String eventType, int eventVersion, String payload) {
         this.id = id;
@@ -85,6 +91,8 @@ public class OutboxEvent {
         this.status = OutboxStatus.PUBLISHED;
         this.publishedAt = now;
         this.failureMessage = null;
+        this.leaseOwner = null;
+        this.leaseUntil = null;
     }
 
     /**
@@ -100,6 +108,8 @@ public class OutboxEvent {
         } else {
             this.nextAttemptAt = null;
         }
+        this.leaseOwner = null;
+        this.leaseUntil = null;
     }
 
     /**
@@ -109,5 +119,7 @@ public class OutboxEvent {
         this.status = OutboxStatus.PENDING;
         this.failureMessage = null;
         this.nextAttemptAt = null;
+        this.leaseOwner = null;
+        this.leaseUntil = null;
     }
 }
