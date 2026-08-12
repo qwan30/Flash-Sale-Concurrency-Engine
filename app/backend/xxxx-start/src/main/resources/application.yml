@@ -96,6 +96,19 @@ resilience4j:
         timeoutDuration: 0
         registerHealthIndicator: true
         eventConsumerBufferSize: 100
+      reservationCreate:
+        limitForPeriod: 40
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+
+  bulkhead:
+    instances:
+      reservationCreate:
+        maxConcurrentCalls: 4
+        maxWaitDuration: 0
+      reservationTerminal:
+        maxConcurrentCalls: 2
+        maxWaitDuration: 100ms
 
 management:
   health:
