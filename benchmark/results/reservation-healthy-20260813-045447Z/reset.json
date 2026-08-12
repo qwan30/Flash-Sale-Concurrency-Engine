@@ -1,0 +1,20 @@
+﻿{
+    "success":  true,
+    "message":  "success",
+    "code":  200,
+    "timestamp":  1786596888286,
+    "result":  {
+                   "success":  true,
+                   "reservationFixtureReset":  true,
+                   "ticketItemId":  950015,
+                   "stock":  10,
+                   "reservationStockAfter":  10,
+                   "reservationRedisStockAfter":  10,
+                   "reserved":  0,
+                   "confirmed":  0,
+                   "fenceVersion":  0,
+                   "admissionState":  "OPEN",
+                   "strategy":  "REDIS_FIRST",
+                   "message":  "Reservation fixture reset"
+               }
+}

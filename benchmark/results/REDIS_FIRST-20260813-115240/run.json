@@ -1,0 +1,79 @@
+﻿{
+    "summary":  {
+                    "runId":  "REDIS_FIRST-20260813-115240",
+                    "date":  "2026-08-13",
+                    "machine":  "ACER",
+                    "strategy":  "REDIS_FIRST",
+                    "totalRequests":  10,
+                    "concurrency":  10,
+                    "throughput":  2.27,
+                    "averageMs":  15,
+                    "p95Ms":  66,
+                    "p99Ms":  66,
+                    "successOrders":  0,
+                    "failedOrders":  10,
+                    "oversoldCount":  0,
+                    "redisStockAfter":  0,
+                    "dbStockAfter":  0,
+                    "dbOrderCount":  0,
+                    "redisDbInconsistencyCount":  0,
+                    "status":  "PASS"
+                },
+    "reset":  {
+                  "success":  true,
+                  "message":  "success",
+                  "code":  200,
+                  "timestamp":  1786596761146,
+                  "result":  {
+                                 "success":  true,
+                                 "message":  "Benchmark data reset",
+                                 "ticketItemId":  4,
+                                 "stock":  10,
+                                 "yearMonth":  "202608",
+                                 "redisStockAfter":  10,
+                                 "dbStockAfter":  0,
+                                 "dbOrderCount":  0
+                             }
+              },
+    "warmup":  {
+                   "success":  true,
+                   "message":  "success",
+                   "code":  200,
+                   "timestamp":  1786596761180,
+                   "result":  {
+                                  "success":  true,
+                                  "code":  "SUCCESS",
+                                  "message":  "Redis stock warmed from database",
+                                  "orderNumber":  null,
+                                  "strategy":  null,
+                                  "ticketItemId":  4,
+                                  "userId":  null,
+                                  "quantity":  null,
+                                  "redisStockAfter":  0,
+                                  "dbStockAfter":  0
+                              }
+               },
+    "consistency":  {
+                        "success":  true,
+                        "message":  "success",
+                        "code":  200,
+                        "timestamp":  1786596770495,
+                        "result":  {
+                                       "ticketItemId":  4,
+                                       "yearMonth":  "202608",
+                                       "redisStockAfter":  0,
+                                       "dbStockAfter":  0,
+                                       "dbOrderCount":  0,
+                                       "oversoldCount":  0,
+                                       "redisDbInconsistencyCount":  0,
+                                       "initialStock":  0,
+                                       "expectedRedisStock":  0,
+                                       "driftAmount":  0
+                                   }
+                    },
+    "artifacts":  {
+                      "jtl":  "results.jtl",
+                      "html":  "html/index.html",
+                      "summary":  "summary-row.md"
+                  }
+}

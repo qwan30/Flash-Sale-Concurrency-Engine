@@ -1,0 +1,40 @@
+{
+  "name": "flash-sale-reservation-reliability",
+  "version": 1,
+  "api": "/api/v1/reservations",
+  "baseUrl": "http://localhost:1122",
+  "fixture": {
+    "ticketItemId": 950015,
+    "stock": 1000,
+    "reservationTtlSeconds": 120
+  },
+  "threads": 100,
+  "attempts": 5000,
+  "quantityDistribution": [1, 1, 1, 2, 2, 3, 4],
+  "createLimitPerSecondPerInstance": 40,
+  "scenarios": ["healthy", "duplicate-retry", "overload", "kafka-recovery"],
+  "correlation": {
+    "actorHeader": "X-Demo-Actor-Id",
+    "idempotencyHeader": "Idempotency-Key",
+    "traceHeader": "traceparent",
+    "syntheticHeader": "X-Flashsale-Synthetic",
+    "fixtureResetTokenHeader": "X-Flashsale-Fixture-Token"
+  },
+  "artifacts": [
+    "reset.json",
+    "manifest.json",
+    "git.json",
+    "environment.json",
+    "fault-timeline.json",
+    "results.jtl",
+    "html/index.html",
+    "consistency.json",
+    "convergence.json",
+    "consistency.json.sha256",
+    "convergence.json.sha256",
+    "metrics.json",
+    "metrics.json.sha256",
+    "ui.json",
+    "summary.md"
+  ]
+}

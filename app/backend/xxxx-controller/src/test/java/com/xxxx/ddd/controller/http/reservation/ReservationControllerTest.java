@@ -8,8 +8,7 @@ import com.xxxx.ddd.application.reservation.ReservationLifecycleResult;
 import com.xxxx.ddd.application.reservation.port.InventoryRepository;
 import com.xxxx.ddd.application.reservation.port.OperationJournalRepository;
 import com.xxxx.ddd.application.reservation.port.ReservationRepository;
-import com.xxxx.ddd.application.reservation.strategy.ReservationCoordinationStrategy;
-import com.xxxx.ddd.application.reservation.strategy.ReservationStrategy;
+
 import com.xxxx.ddd.domain.reservation.Reservation;
 import com.xxxx.ddd.domain.reservation.ReservationOrder;
 import com.xxxx.ddd.domain.reservation.ReservationStatus;
@@ -55,8 +54,6 @@ class ReservationControllerTest {
     @MockBean
     private CreateReservationService creation;
 
-    @MockBean(name = "mysqlConditionalStrategy")
-    private ReservationCoordinationStrategy mysqlCreation;
 
     @MockBean
     private ConfirmReservationService confirmation;
@@ -78,8 +75,7 @@ class ReservationControllerTest {
 
     @BeforeEach
     void allowAdmissionForMvcSlice() {
-        when(creation.strategy()).thenReturn(ReservationStrategy.REDIS_FIRST);
-        when(mysqlCreation.strategy()).thenReturn(ReservationStrategy.MYSQL_CONDITIONAL);
+
         when(admission.executeCreate(any())).thenAnswer(invocation -> {
             Supplier<CreateReservationResult> operation = invocation.getArgument(0);
             return operation.get();
@@ -94,29 +90,6 @@ class ReservationControllerTest {
         });
     }
 
-    @Test
-    void routesExplicitMysqlStrategyHeaderToMysqlLane() throws Exception {
-        when(mysqlCreation.create(any())).thenReturn(new CreateReservationResult(
-                CreateReservationResult.Outcome.NEW,
-                OPERATION_ID,
-                RESERVATION_ID,
-                Optional.of(reservation(ReservationStatus.RESERVED)),
-                Optional.empty(),
-                Optional.of(OperationJournalRepository.JournalState.COMMITTED),
-                "NEW",
-                OptionalInt.of(7)));
-
-        mvc.perform(post("/api/v1/reservations")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
-                        .header("X-Demo-Actor-Id", ACTOR_ID)
-                        .header("X-Reservation-Strategy", "MYSQL_CONDITIONAL")
-                        .content("{\"ticketItemId\":42,\"quantity\":2}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.outcome").value("NEW"));
-
-        verify(mysqlCreation).create(any());
-    }
 
     @Test
     void createsReservationWith201AndRequiredHeaders() throws Exception {

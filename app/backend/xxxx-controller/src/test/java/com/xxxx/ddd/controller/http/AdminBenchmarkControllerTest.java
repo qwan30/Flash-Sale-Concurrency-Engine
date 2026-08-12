@@ -8,8 +8,10 @@ import com.xxxx.ddd.application.model.order.ConsistencySnapshot;
 import com.xxxx.ddd.application.model.order.CreateOrderResponse;
 import com.xxxx.ddd.application.model.order.OrderStrategy;
 import com.xxxx.ddd.application.service.benchmark.BenchmarkRunService;
+import com.xxxx.ddd.application.service.reservation.ReservationFixtureService;
 import com.xxxx.ddd.application.service.order.OrderReconciliationService;
 import com.xxxx.ddd.application.service.order.TicketOrderAppService;
+import com.xxxx.ddd.application.reservation.ReservationFixtureResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,13 +48,83 @@ class AdminBenchmarkControllerTest {
     @Mock
     private OrderReconciliationService orderReconciliationService;
 
+    @Mock
+    private ReservationFixtureService reservationFixtureService;
+
     @BeforeEach
     void setUp() {
         AdminBenchmarkController controller = new AdminBenchmarkController();
         ReflectionTestUtils.setField(controller, "ticketOrderAppService", ticketOrderAppService);
         ReflectionTestUtils.setField(controller, "benchmarkRunService", benchmarkRunService);
         ReflectionTestUtils.setField(controller, "orderReconciliationService", orderReconciliationService);
+        ReflectionTestUtils.setField(controller, "reservationFixtureService", reservationFixtureService);
+        ReflectionTestUtils.setField(controller, "fixtureResetToken", "test-fixture-token");
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+    }
+
+    @Test
+    void reservationFixtureResetReturnsDurableAndRedisProof() throws Exception {
+        when(reservationFixtureService.reset(any())).thenReturn(
+                ReservationFixtureResult.success(950015L, 1000, 0, "OPEN")
+        );
+
+        mockMvc.perform(post("/admin/reservation-fixtures/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Flashsale-Synthetic", "true")
+                        .header("X-Flashsale-Fixture-Token", "test-fixture-token")
+                        .content("""
+                                {
+                                  "ticketItemId": 950015,
+                                  "stock": 1000,
+                                  "strategy": "REDIS_LUA_WITH_COMPENSATION",
+                                  "reservationFixture": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.success").value(true))
+                .andExpect(jsonPath("$.result.reservationFixtureReset").value(true))
+                .andExpect(jsonPath("$.result.reservationStockAfter").value(1000))
+                .andExpect(jsonPath("$.result.reservationRedisStockAfter").value(1000))
+                .andExpect(jsonPath("$.result.admissionState").value("OPEN"));
+    }
+
+    @Test
+    void reservationFixtureResetReturnsServiceUnavailableWhenParityProofFails() throws Exception {
+        when(reservationFixtureService.reset(any())).thenReturn(
+                ReservationFixtureResult.failed(
+                        950015L,
+                        1000,
+                        "REDIS_FIRST",
+                        "Durable and Redis reservation fixture state diverged"));
+
+        mockMvc.perform(post("/admin/reservation-fixtures/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Flashsale-Synthetic", "true")
+                        .header("X-Flashsale-Fixture-Token", "test-fixture-token")
+                        .content("""
+                                {
+                                  "ticketItemId": 950015,
+                                  "stock": 1000,
+                                  "strategy": "REDIS_FIRST",
+                                  "reservationFixture": true
+                                }
+                                """))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void reservationFixtureResetRequiresSyntheticHeader() throws Exception {
+        mockMvc.perform(post("/admin/reservation-fixtures/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "ticketItemId": 950015,
+                                  "stock": 1000,
+                                  "strategy": "REDIS_FIRST",
+                                  "reservationFixture": true
+                                }
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     @Test

@@ -62,7 +62,7 @@ public class ReservationController {
     @PostMapping("/reservations")
     public ResponseEntity<?> create(
             @Valid @RequestBody CreateReservationRequest request,
-            @RequestHeader("Idempotency-Key") UUID idempotencyKey,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestHeader("X-Demo-Actor-Id") UUID demoActorId,
             @RequestHeader(value = "X-Reservation-Strategy", defaultValue = "REDIS_FIRST") String strategyName,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId
