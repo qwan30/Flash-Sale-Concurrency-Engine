@@ -1256,7 +1256,7 @@ docker compose -f environment/docker-compose-dev.yml --profile observability con
 
 Expected: rendered Compose config contains the dashboard mount with no schema error.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```powershell
 git add -- environment/grafana
