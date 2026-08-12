@@ -1120,7 +1120,7 @@ resilience4j:
 
 Rate limiter rejection → 429. Bulkhead/dependency saturation → 503. Both include `Retry-After: 1`.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=ReservationAdmissionIntegrationTest test
