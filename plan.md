@@ -1172,7 +1172,7 @@ Network partition tests must first assert the Toxiproxy control endpoint and con
 
 Each scenario must end with no negative stock, invariant true, no duplicate order and pending recovery/outbox equal to zero within 30 seconds after dependency recovery.
 
-- [ ] **Step 5: Run and commit**
+- [x] **Step 5: Run and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=ReservationChaosIntegrationTest test
