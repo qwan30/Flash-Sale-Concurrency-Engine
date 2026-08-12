@@ -1223,7 +1223,7 @@ flashsale.outbox.publish
 
 For each metric/span document unit, bounded attributes, emission point and portfolio interpretation. This adapts OTel Demo's schema-first approach without migrating from Brave.
 
-- [ ] **Step 4: Run and commit**
+- [x] **Step 4: Run and commit**
 
 ```powershell
 mvn.cmd -pl app/backend/xxxx-start -Dtest=ReservationTelemetryTest test
