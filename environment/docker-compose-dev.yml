@@ -88,6 +88,8 @@ services:
 
     volumes:
       - ./grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "3000:3000"
     networks:
@@ -198,7 +200,7 @@ services:
     image: alxrem/prometheus-logstash-exporter
     container_name: pre-event-logstash-exporter
     command: ["-logstash.host", "logstash"]
-    profiles: ["observability"]
+    profiles: ["elk"]
     environment:
       LOGSTASH_URI: "http://logstash:9600"
     ports:

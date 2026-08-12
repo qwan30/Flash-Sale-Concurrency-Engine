@@ -5,7 +5,7 @@
 | Method | Route | 2xx result and response body | 4xx/5xx result |
 |---|---|---|---|
 | `POST` | `/api/v1/reservations` | `201` with `ReservationResponse` for a new `RESERVED`; `200` for a same-fingerprint replay, including a persisted bounded `REJECTED` or `COMPENSATED` outcome; `202` with `ReservationProcessingResponse` only while the journal-backed operation is recoverable | `400` validation; `409` for a new sold-out/fence-stale result or idempotency conflict; `429` rate limit; `503` saturation/dependency |
-| `GET` | `/api/v1/reservations/{reservationId}` | `202` with `ReservationProcessingResponse` whenever the journal is `RECEIVED`, `REDIS_APPLIED`, `COMPENSATION_PENDING`, or `MIRROR_PENDING`; otherwise `200` with `ReservationResponse` for a durable reservation in `RESERVED`, `CONFIRMED`, `RELEASED`, or `EXPIRED` | `409` with the persisted bounded result for `REJECTED` or `COMPENSATED`; `404` only when neither a reservation nor journal row exists; `503` with `Retry-After` for `REPAIR_REQUIRED` |
+| `GET` | `/api/v1/reservations/{reservationId}` | `202` with `ReservationProcessingResponse` whenever the journal is `RECEIVED`, `REDIS_APPLYING`, `REDIS_APPLIED`, `COMPENSATION_PENDING`, or `MIRROR_PENDING`; otherwise `200` with `ReservationResponse` for a durable reservation in `RESERVED`, `CONFIRMED`, `RELEASED`, or `EXPIRED` | `409` with the persisted bounded result for `REJECTED` or `COMPENSATED`; `404` only when neither a reservation nor journal row exists; `503` with `Retry-After` for `REPAIR_REQUIRED` |
 | `POST` | `/api/v1/reservations/{reservationId}/confirm` | `200` with the confirmed reservation and one order; duplicate confirm replays the same order | `400` malformed request; `404` missing reservation; `409` expired/late or illegal transition; `429`/`503` admission/dependency rejection |
 | `POST` | `/api/v1/reservations/{reservationId}/release` | `200` with the released reservation; duplicate release replays the state without another increment | `400` malformed request; `404` missing reservation; `409` illegal transition; `429`/`503` admission/dependency rejection |
 | `GET` | `/api/v1/inventory/{ticketItemId}` | `200` with available, reserved, confirmed, initial, and convergence state | `404` unknown ticket item; `503` when the durable snapshot cannot be read |
@@ -44,6 +44,7 @@ The database conditional update is the winner for confirm-versus-expire and dupl
 | State | Meaning | Retry disposition |
 |---|---|---|
 | `RECEIVED` | durable request/operation claim exists | apply or inspect Redis token |
+| `REDIS_APPLYING` | Redis mutation may be in flight after a durable marker | inspect the operation token; missing or invalid evidence enters `REPAIR_REQUIRED` |
 | `REJECTED` | durable non-retryable result such as sold out or stale fence | replay the stored bounded result; never retry Redis |
 | `REDIS_APPLIED` | Redis accepted the operation | finalize database or compensate |
 | `COMMITTED` | reservation and outbox are durable | replay response/mirror |

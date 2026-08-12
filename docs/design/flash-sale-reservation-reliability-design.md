@@ -13,6 +13,8 @@ validate request, generate operation/reservation IDs, and derive SHA-256 fingerp
         |
 durably claim actor + idempotency hash in operation journal (RECEIVED)
         |
+durably mark the Redis mutation as in-flight (REDIS_APPLYING)
+        |
 Redis Lua apply-once using operationId and stock key
         |-- SOLD_OUT -> persist REJECTED(SOLD_OUT, stockAfter) and return bounded result
         |-- STALE_FENCE -> persist REJECTED(FENCE_STALE, stockAfter=null) and return bounded result
@@ -54,7 +56,8 @@ Recovery workers claim journal rows with a 30-second lease, batch size 50, retry
 
 | Durable/journal observation | Recovery action |
 |---|---|
-| `RECEIVED` with no Redis operation token | Retry `applyOnce` |
+| `RECEIVED` with no Redis operation token | Mark `REDIS_APPLYING`, then retry `applyOnce` |
+| `REDIS_APPLYING` with no Redis operation token | Enter `REPAIR_REQUIRED`; do not retry an ambiguous mutation |
 | `RECEIVED` with a stale fence | Persist `REJECTED(FENCE_STALE, stockAfter=null)` and do not retry |
 | `RECEIVED` with an `APPLIED` Redis token | Finalize the MySQL reservation or compensate |
 | `REDIS_APPLIED` with no reservation | Finalize the MySQL reservation or compensate |

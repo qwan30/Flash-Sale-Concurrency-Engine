@@ -33,6 +33,10 @@ const DYNAMIC_ALLOWED_BACKEND_ROUTES: Array<{ method: string; pattern: RegExp }>
   { method: "POST", pattern: /^admin\/tickets\/\d+\/stock\/warmup$/ },
   { method: "GET", pattern: /^admin\/benchmarks\/runs\/[A-Za-z0-9_.-]+$/ },
   { method: "GET", pattern: /^orders\/[^/]+$/ },
+  { method: "POST", pattern: /^api\/v1\/reservations$/ },
+  { method: "GET", pattern: /^api\/v1\/reservations\/[0-9a-fA-F-]{36}$/ },
+  { method: "POST", pattern: /^api\/v1\/reservations\/[0-9a-fA-F-]{36}\/(confirm|release)$/ },
+  { method: "GET", pattern: /^api\/v1\/inventory\/\d+$/ },
 ];
 
 function isAllowedBackendRoute(method: string, path: string[]) {

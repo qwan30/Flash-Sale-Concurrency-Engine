@@ -78,3 +78,7 @@ benchmark/results/**
 !benchmark/results/*/reset.json
 !benchmark/results/*/warmup.json
 !benchmark/results/*/run.json
+
+target-effective-pom
+.env
+.env

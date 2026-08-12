@@ -1343,7 +1343,7 @@ Show Available, Reserved and Confirmed buckets plus a 120-second countdown. Time
 
 Keep benchmark and consistency pages, but link them under “Engineering Evidence” rather than placing them in the primary customer journey.
 
-- [ ] **Step 5: Run UI gates and commit**
+- [x] **Step 5: Run UI gates and commit**
 
 ```powershell
 Push-Location app/frontend
@@ -1460,11 +1460,11 @@ summary.md
 ./benchmark/run-reservation-jmeter.ps1
 ```
 
-- [ ] **Step 5: Validate claims**
+- [x] **Step 5: Validate claims**
 
 Healthy p95 must not regress more than 20% versus the same-SHA pre-change baseline on the same machine/config. Correctness gates are absolute: zero oversell, zero negative stock, zero duplicate order and zero final drift.
 
-- [ ] **Step 6: Commit harness, not ad-hoc local output**
+- [x] **Step 6: Commit harness, not ad-hoc local output**
 
 ```powershell
 git add -- benchmark/flash-sale-reservation.jmx benchmark/reservation-experiment-spec.json benchmark/run-reservation-jmeter.ps1 benchmark/jmeter/README.md
@@ -1554,7 +1554,7 @@ oversold/negative/drift units
 
 Flood create at five times the configured 40 requests/second limit while issuing confirm/release traffic. Report create admission rejects, terminal success percentage, terminal p95 and maximum Hikari pending connections.
 
-- [ ] **Step 5: Run each deterministic fault measurement**
+- [x] **Step 5: Run each deterministic fault measurement**
 
 For each fault, record activation time, dependency restoration time, first healthy request time and convergence time:
 
@@ -1570,7 +1570,7 @@ CONFIRM_EXPIRE_RACE
 
 The report must contain tables for baseline versus upgraded behavior, healthy versus faulted behavior, measured improvements, regressions, threshold verdicts and raw artifact paths. Mark every number as local/environment-specific.
 
-- [ ] **Step 7: Verify measurement gate**
+- [x] **Step 7: Verify measurement gate**
 
 ```powershell
 ./benchmark/measure-reservation-effectiveness.ps1
@@ -1590,7 +1590,7 @@ Expected: exit `0` only when every correctness/recovery threshold passes. Perfor
 - Browser surface: connected Chrome through `chrome:control-chrome`; if Chrome is unavailable, use the explicitly allowed in-app browser. Record which surface/version was used.
 - Produces: one result row for every visible button, link, tab, form control and drawer action.
 
-- [ ] **Step 1: Run automated browser regression first**
+- [x] **Step 1: Run automated browser regression first**
 
 ```powershell
 Push-Location app/frontend
@@ -1600,7 +1600,7 @@ Pop-Location
 
 Expected: existing and new Playwright journeys pass before manual control inspection begins.
 
-- [ ] **Step 2: Start the integrated runtime and verify readiness**
+- [x] **Step 2: Start the integrated runtime and verify readiness**
 
 ```powershell
 docker compose -f environment/docker-compose-dev.yml --profile observability up -d
@@ -1609,7 +1609,7 @@ docker compose -f environment/docker-compose-dev.yml --profile observability up 
 
 Expected: frontend, backend, MySQL, Redis, Kafka, Prometheus and Grafana health checks pass.
 
-- [ ] **Step 3: Build the control inventory before clicking**
+- [x] **Step 3: Build the control inventory before clicking**
 
 Use the selected browser to visit every public/admin page. Record each control with this schema:
 
@@ -1630,19 +1630,19 @@ Use the selected browser to visit every public/admin page. Record each control w
 
 Inventory all controls before execution so failed/hidden controls cannot disappear from the denominator.
 
-- [ ] **Step 4: Exercise every primary business control**
+- [x] **Step 4: Exercise every primary business control**
 
 At minimum verify event navigation, quantity selection, reserve, confirm, released/expired try-again, order navigation, stock refresh and the contextual CTA for every lifecycle state.
 
-- [ ] **Step 5: Exercise every scenario-drawer control**
+- [x] **Step 5: Exercise every scenario-drawer control**
 
 Verify drawer open/close plus duplicate, sold-out, overload and expiry scenarios. Each action must produce the expected backend request/status, visible state, timeline event and stock buckets; a client-only simulated success is a failure.
 
-- [ ] **Step 6: Exercise every Engineering Evidence/admin control**
+- [x] **Step 6: Exercise every Engineering Evidence/admin control**
 
 Verify navigation links, tabs, refresh controls, benchmark start/status controls, consistency check, Redis warm/reset controls and every existing button retained after the UI reorganization. Destructive lab controls require a seeded disposable fixture and must restore it after the check.
 
-- [ ] **Step 7: Capture browser diagnostics and user-visible timings**
+- [x] **Step 7: Capture browser diagnostics and user-visible timings**
 
 For each page/state capture:
 
@@ -1660,11 +1660,11 @@ narrow viewport screenshot
 
 Expected final gate: 100% inventoried controls pass, zero unexpected console errors and zero unexpected network failures.
 
-- [ ] **Step 8: Convert browser defects into TDD fixes**
+- [x] **Step 8: Convert browser defects into TDD fixes**
 
 For every failure: first add or tighten a Playwright/component test that reproduces it, observe RED, implement the smallest fix, rerun GREEN, then repeat the exact browser action and replace failed evidence with passing evidence. Do not patch UI behavior before a reproducing test exists.
 
-- [ ] **Step 9: Write and commit the audit evidence**
+- [x] **Step 9: Write and commit the audit evidence**
 
 ```powershell
 git status --porcelain=v1
@@ -1684,7 +1684,7 @@ After this commit, perform the named strategic compact before entering compariso
 **Files:**
 - Create: `app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/reservation/strategy/ReservationCoordinationStrategy.java`
 - Create: `app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/reservation/strategy/ReservationStrategy.java`
-- Create: `app/backend/xxxx-infrastructure/src/main/java/com/xxxx/ddd/infrastructure/reservation/mysql/MySqlConditionalReservationStrategy.java`
+- Create: `app/backend/xxxx-infrastructure/src/main/java/com/xxxx/ddd/infrastructure/reservation/mysql/LocalMySqlConditionalReservationStrategy.java`
 - Create: `benchmark/reservation-strategy-matrix.json`
 - Test: `app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/ReservationStrategyContractTest.java`
 
@@ -1699,14 +1699,14 @@ Run every strategy against duplicate, sold-out, confirm/expiry race and invarian
 
 Do not introduce one-row-per-unit or multi-warehouse in this comparison; otherwise the benchmark would compare data models rather than coordination strategies.
 
-- [ ] **Step 3: Benchmark separately**
+- [x] **Step 3: Benchmark separately**
 
 Reset/seed before each strategy, never run both against the same live stock account, and report throughput/latency/pool pressure separately from correctness.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
-git add -- app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/reservation/strategy/ReservationCoordinationStrategy.java app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/reservation/strategy/ReservationStrategy.java app/backend/xxxx-infrastructure/src/main/java/com/xxxx/ddd/infrastructure/reservation/mysql/MySqlConditionalReservationStrategy.java app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/ReservationStrategyContractTest.java benchmark/reservation-strategy-matrix.json
+git add -- app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/reservation/strategy/ReservationCoordinationStrategy.java app/backend/xxxx-application/src/main/java/com/xxxx/ddd/application/reservation/strategy/ReservationStrategy.java app/backend/xxxx-infrastructure/src/main/java/com/xxxx/ddd/infrastructure/reservation/mysql/LocalMySqlConditionalReservationStrategy.java app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/ReservationStrategyContractTest.java benchmark/reservation-strategy-matrix.json
 git commit -m "perf: compare reservation coordination strategies"
 ```
 
@@ -1745,11 +1745,11 @@ cardinality controls
 layered observability Compose
 ```
 
-- [ ] **Step 4: Prove parity before switching defaults**
+- [x] **Step 4: Prove parity before switching defaults**
 
 The OTLP/k6 path must reproduce the same correctness/convergence assertions and dashboard signals as the JMeter/Micrometer path.
 
-- [ ] **Step 5: Commit as a separate reversible change**
+- [x] **Step 5: Commit as a separate reversible change**
 
 ```powershell
 git add -- environment/otel/otel-collector.yml environment/docker-compose-otel.yml benchmark/flash-sale-reservation-k6.js benchmark/run-reservation-k6.ps1 app/backend/xxxx-start/src/main/resources/application-otel.yml app/backend/xxxx-start/src/test/java/com/xxxx/ddd/integration/OtelPipelineSmokeIntegrationTest.java docs/observability/otel-migration.md
@@ -1777,7 +1777,7 @@ Separate completed phases from unexecuted phases. Do not present Phases 15 or 16
 
 For every reused unit list repository, pinned SHA, source file/function, reuse mode (`DIRECT_COPY`, `LOGIC_PORT` or `DESIGN_REFERENCE`), target symbol and tests. State explicitly that the target may reuse source under the user-confirmed permissions while the reference clones themselves remained unmodified.
 
-- [ ] **Step 3: Include exact certification evidence**
+- [x] **Step 3: Include exact certification evidence**
 
 ```text
 target Git SHA
@@ -1794,11 +1794,11 @@ console/network error counts and UI timing measurements
 known limitations: per-instance rate limit, no real auth, one ticket/one location
 ```
 
-- [ ] **Step 4: Update public and agent documentation**
+- [x] **Step 4: Update public and agent documentation**
 
 Update `README.md` only with numbers from the final same-SHA evidence directory. Update `CLAUDE.md` and `AGENTS.md` only with stable commands, branch/TDD workflow, reference-reuse policy and browser certification location; remove any superseded command or claim rather than duplicating it.
 
-- [ ] **Step 5: Run final verification**
+- [x] **Step 5: Run final verification**
 
 ```powershell
 mvn.cmd clean verify -Pflashsale-integration
@@ -1817,7 +1817,7 @@ git status --short
 
 Expected: all required gates pass, both references remain clean, and only intentional target files are staged/modified.
 
-- [ ] **Step 6: Commit final documentation with smart-commits**
+- [x] **Step 6: Commit final documentation with smart-commits**
 
 ```powershell
 git status --porcelain=v1
@@ -1830,23 +1830,23 @@ git commit -m "docs: certify flash sale reservation reliability upgrade" -m "Pub
 
 ## Final Acceptance Checklist
 
-- [ ] `/orders` regression suite and legacy benchmark behavior remain unchanged.
-- [ ] No negative stock or oversell under healthy, overloaded or fault-injected runs.
+- [x] `/orders` regression suite and legacy benchmark behavior remain unchanged.
+- [x] No negative stock or oversell under healthy, overloaded or fault-injected runs.
 - [x] Same idempotency key and payload replay the same reservation.
 - [x] Same key with another payload returns 409 without stock mutation.
 - [x] Confirm creates exactly one order; release/expire restore exactly once.
-- [ ] MySQL invariant holds per ticket after every converged run.
-- [ ] Redis/MySQL drift converges to zero within 30 seconds after recovery.
-- [ ] Create overload is rejected at admission boundary without starving terminal operations.
-- [ ] No critical integration test is skipped in CI.
-- [ ] New reservation code reaches at least 80% coverage.
+- [x] MySQL invariant holds per ticket after every converged run.
+- [x] Redis/MySQL drift converges to zero within 30 seconds after recovery.
+- [x] Create overload is rejected at admission boundary without starving terminal operations.
+- [x] No critical integration test is skipped in CI.
+- [x] New reservation code reaches at least 80% coverage.
 - [x] UI contains no login and makes the demo-only identity limitation explicit.
 - [x] Metrics contain no high-cardinality identifiers.
-- [ ] Benchmark/report claims are tied to exact SHA, environment and raw artifacts.
+- [x] Benchmark/report claims are tied to exact SHA, environment and raw artifacts.
 - [x] Both reference repositories remain unchanged at their pinned SHAs.
 - [x] Every directly copied or cross-language-ported unit has a source mapping and a target test that was observed failing before implementation.
-- [ ] Effectiveness report contains exact-SHA correctness, throughput, p50/p95/p99, admission, recovery and convergence measurements.
-- [ ] Chrome or in-app browser audit inventories and executes 100% of visible buttons, links, tabs, form controls and drawer actions.
-- [ ] Browser audit ends with 100% control pass rate, zero unexpected console errors and zero unexpected network failures.
-- [ ] `README.md` contains only final measured results; `CLAUDE.md` and `AGENTS.md` reflect any stable new workflow/verification commands without duplicating the plan.
+- [x] Effectiveness report contains exact-SHA correctness, throughput, p50/p95/p99, admission, recovery and convergence measurements.
+- [x] Chrome or in-app browser audit inventories and executes 100% of visible buttons, links, tabs, form controls and drawer actions.
+- [x] Browser audit ends with 100% control pass rate, zero unexpected console errors and zero unexpected network failures.
+- [x] `README.md` contains only final measured results; `CLAUDE.md` and `AGENTS.md` reflect any stable new workflow/verification commands without duplicating the plan.
 - [x] No Git worktree was created or used during execution.
