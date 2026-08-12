@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Flash Sale reliability
+    orgId: 1
+    folder: Flash Sale
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards
