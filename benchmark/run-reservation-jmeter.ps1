@@ -119,7 +119,7 @@ if ($Scenario -eq "kafka-recovery") {
   docker pause pre-event-kafka 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Failed to pause pre-event-kafka container." }
   $activation = (Get-Date).ToUniversalTime().ToString("o")
-  
+
   # Lên lịch phục hồi Kafka sau 15 giây chạy background
   $restoreJob = Start-Job -ScriptBlock {
     Start-Sleep -Seconds 15
@@ -167,7 +167,7 @@ if ($Scenario -eq "kafka-recovery") {
   Receive-Job -Job $restoreJob | Out-Null
   Remove-Job -Job $restoreJob
   $restoration = (Get-Date).ToUniversalTime().ToString("o")
-  
+
   $timeline = Get-Content (Join-Path $resultsDir "fault-timeline.json") -Raw | ConvertFrom-Json
   $timeline.restoration = $restoration
   Write-JsonFile (Join-Path $resultsDir "fault-timeline.json") $timeline
