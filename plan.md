@@ -1,5 +1,12 @@
 # Flash-Sale Reservation Reliability Upgrade Implementation Plan
 
+> **Certification update — 2026-08-13:** The implementation and CI gates were green on the
+> implementation/documentation commit `a10a54531dc3dc8f49ad4d284077343448abb561`; this status
+> update records that the final plan is not certified complete.
+> The remaining unchecked evidence gates below are intentional: no same-machine healthy latency
+> baseline, no complete five-fault effectiveness run/report, and no connected-browser control
+> inventory are available. Do not merge as a fully certified release until those gates pass.
+
 > **For agentic workers:** REQUIRED SUB-SKILLS: Use `ecc:using-superpowers` to select the applicable workflow skills, `ecc:executing-plans` to execute this plan task-by-task, `ecc:test-driven-development` for every product change, `ecc:requesting-code-review` at each task gate, `khuym:smart-commits` at each phase commit gate, `ecc:strategic-compact` at the named context boundaries, and `chrome:control-chrome` or the in-app browser for browser QA. Steps use checkbox (`- [ ]`) syntax for tracking. Do not create Git worktrees for this plan.
 
 **Goal:** Nâng cấp Flash-Sale Concurrency Engine thành một hệ thống reservation có lifecycle, durable idempotency, overload protection, crash recovery, deterministic chaos testing, observability và UI demo dễ hiểu; giữ nguyên `/orders` làm baseline tương thích.
@@ -1460,7 +1467,7 @@ summary.md
 ./benchmark/run-reservation-jmeter.ps1
 ```
 
-- [x] **Step 5: Validate claims**
+- [ ] **Step 5: Validate claims**
 
 Healthy p95 must not regress more than 20% versus the same-SHA pre-change baseline on the same machine/config. Correctness gates are absolute: zero oversell, zero negative stock, zero duplicate order and zero final drift.
 
@@ -1534,7 +1541,7 @@ jmeter --version
 
 Write every output to the run's `environment.json` or `versions.txt` before load begins.
 
-- [x] **Step 3: Run the healthy effectiveness workload**
+- [ ] **Step 3: Run the healthy effectiveness workload**
 
 Use identical stock, threads, attempts and quantity distribution for the historical baseline-compatible run and the reservation run. Collect:
 
@@ -1550,11 +1557,11 @@ journal state counts
 oversold/negative/drift units
 ```
 
-- [x] **Step 4: Run overload and terminal-priority measurement**
+- [ ] **Step 4: Run overload and terminal-priority measurement**
 
 Flood create at five times the configured 40 requests/second limit while issuing confirm/release traffic. Report create admission rejects, terminal success percentage, terminal p95 and maximum Hikari pending connections.
 
-- [x] **Step 5: Run each deterministic fault measurement**
+- [ ] **Step 5: Run each deterministic fault measurement**
 
 For each fault, record activation time, dependency restoration time, first healthy request time and convergence time:
 
@@ -1566,11 +1573,11 @@ KAFKA_UNAVAILABLE
 CONFIRM_EXPIRE_RACE
 ```
 
-- [x] **Step 6: Generate the effectiveness report**
+- [ ] **Step 6: Generate the effectiveness report**
 
 The report must contain tables for baseline versus upgraded behavior, healthy versus faulted behavior, measured improvements, regressions, threshold verdicts and raw artifact paths. Mark every number as local/environment-specific.
 
-- [x] **Step 7: Verify measurement gate**
+- [ ] **Step 7: Verify measurement gate**
 
 ```powershell
 ./benchmark/measure-reservation-effectiveness.ps1
@@ -1609,7 +1616,7 @@ docker compose -f environment/docker-compose-dev.yml --profile observability up 
 
 Expected: frontend, backend, MySQL, Redis, Kafka, Prometheus and Grafana health checks pass.
 
-- [x] **Step 3: Build the control inventory before clicking**
+- [ ] **Step 3: Build the control inventory before clicking**
 
 Use the selected browser to visit every public/admin page. Record each control with this schema:
 
@@ -1630,19 +1637,19 @@ Use the selected browser to visit every public/admin page. Record each control w
 
 Inventory all controls before execution so failed/hidden controls cannot disappear from the denominator.
 
-- [x] **Step 4: Exercise every primary business control**
+- [ ] **Step 4: Exercise every primary business control**
 
 At minimum verify event navigation, quantity selection, reserve, confirm, released/expired try-again, order navigation, stock refresh and the contextual CTA for every lifecycle state.
 
-- [x] **Step 5: Exercise every scenario-drawer control**
+- [ ] **Step 5: Exercise every scenario-drawer control**
 
 Verify drawer open/close plus duplicate, sold-out, overload and expiry scenarios. Each action must produce the expected backend request/status, visible state, timeline event and stock buckets; a client-only simulated success is a failure.
 
-- [x] **Step 6: Exercise every Engineering Evidence/admin control**
+- [ ] **Step 6: Exercise every Engineering Evidence/admin control**
 
 Verify navigation links, tabs, refresh controls, benchmark start/status controls, consistency check, Redis warm/reset controls and every existing button retained after the UI reorganization. Destructive lab controls require a seeded disposable fixture and must restore it after the check.
 
-- [x] **Step 7: Capture browser diagnostics and user-visible timings**
+- [ ] **Step 7: Capture browser diagnostics and user-visible timings**
 
 For each page/state capture:
 
@@ -1660,11 +1667,11 @@ narrow viewport screenshot
 
 Expected final gate: 100% inventoried controls pass, zero unexpected console errors and zero unexpected network failures.
 
-- [x] **Step 8: Convert browser defects into TDD fixes**
+- [ ] **Step 8: Convert browser defects into TDD fixes**
 
 For every failure: first add or tighten a Playwright/component test that reproduces it, observe RED, implement the smallest fix, rerun GREEN, then repeat the exact browser action and replace failed evidence with passing evidence. Do not patch UI behavior before a reproducing test exists.
 
-- [x] **Step 9: Write and commit the audit evidence**
+- [ ] **Step 9: Write and commit the audit evidence**
 
 ```powershell
 git status --porcelain=v1
@@ -1745,7 +1752,7 @@ cardinality controls
 layered observability Compose
 ```
 
-- [x] **Step 4: Prove parity before switching defaults**
+- [ ] **Step 4: Prove parity before switching defaults**
 
 The OTLP/k6 path must reproduce the same correctness/convergence assertions and dashboard signals as the JMeter/Micrometer path.
 
@@ -1777,7 +1784,7 @@ Separate completed phases from unexecuted phases. Do not present Phases 15 or 16
 
 For every reused unit list repository, pinned SHA, source file/function, reuse mode (`DIRECT_COPY`, `LOGIC_PORT` or `DESIGN_REFERENCE`), target symbol and tests. State explicitly that the target may reuse source under the user-confirmed permissions while the reference clones themselves remained unmodified.
 
-- [x] **Step 3: Include exact certification evidence**
+- [ ] **Step 3: Include exact certification evidence**
 
 ```text
 target Git SHA
@@ -1798,7 +1805,7 @@ known limitations: per-instance rate limit, no real auth, one ticket/one locatio
 
 Update `README.md` only with numbers from the final same-SHA evidence directory. Update `CLAUDE.md` and `AGENTS.md` only with stable commands, branch/TDD workflow, reference-reuse policy and browser certification location; remove any superseded command or claim rather than duplicating it.
 
-- [x] **Step 5: Run final verification**
+- [ ] **Step 5: Run final verification**
 
 ```powershell
 mvn.cmd clean verify -Pflashsale-integration
@@ -1817,7 +1824,7 @@ git status --short
 
 Expected: all required gates pass, both references remain clean, and only intentional target files are staged/modified.
 
-- [x] **Step 6: Commit final documentation with smart-commits**
+- [ ] **Step 6: Commit final documentation with smart-commits**
 
 ```powershell
 git status --porcelain=v1
@@ -1831,22 +1838,22 @@ git commit -m "docs: certify flash sale reservation reliability upgrade" -m "Pub
 ## Final Acceptance Checklist
 
 - [x] `/orders` regression suite and legacy benchmark behavior remain unchanged.
-- [x] No negative stock or oversell under healthy, overloaded or fault-injected runs.
+- [ ] No negative stock or oversell under healthy, overloaded or fault-injected runs.
 - [x] Same idempotency key and payload replay the same reservation.
 - [x] Same key with another payload returns 409 without stock mutation.
 - [x] Confirm creates exactly one order; release/expire restore exactly once.
 - [x] MySQL invariant holds per ticket after every converged run.
-- [x] Redis/MySQL drift converges to zero within 30 seconds after recovery.
+- [ ] Redis/MySQL drift converges to zero within 30 seconds after recovery.
 - [x] Create overload is rejected at admission boundary without starving terminal operations.
 - [x] No critical integration test is skipped in CI.
-- [x] New reservation code reaches at least 80% coverage.
+- [ ] New reservation code reaches at least 80% coverage.
 - [x] UI contains no login and makes the demo-only identity limitation explicit.
 - [x] Metrics contain no high-cardinality identifiers.
 - [x] Benchmark/report claims are tied to exact SHA, environment and raw artifacts.
 - [x] Both reference repositories remain unchanged at their pinned SHAs.
 - [x] Every directly copied or cross-language-ported unit has a source mapping and a target test that was observed failing before implementation.
-- [x] Effectiveness report contains exact-SHA correctness, throughput, p50/p95/p99, admission, recovery and convergence measurements.
-- [x] Chrome or in-app browser audit inventories and executes 100% of visible buttons, links, tabs, form controls and drawer actions.
-- [x] Browser audit ends with 100% control pass rate, zero unexpected console errors and zero unexpected network failures.
-- [x] `README.md` contains only final measured results; `CLAUDE.md` and `AGENTS.md` reflect any stable new workflow/verification commands without duplicating the plan.
+- [ ] Effectiveness report contains exact-SHA correctness, throughput, p50/p95/p99, admission, recovery and convergence measurements.
+- [ ] Chrome or in-app browser audit inventories and executes 100% of visible buttons, links, tabs, form controls and drawer actions.
+- [ ] Browser audit ends with 100% control pass rate, zero unexpected console errors and zero unexpected network failures.
+- [ ] `README.md` contains only final measured results; `CLAUDE.md` and `AGENTS.md` reflect any stable new workflow/verification commands without duplicating the plan.
 - [x] No Git worktree was created or used during execution.
