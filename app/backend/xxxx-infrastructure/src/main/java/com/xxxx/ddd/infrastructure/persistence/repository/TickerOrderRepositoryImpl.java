@@ -47,7 +47,8 @@ public class TickerOrderRepositoryImpl implements TickerOrderRepository {
 
     @Override
     public int getStockAvailable(Long ticketId) {
-        return ticketOrderJPAMapper.getStockAvailable(ticketId);
+        Integer stock = ticketOrderJPAMapper.getStockAvailable(ticketId);
+        return stock == null ? 0 : stock;
     }
 
     @Override

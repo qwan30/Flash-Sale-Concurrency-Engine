@@ -13,7 +13,8 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 5
-    url: ${MYSQL_URL:jdbc:mysql://localhost:3316/vetautet}
+      connection-init-sql: SET time_zone = '+00:00'
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3316/vetautet?serverTimezone=UTC}
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:root1234}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -23,6 +24,14 @@ spring:
     show-sql: true
     hibernate:
       ddl-auto: none
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:false}
+    validate-on-migrate: true
+    clean-disabled: true
   jackson:
     serialization:
       indent-output: true
@@ -71,11 +80,20 @@ app:
     topic: ${KAFKA_TOPIC:flashsale.orders}
   outbox:
     publish-batch-size: 50
+    publish-lease: 30s
     retry-delay: 10s
     max-attempts: 5
+  reservation:
+    recovery-delay: 1s
+    expiry-delay: 1s
 
 benchmark:
   results-dir: ${BENCHMARK_RESULTS_DIR:benchmark/results}
+  control-enabled: ${BENCHMARK_CONTROL_ENABLED:false}
+  control-token: ${BENCHMARK_CONTROL_TOKEN:}
+  fixture-reset-enabled: ${BENCHMARK_FIXTURE_RESET_ENABLED:false}
+  fixture-reset-token: ${BENCHMARK_FIXTURE_RESET_TOKEN:}
+  fixture-ticket-item-id: ${BENCHMARK_FIXTURE_TICKET_ITEM_ID:950015}
 
 # Admission control for the public order API. The ceiling sits well above the highest
 # throughput observed in the benchmark matrix (443 req/s), so load tests measure the
@@ -90,6 +108,19 @@ resilience4j:
         timeoutDuration: 0
         registerHealthIndicator: true
         eventConsumerBufferSize: 100
+      reservationCreate:
+        limitForPeriod: 40
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+
+  bulkhead:
+    instances:
+      reservationCreate:
+        maxConcurrentCalls: 4
+        maxWaitDuration: 0
+      reservationTerminal:
+        maxConcurrentCalls: 2
+        maxWaitDuration: 100ms
 
 management:
   health:

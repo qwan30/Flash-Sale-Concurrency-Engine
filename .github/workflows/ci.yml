@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, "program/**"]
   pull_request:
-    branches: [master]
+    branches: [master, "program/**"]
 
 jobs:
   # ═══════════════════════════════════════════════════════════
@@ -56,12 +56,12 @@ jobs:
             testcontainers-${{ runner.os }}-
       - name: Run integration tests (Testcontainers)
         id: integration-tests
-        run: >
-          mvn -B
-          -pl app/backend/xxxx-start -am
-          -Dflashsale.integration=true
-          test 2>&1 | tee maven-integration-test.log
-        continue-on-error: true
+        run: |
+          set -o pipefail
+          mvn -B \
+            -pl app/backend/xxxx-start -am \
+            -Pflashsale-integration \
+            verify 2>&1 | tee maven-integration-test.log
       - name: Show Maven output on failure
         if: steps.integration-tests.outcome == 'failure'
         run: |
@@ -69,7 +69,6 @@ jobs:
           tail -200 maven-integration-test.log || true
           echo "=== Test Failures ==="
           grep -E "(ERROR|FAILURE|Failed|Caused by)" maven-integration-test.log || true
-          exit 1
       - name: Upload Maven log
         if: always()
         uses: actions/upload-artifact@v4
@@ -82,6 +81,12 @@ jobs:
         with:
           name: integration-surefire-reports
           path: "**/target/surefire-reports/"
+      - name: Upload JaCoCo coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-jacoco-coverage
+          path: "**/target/site/jacoco*/"
 
   backend-build:
     name: Backend — Package JAR
@@ -111,6 +116,8 @@ jobs:
     needs: backend-build
     env:
       KAFKA_BOOTSTRAP_SERVERS: localhost:9094
+      # docker-compose-dev.yml creates the legacy schema before the JAR starts.
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

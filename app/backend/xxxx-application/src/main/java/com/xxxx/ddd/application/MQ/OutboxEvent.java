@@ -1,6 +1,7 @@
 package com.xxxx.ddd.application.MQ;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -26,6 +27,10 @@ public class OutboxEvent {
     @Id
     @Column(length = 36)
     private String id;
+
+    @Column(name = "event_id", length = 36, nullable = false, insertable = false, updatable = false)
+    @Setter(AccessLevel.NONE)
+    private String eventId;
 
     @Column(name = "aggregate_type", length = 100, nullable = false)
     private String aggregateType;
@@ -61,9 +66,16 @@ public class OutboxEvent {
     @Column(name = "next_attempt_at")
     private Instant nextAttemptAt;
 
+    @Column(name = "lease_owner", length = 64)
+    private String leaseOwner;
+
+    @Column(name = "lease_until")
+    private Instant leaseUntil;
+
     public OutboxEvent(String id, String aggregateType, String aggregateId,
                        String eventType, int eventVersion, String payload) {
         this.id = id;
+        this.eventId = id;
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
         this.eventType = eventType;
@@ -79,6 +91,8 @@ public class OutboxEvent {
         this.status = OutboxStatus.PUBLISHED;
         this.publishedAt = now;
         this.failureMessage = null;
+        this.leaseOwner = null;
+        this.leaseUntil = null;
     }
 
     /**
@@ -94,6 +108,8 @@ public class OutboxEvent {
         } else {
             this.nextAttemptAt = null;
         }
+        this.leaseOwner = null;
+        this.leaseUntil = null;
     }
 
     /**
@@ -103,5 +119,7 @@ public class OutboxEvent {
         this.status = OutboxStatus.PENDING;
         this.failureMessage = null;
         this.nextAttemptAt = null;
+        this.leaseOwner = null;
+        this.leaseUntil = null;
     }
 }

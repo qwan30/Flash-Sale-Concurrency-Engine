@@ -126,6 +126,14 @@ Release docs live in `docs/`:
 | `docs/RELEASE_CHECKLIST.md` | release verification checklist |
 
 When refreshing docs, treat Java source, Maven files, scripts, and runtime config as canonical. Use evergreen current-state wording; avoid changelog phrasing such as "newly added" or "recently updated".
+
+## Reservation reliability workflow
+
+- Use the red → green → refactor order for every reservation product change; run the narrow test before implementation and the module/integration gate after refactoring.
+- The integration verification command is `mvn.cmd clean verify -Pflashsale-integration`; frontend gates are run from `app/frontend` with `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`, and `npm.cmd run test:e2e`.
+- Do not create Git worktrees for this program. Use the ordered branch chain in `plan.md`, merge each phase into `program/reservation-reliability`, and leave unrelated dirty paths untouched.
+- Reuse from `reference/saleor` and `reference/opentelemetry-demo` only at their pinned SHAs in `docs/references/source-lock.md`; record source file, symbol, reuse mode, target symbol, retained/changed behavior, and the test-first evidence in `docs/references/reference-extraction.md`.
+- Browser certification uses Chrome or the explicitly allowed in-app browser; automated checks run from `app/frontend`, and the manual control matrix/evidence is saved under `docs/reports/ui-control-matrix.json`, `docs/reports/ui-control-audit.md`, and `docs/reports/ui-evidence/`.
 <!-- project-docs:end -->
 
 <!-- KHUYM:START -->

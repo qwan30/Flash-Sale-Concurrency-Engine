@@ -30,6 +30,11 @@ test.describe('Admin Operator Workflow', () => {
     const desk = new ControlDeskPage(page);
     await desk.goto();
     await expect(page).toHaveURL('/admin/control-desk');
+    const operatorToken = process.env.BENCHMARK_OPERATOR_TOKEN;
+    if (!operatorToken) {
+      throw new Error('BENCHMARK_OPERATOR_TOKEN is required for the control-desk UI test');
+    }
+    await desk.authorizeControls(operatorToken);
 
     // Step 1: Reset stock through the dashboard UI
     await desk.setupSale(TICKET_ITEM_ID, STOCK, YEAR_MONTH);
@@ -50,7 +55,7 @@ test.describe('Admin Operator Workflow', () => {
     expect(consistency.result.driftAmount).toBe(0);
   });
 
-  test('operator submits order probe through dashboard and verifies result', async ({
+  test('operator verifies post-order stock through the control desk', async ({
     page,
   }) => {
     // Setup via API
@@ -61,21 +66,18 @@ test.describe('Admin Operator Workflow', () => {
     });
     await warmupStock(TICKET_ITEM_ID);
 
-    // Navigate to control desk and submit an order probe
-    const desk = new ControlDeskPage(page);
-    await desk.goto();
-
-    await desk.submitOrderProbe({
+    await placeOrder({
+      ticketItemId: TICKET_ITEM_ID,
       userId: 88_001,
       quantity: 1,
       strategy: 'REDIS_LUA_WITH_COMPENSATION',
       idempotencyKey: `e2e-admin-probe-${Date.now()}`,
     });
 
-    // Verify probe result is displayed
-    await expect(desk.probeResult).toBeVisible({ timeout: 5000 });
-    const resultText = await desk.probeResult.textContent();
-    expect(resultText).toBeTruthy();
+    // Navigate to control desk and verify the live consistency snapshot.
+    const desk = new ControlDeskPage(page);
+    await desk.goto();
+    await desk.checkConsistency(TICKET_ITEM_ID);
 
     // Verify stock decremented
     const consistency = await getConsistency(TICKET_ITEM_ID, YEAR_MONTH);

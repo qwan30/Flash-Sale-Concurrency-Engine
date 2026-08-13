@@ -1,0 +1,82 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "title": "1. Request throughput and p95/p99",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "sum(rate(http_server_requests_seconds_count{uri=~\"/api/v1/reservations.*\"}[5m]))", "legendFormat": "requests/s", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri=~\"/api/v1/reservations.*\"}[5m])))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{uri=~\"/api/v1/reservations.*\"}[5m])))", "legendFormat": "p99", "refId": "C"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "reqps"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "title": "2. 429/503 admission reasons",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "sum by (status) (rate(http_server_requests_seconds_count{uri=~\"/api/v1/reservations.*\",status=~\"429|503\"}[5m]))", "legendFormat": "HTTP {{status}}", "refId": "A"},
+        {"expr": "sum by (operation,reason) (rate(flashsale_admission_rejections_total[5m]))", "legendFormat": "{{operation}} / {{reason}}", "refId": "B"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "title": "3. Available / Reserved / Confirmed stock",
+      "type": "timeseries",
+      "targets": [{"expr": "flashsale_reservation_units", "legendFormat": "{{status}}", "refId": "A"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "title": "4. Recovery journal states",
+      "type": "timeseries",
+      "targets": [{"expr": "flashsale_recovery_operations", "legendFormat": "{{state}}", "refId": "A"}]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "id": 5,
+      "title": "5. Outbox oldest age and backlog",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "flashsale_outbox_oldest_age_seconds", "legendFormat": "oldest age", "refId": "A"},
+        {"expr": "sum(outbox_backlog_pending)", "legendFormat": "pending", "refId": "B"}
+      ]
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "id": 6,
+      "title": "6. Redis/MySQL drift and convergence",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "flashsale_inventory_drift_units", "legendFormat": "drift units", "refId": "A"},
+        {"expr": "flashsale_redis_mirror_pending", "legendFormat": "mirror pending", "refId": "B"}
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["flashsale", "reservation", "reliability"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "title": "Flash Sale Reservation Reliability",
+  "uid": "flashsale-reservation-reliability",
+  "version": 1
+}

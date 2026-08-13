@@ -126,4 +126,8 @@ Release docs live in `docs/`:
 | `docs/RELEASE_CHECKLIST.md` | release verification checklist |
 
 When refreshing docs, treat Java source, Maven files, scripts, and runtime config as canonical. Use evergreen current-state wording; avoid changelog phrasing such as "newly added" or "recently updated".
+
+## Reservation reliability workflow
+
+The reservation upgrade follows the checked-in `plan.md` sequentially: no Git worktrees, one active phase branch, exact-file staging, and RED → GREEN → REFACTOR before each product implementation. The canonical backend gate is `mvn.cmd clean verify -Pflashsale-integration`; frontend gates run under `app/frontend`. Reference reuse is pinned and mapped in `docs/references/`; browser certification evidence is stored in `docs/reports/ui-control-matrix.json`, `docs/reports/ui-control-audit.md`, and `docs/reports/ui-evidence/`.
 <!-- project-docs:end -->

@@ -14,6 +14,23 @@ By The Apache Software Foundation
 
 ## What Is It?
 
+## Flash-sale reservation workload
+
+The repository-level reservation harness is defined in `../reservation-experiment-spec.json` and
+`../flash-sale-reservation.jmx`. Run it from the repository root with:
+
+```powershell
+./benchmark/run-reservation-jmeter.ps1 -FixtureResetUrl http://localhost:1122/admin/reservation-fixtures/reset -FixtureResetToken $env:BENCHMARK_FIXTURE_RESET_TOKEN -Scenario healthy
+```
+
+The reset endpoint must accept `X-Flashsale-Synthetic: true` and return (inside the standard
+`result` response envelope) `success=true`, `reservationFixtureReset=true`, and matching durable
+and Redis stock fields before JMeter starts. The runner records the exact Git SHA, working-tree
+status, reset proof, tool versions, fault timeline, raw JTL, HTML report, inventory snapshot,
+convergence disposition, metrics, and a local-only summary under `benchmark/results/<run-id>/`.
+It fails closed when JMeter or fixture-reset proof is unavailable and does not turn missing
+journal/outbox snapshots into a convergence claim.
+
 Apache JMeter can measure performance and load test static and dynamic web applications.
 
 It can be used to simulate a heavy load on a server, group of servers,

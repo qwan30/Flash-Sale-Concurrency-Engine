@@ -22,6 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.3.5</spring-boot.version>
         <springdoc-openapi.version>2.6.0</springdoc-openapi.version>
+        <flashsale.integration>false</flashsale.integration>
     </properties>
 
     <dependencyManagement>
@@ -124,9 +125,47 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.12</version>
+                <executions>
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
 
 
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>flashsale-integration</id>
+            <properties>
+                <flashsale.integration>true</flashsale.integration>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>3.2.5</version>
+                        <configuration>
+                            <skipTests>false</skipTests>
+                            <failIfNoTests>true</failIfNoTests>
+                            <systemPropertyVariables>
+                                <flashsale.integration>${flashsale.integration}</flashsale.integration>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

@@ -1,0 +1,17 @@
+spring:
+  config:
+    activate:
+      on-profile: otel
+
+# This file is intentionally opt-in. The default runtime continues to use the
+# existing Brave bridge; an OTLP exporter must be introduced and verified as a
+# separate dependency change before this profile is used for certification.
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+
+otel:
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}

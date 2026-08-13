@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Scheduled reconciliation service that detects and repairs Redis/MySQL stock drift.
@@ -68,6 +69,7 @@ public class OrderReconciliationService {
      * for the lab we reconcile the default ticket item.
      */
     @Scheduled(fixedDelay = 30_000, initialDelay = 10_000)
+    @Transactional(rollbackFor = Exception.class)
     public void scheduledReconcile() {
         try {
             ReconciliationResult result = reconcile(DEFAULT_TICKET_ITEM_ID, null);
@@ -88,6 +90,7 @@ public class OrderReconciliationService {
      * @return the reconciliation result with before/after state
      */
     @Observed(name = "reconciliation.run", contextualName = "run-reconciliation")
+    @Transactional(rollbackFor = Exception.class)
     public ReconciliationResult reconcile(Long ticketItemId, String yearMonth) {
         String normalizedYearMonth = OrderDateSupport.normalizeYearMonth(yearMonth);
 

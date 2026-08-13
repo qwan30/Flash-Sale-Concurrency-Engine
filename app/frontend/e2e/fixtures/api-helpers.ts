@@ -10,6 +10,7 @@
  */
 
 const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:1122';
+const CONTROL_TOKEN = process.env.BENCHMARK_CONTROL_TOKEN;
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -24,8 +25,8 @@ async function request<T>(
 ): Promise<ApiEnvelope<T>> {
   const url = `${BACKEND}${path}`;
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
   });
   const body = await response.json();
   if (!response.ok) {
@@ -38,6 +39,16 @@ async function request<T>(
   return body as ApiEnvelope<T>;
 }
 
+function benchmarkControlHeaders(): HeadersInit {
+  if (!CONTROL_TOKEN) {
+    throw new Error('BENCHMARK_CONTROL_TOKEN is required for destructive benchmark test setup');
+  }
+  return {
+    'X-Flashsale-Synthetic': 'true',
+    'X-Flashsale-Control-Token': CONTROL_TOKEN,
+  };
+}
+
 // ─── Admin helpers ───────────────────────────────────────────────────────────
 
 export async function resetBenchmark(params: {
@@ -47,6 +58,7 @@ export async function resetBenchmark(params: {
 }) {
   return request('/admin/benchmarks/reset', {
     method: 'POST',
+    headers: benchmarkControlHeaders(),
     body: JSON.stringify(params),
   });
 }
@@ -54,6 +66,7 @@ export async function resetBenchmark(params: {
 export async function warmupStock(ticketItemId: number) {
   return request(`/admin/tickets/${ticketItemId}/stock/warmup`, {
     method: 'POST',
+    headers: benchmarkControlHeaders(),
   });
 }
 
@@ -81,6 +94,7 @@ export async function reconcile(ticketItemId: number, yearMonth: string) {
     driftAmount: number;
   }>(`/admin/benchmarks/reconcile?ticketItemId=${ticketItemId}&yearMonth=${yearMonth}`, {
     method: 'POST',
+    headers: benchmarkControlHeaders(),
   });
 }
 

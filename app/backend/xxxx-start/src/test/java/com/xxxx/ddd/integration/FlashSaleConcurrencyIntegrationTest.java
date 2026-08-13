@@ -8,11 +8,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -40,15 +44,19 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "logging.level.root=WARN",
                 "logging.level.com.xxxx=WARN",
                 "logging.level.org.springframework=WARN",
-                "spring.jpa.show-sql=false"
+                "spring.jpa.show-sql=false",
+                "benchmark.control-enabled=true",
+                "benchmark.control-token=integration-control-token"
         }
 )
+@ActiveProfiles("benchmark")
 @EnabledIfSystemProperty(named = "flashsale.integration", matches = "true")
 class FlashSaleConcurrencyIntegrationTest {
 
     private static final long TICKET_ITEM_ID = 4L;
     private static final int STOCK = 20;
     private static final int REQUESTS = 80;
+    private static final String CONTROL_TOKEN = "integration-control-token";
     private static final String YEAR_MONTH = YearMonth.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
 
     private static final MySQLContainer<?> MYSQL = new MySQLContainer<>(DockerImageName.parse("mysql:8.4"))
@@ -220,7 +228,13 @@ class FlashSaleConcurrencyIntegrationTest {
     }
 
     private ResponseEntity<Map> post(String url, Object body) {
-        return restTemplate.postForEntity(url, body, Map.class);
+        HttpHeaders headers = new HttpHeaders();
+        if (url.startsWith("/admin/benchmarks/")
+                || url.startsWith("/admin/tickets/")) {
+            headers.set("X-Flashsale-Synthetic", "true");
+            headers.set("X-Flashsale-Control-Token", CONTROL_TOKEN);
+        }
+        return restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
     }
 
     private void loadSchema() {
@@ -228,6 +242,20 @@ class FlashSaleConcurrencyIntegrationTest {
         if (!Files.isRegularFile(initScript)) {
             initScript = Path.of("environment/mysql/init/ticket_init.sql").normalize();
         }
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        // The same Testcontainers database is shared by both methods. Reset the legacy fixture
+        // before replaying its deterministic INSERT script so test order cannot create duplicate
+        // order numbers or move the explicit ticket-item ids.
+        jdbc.execute("DELETE FROM reservation_order");
+        jdbc.execute("DELETE FROM inventory_repair_journal");
+        jdbc.execute("DELETE FROM inventory_reservation");
+        jdbc.execute("DELETE FROM inventory_operation_journal");
+        jdbc.execute("DELETE FROM inventory_stock_account");
+        jdbc.execute("DELETE FROM ticket_order_details_202502");
+        jdbc.execute("DELETE FROM ticket_order_202502");
+        jdbc.execute("DELETE FROM ticket_item");
+        jdbc.execute("ALTER TABLE ticket_item AUTO_INCREMENT = 1");
+        jdbc.execute("DELETE FROM ticket");
         new ResourceDatabasePopulator(new FileSystemResource(initScript)).execute(dataSource);
     }
 
@@ -235,4 +263,3 @@ class FlashSaleConcurrencyIntegrationTest {
         return Boolean.parseBoolean(System.getProperty("flashsale.integration", "false"));
     }
 }
-

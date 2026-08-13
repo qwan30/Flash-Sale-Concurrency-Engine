@@ -16,7 +16,7 @@ public interface TicketOrderJPAMapper extends JpaRepository<TicketDetail, Long> 
      * @return The available stock quantity.
      */
     @Query("SELECT t.stockAvailable FROM TicketDetail t WHERE t.id = :ticketId")
-    int getStockAvailable(@Param("ticketId") Long ticketId);
+    Integer getStockAvailable(@Param("ticketId") Long ticketId);
 
 
     /**

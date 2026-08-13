@@ -1,7 +1,7 @@
 import { test } from '@playwright/test';
 import * as path from 'path';
 
-const BASE = 'http://localhost:3002';
+const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
 const OUT = 'D:/projects/tipjs-project/xxxx.com-section-ddd-24-27042025/Flash-Sale-Concurrency-Engine/screen-demo';
 
 test.describe('Screenshot All Dashboard Pages', () => {

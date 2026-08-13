@@ -1,0 +1,8 @@
+spring:
+  config:
+    activate:
+      on-profile: chaos
+
+app:
+  chaos:
+    enabled: true

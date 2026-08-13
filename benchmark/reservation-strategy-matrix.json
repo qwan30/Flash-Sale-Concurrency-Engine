@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "title": "Reservation coordination strategy comparison",
+  "status": "NOT_RUN",
+  "purpose": "Compare coordination mechanisms while keeping the reservation command, durable schema, fixture, and acceptance contract constant.",
+  "strategies": [
+    {
+      "id": "REDIS_FIRST",
+      "implementation": "com.xxxx.ddd.application.reservation.CreateReservationService",
+      "coordination": "Redis Lua admission followed by fenced MySQL commit and compensation/recovery"
+    },
+    {
+      "id": "MYSQL_CONDITIONAL",
+      "implementation": "com.xxxx.ddd.infrastructure.reservation.mysql.LocalMySqlConditionalReservationStrategy",
+      "coordination": "Conditional inventory_stock_account update and reservation/outbox commit in one MySQL transaction; mirror parity lock is JVM-local and requires single-instance comparison execution"
+    }
+  ],
+  "sharedCommand": {
+    "ticketItemId": 950015,
+    "quantityRange": [1, 4],
+    "idempotency": "same demo actor and idempotency key must replay the original operation",
+    "fixtureReset": "reset and seed the durable stock account and Redis mirror before each strategy"
+  },
+  "acceptance": {
+    "duplicateCreate": "one reservation and one durable journal claim",
+    "soldOut": "no negative available stock and a REJECTED/SOLD_OUT journal result",
+    "terminalRace": "confirm and expire are mutually exclusive transitions",
+    "invariant": "initial = available + reserved + confirmed",
+    "outbox": "one reservation.created event for each accepted reservation"
+  },
+  "measurements": {
+    "throughputRequestsPerSecond": null,
+    "latencyP50Milliseconds": null,
+    "latencyP95Milliseconds": null,
+    "latencyP99Milliseconds": null,
+    "hikariPendingMaximum": null,
+    "admissionRejects": null,
+    "rawArtifact": null,
+    "runStatus": "NOT_RUN"
+  },
+  "execution": {
+    "runner": "benchmark/run-reservation-jmeter.ps1 -FixtureResetUrl <reservation-fixture-reset-endpoint> -FixtureResetToken <configured-token> -Strategy <REDIS_FIRST|MYSQL_CONDITIONAL>",
+    "comparisonRule": "run each strategy against a freshly seeded stock account; do not compare against the same live account",
+    "evidenceRule": "populate measurements only from raw same-SHA workload artifacts"
+  }
+}
