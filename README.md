@@ -14,13 +14,18 @@
 
 > **An unsafe stock deduction oversold 4,000 units under 100-thread load and drove database stock to −2,278. Three successive strategies took that to zero — at 2.5× the throughput.**
 
-**A backend concurrency reliability lab** that tests stock-deduction correctness under flash-sale load. It compares 4 strategies — unsafe DB updates, conditional DB updates, Redis Lua gating, and Redis Lua with compensation — and records JMeter evidence, Redis/MySQL consistency checks, and reconciliation behavior. Built with **Domain-Driven Design** principles, virtual threads, a transactional outbox, and a Next.js operator dashboard.
+**A backend concurrency reliability lab** that tests inventory and reservation correctness under flash-sale load. It compares 4 stock-deduction strategies — unsafe DB updates, conditional DB updates, Redis Lua gating, and Redis Lua with compensation — and now includes a durable reservation lifecycle, recovery journal, admission control, deterministic fault scenarios, OTel/k6 evidence, and a Next.js operator dashboard. Built with **Domain-Driven Design** principles, virtual threads, a transactional outbox, and identity-bound benchmark artifacts.
 
 Every number quoted below is reproducible from committed artifacts under [`benchmark/results/`](benchmark/results/) — each run directory holds its reset, warmup, consistency snapshot, and summary row.
 
 ![Operator control desk](screen-demo/07-admin-control-desk.png)
 
-> **🟢 Evidence status — July 2026**
+> **🟢 Release status — reservation reliability upgrade**
+> The reservation-reliability phase chain has been reviewed and merged into the repository default branch, `master`. The release scope covers reservation create/confirm/release/expiry, fenced recovery, durable idempotency markers, Redis/MySQL reconciliation, admission lanes, operator controls, benchmark/effectiveness tooling, and optional OTel/k6 observability.
+>
+> The completed release evidence is maintained in the [reliability report](docs/reports/flash-sale-reliability-upgrade-report.md), [effectiveness report](docs/reports/reservation-effectiveness-report.md), [UI control audit](docs/reports/ui-control-audit.md), and [execution plan](plan.md). Claims are bound to the final candidate revision and its committed raw artifacts; the historical strategy matrix below remains a dated comparison, not a production-capacity claim.
+>
+> **Historical correctness evidence — July 2026**
 > Latest local validation: `REDIS_LUA_WITH_COMPENSATION` completed 5,000 attempts at 100 threads with **0 oversells** and **0 Redis/MySQL drift** (13 July 2026). Its local result was **142.1 req/s**, **643.16 ms** average, and **2,055 ms p95**. It is a single-strategy run, so it is not a replacement for the dated four-strategy comparison below.
 >
 > The last like-for-like four-strategy matrix ran on 31 May 2026; its local winner measured **443.03 req/s** at **165.95 ms** average latency. Treat throughput and latency as machine-specific local evidence, not a production capacity claim. CI/CD configuration and GHCR image publishing are present in the repository.
@@ -46,6 +51,8 @@ This lab exists to **test the answers empirically**, not just theorize about the
 | **Transactional Outbox + Kafka** (not fire-and-forget) | Persists an order and outbox row in one DB transaction, then publishes through a scheduled relay with at-least-once semantics. Consumers must tolerate duplicates. | [ADR-001](docs/04-architecture/adr/ADR-001-kafka-outbox.md) |
 | **Strategy Pattern** for stock deduction | 4 strategies share a common interface; the active strategy is selected per-request via `strategy` field. Enables A/B comparison under identical load without code changes. | [ADR-002](docs/04-architecture/adr/ADR-002-strategy-pattern.md) |
 | **Redis as Atomic Pre-Gate** | Redis Lua scripts execute atomically and act as the fast gate/cache; MySQL remains the durable source of truth. Redis-backed strategies reject excess demand before the DB deduction path. | [ADR-003](docs/04-architecture/adr/ADR-003-redis-as-gate.md) |
+| **Reservation lifecycle with durable recovery** | Create, confirm, release, and expiry transitions are fenced and idempotent. A durable operation journal, repair states, and scheduled recovery make ambiguous Redis/DB windows observable and retryable. | [`plan.md`](plan.md) · [`flash-sale-reliability-upgrade-report.md`](docs/reports/flash-sale-reliability-upgrade-report.md) |
+| **Evidence-first release gates** | Healthy baseline comparison, five deterministic fault points, terminal-priority admission, browser control coverage, and OTel/k6 checks are separate gates. A green unit/CI run alone is not a release certificate. | [`reservation-effectiveness-report.md`](docs/reports/reservation-effectiveness-report.md) |
 
 ---
 
@@ -149,6 +156,26 @@ graph LR
 ---
 
 ## 📊 Benchmark Evidence
+
+### Reservation reliability release gates
+
+The release harness extends the original JMeter comparison with identity-bound reset/evidence
+artifacts and fail-closed gates for correctness, convergence, latency regression, terminal
+priority, and UI behavior. The final candidate is certified only when the following are recorded
+against the same revision:
+
+| Gate | Required evidence |
+|------|-------------------|
+| Healthy workload | 5,000 attempts, 100 threads, zero oversell/negative stock/duplicates/drift, zero pending journal/outbox, convergence within 30 seconds |
+| Performance | Same-machine healthy p95 baseline and candidate p95 with no regression beyond the locked threshold |
+| Recovery | `AFTER_REDIS_BEFORE_DB`, `AFTER_DB_COMMIT_BEFORE_RESPONSE`, `REDIS_MIRROR_TIMEOUT`, `KAFKA_UNAVAILABLE`, and `CONFIRM_EXPIRE_RACE` timelines with recovery/convergence proof |
+| Terminal priority | Overload evidence showing bounded create admission and successful confirm/release/expire traffic |
+| Operator UI | Connected-browser control inventory with 100% pass rate, zero unexpected console errors, and zero unexpected network failures |
+| Observability | OTel/k6 path and metric/parity evidence kept reversible and separate from the default Brave path |
+
+See the [reservation effectiveness report](docs/reports/reservation-effectiveness-report.md) for
+the candidate-bound raw artifact paths and the [UI control audit](docs/reports/ui-control-audit.md)
+for the operator surface.
 
 ### Latest local correctness validation — July 13, 2026
 
@@ -318,11 +345,8 @@ Open: `http://localhost:3000`
 ## 🧪 Testing & Quality
 
 ```bash
-# Backend — unit + integration tests
-mvn -pl app/backend/xxxx-start -am test
-
-# Backend — Docker-gated integration tests (requires Docker)
-mvn -pl app/backend/xxxx-start -am "-Dflashsale.integration=true" test
+# Backend — unit + Docker-gated integration tests (requires Docker)
+mvn.cmd clean verify -Pflashsale-integration
 
 # Frontend — lint, typecheck, build
 cd app/frontend
@@ -338,6 +362,7 @@ npm run test:e2e
 |-------------|---------|-----------------|
 | **Unit tests** | `mvn test` | Strategy correctness, idempotency, domain logic |
 | **Integration tests** | `mvn test -Dflashsale.integration=true` | Redis Lua scripts, MySQL conditional updates, outbox flow |
+| **Reservation reliability gate** | `mvn.cmd clean verify -Pflashsale-integration` | Reservation lifecycle, journal/recovery, admission, chaos, Redis/MySQL/Kafka and Toxiproxy contracts |
 | **Smoke test** | `benchmark/smoke-local.ps1` | Reset → warmup → order → consistency end-to-end |
 | **JMeter benchmark** | `benchmark/run-jmeter.ps1` | Full 5,000-request load test with HTML report |
 | **Frontend gate** | `npm run lint && npm run typecheck && npm run build` | Dashboard code quality |
@@ -352,6 +377,9 @@ npm run test:e2e
 |----------|---------|---------|
 | **CI** (`ci.yml`) | Push / PR | Java compile · Unit tests · Integration tests · Frontend checks · Observability smoke · Infra validation |
 | **CD** (`cd.yml`) | Push to master | Docker build · Push to GHCR · Production compose validation |
+
+The optional observability profile adds Prometheus/Grafana and the reversible OTel collector path;
+the k6 workload is an evidence lane and does not silently replace the default Brave tracing path.
 
 **Observability stack (optional):**
 ```bash
@@ -386,6 +414,7 @@ docker compose -f environment/docker-compose-dev.yml --profile observability up 
 | **07-flows** | End-to-end business flow, state machines | [`end-to-end-business-flow.md`](docs/07-flows/end-to-end-business-flow.md) |
 | **10-deployment** | CI/CD, Docker, env variables | [`ci-cd.md`](docs/10-deployment/ci-cd.md) |
 | **performance** | Strategy analysis, benchmarking, consistency | [`CONCURRENCY_AND_CONSISTENCY.md`](docs/performance/CONCURRENCY_AND_CONSISTENCY.md) |
+| **reservation release** | Lifecycle, recovery, effectiveness, browser and OTel/k6 certification | [`flash-sale-reliability-upgrade-report.md`](docs/reports/flash-sale-reliability-upgrade-report.md) · [`plan.md`](plan.md) |
 | **operations** | Lab operations, dashboard guide, release checklist | [`LAB_OPERATIONS.md`](docs/operations/LAB_OPERATIONS.md) |
 | **reference** | API contract, reviewer guide, source status | [`API_REFERENCE.md`](docs/reference/API_REFERENCE.md) |
 | **process-learn** | Structured self-study program (7 phases) | [`00-Index-Guide.md`](docs/process-learn/00-Index-Guide.md) |
