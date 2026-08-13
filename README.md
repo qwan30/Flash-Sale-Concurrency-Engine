@@ -71,92 +71,18 @@ This lab exists to **test the answers empirically**, not just theorize about the
 
 ## 🎯 System Architecture Overview
 
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e1e2e', 'primaryTextColor': '#cdd6f4', 'primaryBorderColor': '#89b4fa', 'lineColor': '#a6adc8', 'secondaryColor': '#313244', 'tertiaryColor': '#11111b'}}}%%
-graph TD
-    User([🛒 5,000 Concurrent Requests]) --> API[Spring Boot / Tomcat Virtual Threads]
+![Strategy routing, Redis gating, compensation, and outbox flow](docs/images/strategy-routing-and-recovery.png)
 
-    subgraph Strategy_Selection["Strategy Router"]
-        API --> Registry{StockDeductionStrategyRegistry}
-        Registry -->|strategy=UNSAFE_DB| Unsafe["❌ Direct DB Update<br/><i>No condition — race condition demo</i>"]
-        Registry -->|strategy=CONDITIONAL_DB| CondDB["🛡️ Conditional DB Update<br/><i>WHERE stock >= qty</i>"]
-        Registry -->|strategy=REDIS_LUA| RedisLua["⚡ Redis Lua Atomic Gate<br/><i>Pre-deduct in cache layer</i>"]
-        Registry -->|strategy=REDIS_LUA_WITH_COMPENSATION| RedisComp["🚀 Redis Lua + Compensation<br/><i>Pre-deduct + auto-rollback</i>"]
-    end
-
-    subgraph Cache_Layer["Pre-Deduction Layer (Redis)"]
-        RedisLua --> LuaScript["Lua EVAL: DECR + check >= 0"]
-        RedisComp --> LuaScriptComp["Lua EVAL: DECR + check + compensation hook"]
-        LuaScript -- "stock <= 0" --> Reject["❌ Business rejection<br/><i>envelope code 409</i>"]
-        LuaScriptComp -- "stock <= 0" --> Reject
-    end
-
-    subgraph Persistence_Layer["Core Persistence (MySQL)"]
-        CondDB --> MySQL[(MySQL: Atomic Row Update)]
-        LuaScript -- "stock > 0" --> Outbox["📦 Outbox: Order + Event in 1 TX"]
-        LuaScriptComp -- "stock > 0" --> OutboxComp["📦 Outbox: Order + Event in 1 TX"]
-        Outbox --> MySQL
-        OutboxComp --> MySQL
-    end
-
-    subgraph Reliability_Layer["Async Reliability"]
-        Outbox --> OutboxScheduler["Outbox Publish Scheduler"]
-        OutboxComp --> OutboxScheduler
-        OutboxScheduler --> Kafka{🔔 Kafka KRaft}
-        MySQL -- "Commit fails" --> Rollback["🔄 Compensation: Redis INCR"]
-        Rollback --> RedisReset["↩️ Restore Redis Stock"]
-    end
-
-    MySQL -- "Commit success" --> Done([🎉 Order Finalized])
-
-    style API fill:#1e1e2e,stroke:#89b4fa,stroke-width:2px
-    style RedisComp fill:#313244,stroke:#a6e3a1,stroke-width:2px
-    style RedisLua fill:#313244,stroke:#f9e2af,stroke-width:2px
-    style CondDB fill:#313244,stroke:#89b4fa,stroke-width:2px
-    style Unsafe fill:#313244,stroke:#f38ba8,stroke-width:2px
-    style MySQL fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px
-    style Reject fill:#11111b,stroke:#f38ba8,stroke-width:1px
-    style Done fill:#11111b,stroke:#a6e3a1,stroke-width:2px
-    style Rollback fill:#313244,stroke:#fab387,stroke-width:2px
-```
+This diagram shows the request path from the strategy registry through Redis/MySQL persistence,
+compensation, the transactional outbox, and Kafka publication.
 
 ---
 
 ## ⚡ Strategy Comparison: Historical May 31 Reference Matrix
 
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1e1e2e', 'primaryTextColor': '#cdd6f4', 'primaryBorderColor': '#89b4fa', 'lineColor': '#a6adc8', 'secondaryColor': '#313244', 'tertiaryColor': '#11111b'}}}%%
-graph LR
-    subgraph CONDITIONAL["CONDITIONAL_DB — 173.08 req/s (May 31 local run)"]
-        direction TB
-        R1["100 Concurrent Requests"] --> DB1["MySQL Row Lock Queue<br/><i>Serialized — one at a time</i>"]
-        DB1 --> C1["WHERE stock >= qty<br/>UPDATE SET stock = stock - qty"]
-        C1 --> R1_OK["✅ Order (173.08/s)"]
-        C1 --> R1_FAIL["❌ Sold Out"]
-    end
-
-    subgraph REDIS_COMP["REDIS_LUA_WITH_COMPENSATION — 443.03 req/s (May 31 local run)"]
-        direction TB
-        R2["100 Concurrent Requests"] --> RedisGate["Redis Lua EVAL<br/><i>Atomic — all parallel</i>"]
-        RedisGate -->|"stock > 0"| DB2["MySQL (only 1,000 requests<br/>instead of 5,000)"]
-        RedisGate -->|"stock <= 0"| FastFail["⚡ Instant Reject<br/><i>~1 ms</i>"]
-        DB2 --> R2_OK["✅ Order (443.03/s)"]
-        DB2 -->|"commit fails"| Comp["🔄 INCR Redis back"]
-    end
-
-    style CONDITIONAL fill:#1e1e2e,stroke:#89b4fa,stroke-width:1px
-    style REDIS_COMP fill:#1e1e2e,stroke:#a6e3a1,stroke-width:2px
-    style DB1 fill:#313244,stroke:#f38ba8,stroke-width:1px
-    style RedisGate fill:#313244,stroke:#a6e3a1,stroke-width:2px
-    style FastFail fill:#11111b,stroke:#a6e3a1,stroke-width:1px
-```
+![Conditional MySQL versus Redis Lua with compensation](docs/images/strategy-comparison-flow.png)
 
 **The bottleneck shift:** `CONDITIONAL_DB` sends all 5,000 requests to MySQL — row locking serializes them. `REDIS_LUA_WITH_COMPENSATION` filters 4,000 excess requests at Redis (microsecond rejection), so MySQL only processes the 1,000 that actually have stock available. That's an **80% load reduction on the database** before the first SQL statement runs.
-
-![Strategy routing, Redis gating, compensation, and outbox flow](docs/images/strategy-routing-and-recovery.png)
-
-The routing diagram shows the complete request path: strategy selection, Redis atomic gating,
-MySQL persistence, compensation on failed commits, transactional outbox publication, and Kafka.
 
 ---
 
@@ -203,23 +129,9 @@ The following local matrix uses the same 5,000-attempt, 100-thread, 1,000-unit w
 | `REDIS_LUA` | 226.25 | 361 ms | 829 ms | 0 ✅ | 0 on this healthy path | PASS — no compensation |
 | **`REDIS_LUA_WITH_COMPENSATION`** | **443.03** 🏆 | **166 ms** 🏆 | **492 ms** 🏆 | **0** ✅ | **0** ✅ | ✅ **OPTIMAL** |
 
-```mermaid
-xychart-beta
-    title "May 31 Local Throughput Comparison — 4 Strategies Under 100-Thread Load"
-    x-axis ["UNSAFE_DB", "CONDITIONAL_DB", "REDIS_LUA", "REDIS_LUA_WITH_COMPENSATION"]
-    y-axis "Requests / Second" 0 --> 500
-    bar [84.71, 173.08, 226.25, 443.03]
-```
-
 > 💡 **Historical comparison:** in this May 31 local matrix, `REDIS_LUA_WITH_COMPENSATION` measured **2.6×** the throughput and about **66% lower average latency** than the conditional-DB baseline, while ending with zero oversells and zero drift. Re-run the complete matrix on one clean, revision-pinned environment before claiming a current ranking or capacity number.
 
 Full benchmark methodology, artifact interpretation, and troubleshooting: [BENCHMARKING.md](docs/performance/BENCHMARKING.md).
-
-![Conditional MySQL versus Redis Lua with compensation](docs/images/strategy-comparison-flow.png)
-
-This visual is the same historical May 31 comparison represented above, including the intentional
-unsafe/serialized baseline and the Redis fast-rejection path. It is local lab evidence, not a
-production capacity guarantee.
 
 ---
 
@@ -263,42 +175,9 @@ production capacity guarantee.
 
 ## 🏗️ Architecture — DDD Multi-Module Layout
 
-```
- ┌─────────────────────────────────────────────────────────────────┐
- │                xxxx-start (Spring Boot Entry Point)              │
- │             App Config · Scheduling · Actuator                   │
- ├─────────────────────────────────────────────────────────────────┤
- │               xxxx-controller (HTTP + REST Layer)                │
- │   ┌──────────────────┬──────────────────┬──────────────────┐    │
- │   │ TicketOrderCtrl  │  AdminBenchCtrl  │  TicketItemCtrl  │    │
- │   └──────────────────┴──────────────────┴──────────────────┘    │
- ├─────────────────────────────────────────────────────────────────┤
- │              xxxx-application (Use Cases + Strategies)           │
- │   ┌──────────────────┬──────────────────┬──────────────────┐    │
- │   │ OrderCreationSvc │ IdempotencySvc   │ ReconciliationSvc│    │
- │   │ StrategyRegistry │ 4 Strategies     │ BenchmarkSvc     │    │
- │   └──────────────────┴──────────────────┴──────────────────┘    │
- ├─────────────────────────────────────────────────────────────────┤
- │           xxxx-infrastructure (Adapters + Persistence)           │
- │   ┌──────────────────┬──────────────────┬──────────────────┐    │
- │   │ MySQL Repos      │ Redis Adapters   │ Redisson Config  │    │
- │   │ Kafka Relay      │ JPA Mappers      │ Outbox Publisher │    │
- │   └──────────────────┴──────────────────┴──────────────────┘    │
- ├─────────────────────────────────────────────────────────────────┤
- │              xxxx-domain (Core Domain + Contracts)               │
- │   ┌──────────────────┬──────────────────┬──────────────────┐    │
- │   │ Ticket Entities  │ Order Aggregate  │ Repository Ports │    │
- │   │ Strategy Port    │ Domain Services  │ Domain Events    │    │
- │   └──────────────────┴──────────────────┴──────────────────┘    │
- └─────────────────────────────────────────────────────────────────┘
-     Dependency Flow: domain ← infrastructure ← application ← controller ← start
-```
+![DDD multi-module architecture](docs/images/ddd-module-layout.png)
 
 **5 Maven Modules:** `xxxx-domain` · `xxxx-infrastructure` · `xxxx-application` · `xxxx-controller` · `xxxx-start`
-
-### Visual module map
-
-![DDD multi-module architecture](docs/images/ddd-module-layout.png)
 
 The dependency direction remains `domain ← infrastructure ← application ← controller ← start`.
 
