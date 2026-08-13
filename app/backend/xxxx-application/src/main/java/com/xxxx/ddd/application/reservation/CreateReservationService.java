@@ -7,6 +7,8 @@ import com.xxxx.ddd.application.reservation.port.OperationJournalRepository;
 import com.xxxx.ddd.application.reservation.port.ReservationRepository;
 import com.xxxx.ddd.application.reservation.port.ReservationStockPort;
 import com.xxxx.ddd.application.reservation.port.ReservationTelemetryPort;
+import com.xxxx.ddd.application.reservation.strategy.ReservationCoordinationStrategy;
+import com.xxxx.ddd.application.reservation.strategy.ReservationStrategy;
 import com.xxxx.ddd.domain.reservation.InventorySnapshot;
 import com.xxxx.ddd.domain.reservation.Reservation;
 import com.xxxx.ddd.domain.reservation.ReservationStatus;
@@ -28,7 +30,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 @Service
-public class CreateReservationService {
+public class CreateReservationService implements ReservationCoordinationStrategy {
 
     public static final Duration RESERVATION_TTL = Duration.ofSeconds(120);
     public static final String RESERVATION_AGGREGATE_TYPE = "Reservation";
@@ -64,6 +66,11 @@ public class CreateReservationService {
         this.claimTransaction = requiresNew(Objects.requireNonNull(transactionManager,
                 "transactionManager must not be null"));
         this.databaseTransaction = requiresNew(transactionManager);
+    }
+
+    @Override
+    public ReservationStrategy strategy() {
+        return ReservationStrategy.REDIS_FIRST;
     }
 
     public CreateReservationResult create(CreateReservationCommand command) {

@@ -65,16 +65,12 @@ public class ReservationExceptionHandler {
             IllegalArgumentException.class
     })
     public ResponseEntity<ReservationErrorResponse> badRequest(Exception exception, HttpServletRequest request) {
-        exception.printStackTrace();
-        String msg = "Reservation request is invalid: " + exception.getClass().getSimpleName() + " - " + exception.getMessage();
-        return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", msg, false, request, null);
+        return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Reservation request is invalid", false, request, null);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ReservationErrorResponse> internalError(Exception exception, HttpServletRequest request) {
-        exception.printStackTrace();
-        String msg = "Reservation request could not be completed: " + exception.getClass().getSimpleName() + " - " + exception.getMessage();
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", msg, true,
+        return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Reservation request could not be completed", true,
                 request, null);
     }
 

@@ -3,12 +3,13 @@ package com.xxxx.ddd.controller.http.reservation;
 import com.xxxx.ddd.application.reservation.ConfirmReservationService;
 import com.xxxx.ddd.application.reservation.CreateReservationCommand;
 import com.xxxx.ddd.application.reservation.CreateReservationResult;
-import com.xxxx.ddd.application.reservation.CreateReservationService;
 import com.xxxx.ddd.application.reservation.ReleaseReservationService;
 import com.xxxx.ddd.application.reservation.ReservationLifecycleResult;
 import com.xxxx.ddd.application.reservation.port.InventoryRepository;
 import com.xxxx.ddd.application.reservation.port.OperationJournalRepository;
 import com.xxxx.ddd.application.reservation.port.ReservationRepository;
+import com.xxxx.ddd.application.reservation.strategy.ReservationCoordinationStrategy;
+import com.xxxx.ddd.application.reservation.strategy.ReservationStrategy;
 
 import com.xxxx.ddd.domain.reservation.InventorySnapshot;
 import com.xxxx.ddd.domain.reservation.Reservation;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -33,7 +35,8 @@ import java.util.Optional;
 @RequestMapping("/api/v1")
 public class ReservationController {
 
-    private final CreateReservationService createService;
+    private final Map<ReservationStrategy, ReservationCoordinationStrategy> creationStrategies;
+    private final List<ReservationCoordinationStrategy> creationCandidates;
     private final ConfirmReservationService confirmation;
     private final ReleaseReservationService release;
     private final ReservationRepository reservations;
@@ -42,7 +45,7 @@ public class ReservationController {
     private final ReservationAdmissionControl admission;
 
     public ReservationController(
-            CreateReservationService createService,
+            List<ReservationCoordinationStrategy> creationStrategies,
             ConfirmReservationService confirmation,
             ReleaseReservationService release,
             ReservationRepository reservations,
@@ -50,7 +53,24 @@ public class ReservationController {
             InventoryRepository inventory,
             ReservationAdmissionControl admission
     ) {
-        this.createService = createService;
+        EnumMap<ReservationStrategy, ReservationCoordinationStrategy> resolvedStrategies =
+                new EnumMap<>(ReservationStrategy.class);
+        ReservationCoordinationStrategy unidentified = null;
+        for (ReservationCoordinationStrategy candidate : creationStrategies) {
+            ReservationStrategy key = candidate.strategy();
+            if (key == null) {
+                unidentified = candidate;
+                continue;
+            }
+            if (resolvedStrategies.putIfAbsent(key, candidate) != null) {
+                throw new IllegalStateException("duplicate reservation coordination strategy: " + key);
+            }
+        }
+        if (!resolvedStrategies.containsKey(ReservationStrategy.REDIS_FIRST) && unidentified != null) {
+            resolvedStrategies.put(ReservationStrategy.REDIS_FIRST, unidentified);
+        }
+        this.creationStrategies = Map.copyOf(resolvedStrategies);
+        this.creationCandidates = List.copyOf(creationStrategies);
         this.confirmation = confirmation;
         this.release = release;
         this.reservations = reservations;
@@ -62,12 +82,21 @@ public class ReservationController {
     @PostMapping("/reservations")
     public ResponseEntity<?> create(
             @Valid @RequestBody CreateReservationRequest request,
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("Idempotency-Key") UUID idempotencyKey,
             @RequestHeader("X-Demo-Actor-Id") UUID demoActorId,
             @RequestHeader(value = "X-Reservation-Strategy", defaultValue = "REDIS_FIRST") String strategyName,
             @RequestHeader(value = "X-Trace-Id", required = false) String traceId
     ) {
-        CreateReservationResult result = admission.executeCreate(() -> createService.create(new CreateReservationCommand(
+        ReservationCoordinationStrategy creation = strategy(strategyName);
+        if (creation == null) {
+            return ResponseEntity.badRequest().body(new ReservationErrorResponse(
+                    "INVALID_STRATEGY",
+                    "Unknown reservation coordination strategy",
+                    false,
+                    boundedTraceId(traceId),
+                    null));
+        }
+        CreateReservationResult result = admission.executeCreate(() -> creation.create(new CreateReservationCommand(
                 request.ticketItemId(), request.quantity(), demoActorId, idempotencyKey.toString())));
         if (result.journalState().filter(state -> state == OperationJournalRepository.JournalState.REPAIR_REQUIRED).isPresent()) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
@@ -95,6 +124,20 @@ public class ReservationController {
             return ResponseEntity.accepted().body(toProcessingResponse(result, traceId));
         }
         return ResponseEntity.status(createStatus(result.outcome())).body(toResponse(result));
+    }
+
+    private ReservationCoordinationStrategy strategy(String strategyName) {
+        try {
+            ReservationStrategy requested = ReservationStrategy.valueOf(strategyName.trim().toUpperCase(Locale.ROOT));
+            for (ReservationCoordinationStrategy candidate : creationCandidates) {
+                if (requested == candidate.strategy()) {
+                    return candidate;
+                }
+            }
+            return creationStrategies.get(requested);
+        } catch (RuntimeException exception) {
+            return null;
+        }
     }
 
 

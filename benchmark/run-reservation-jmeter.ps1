@@ -12,7 +12,9 @@ param(
   [int]$FixtureStock = 1000,
   [ValidateSet("healthy", "duplicate-retry", "overload", "kafka-recovery")]
   [string]$Scenario = "healthy",
-  [string]$JMeterBin = ".\benchmark\jmeter\bin\jmeter.bat"
+  [string]$JMeterBin = ".\benchmark\jmeter\bin\jmeter.bat",
+  [ValidateRange(0, 2147483647)]
+  [int]$HealthyP95BaselineMs = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -274,6 +276,33 @@ $expectedCodes = @("200", "201", "202", "404", "409", "429", "503")
 $unexpectedHttpFailurePercent = if ($count) {
   [Math]::Round((@($samples | Where-Object { $expectedCodes -notcontains [string]$_.responseCode }).Count / $count) * 100, 4)
 } else { 100 }
+$gateFailures = [System.Collections.Generic.List[string]]::new()
+if ($count -eq 0) {
+  $gateFailures.Add("JMeter produced no samples.")
+}
+if ($unexpectedHttpFailurePercent -gt 0) {
+  $gateFailures.Add("JMeter produced unexpected HTTP statuses ($unexpectedHttpFailurePercent%).")
+}
+if (-not $converged) {
+  $gateFailures.Add("Reservation invariant or convergence evidence did not pass within 30 seconds.")
+}
+if ($Scenario -eq "duplicate-retry") {
+  $expectedDuplicateSamples = $Threads * $loops
+  $actualDuplicateSamples = @($samples | Where-Object { $_.label -eq "POST /api/v1/reservations duplicate retry" }).Count
+  if ($actualDuplicateSamples -ne $expectedDuplicateSamples) {
+    $gateFailures.Add("Duplicate-retry workload recorded $actualDuplicateSamples retries; expected $expectedDuplicateSamples for one retry per logical intent.")
+  }
+}
+if ($TerminalAction -ne "none" -and $terminalCoveragePercent -lt 100) {
+  $gateFailures.Add("Terminal action coverage was $terminalCoveragePercent%; expected 100% of successful creates.")
+}
+if ($Scenario -eq "healthy") {
+  if ($HealthyP95BaselineMs -le 0) {
+    $gateFailures.Add("HealthyP95BaselineMs is required to certify the healthy latency gate.")
+  } elseif ($p95 -gt ($HealthyP95BaselineMs * 1.2)) {
+    $gateFailures.Add("Healthy p95 $p95 ms exceeds the permitted 20% regression over baseline $HealthyP95BaselineMs ms.")
+  }
+}
 $startMs = if ($count) { ($samples | ForEach-Object { [long]$_.timeStamp } | Measure-Object -Minimum).Minimum } else { 0 }
 $endMs = if ($count) { ($samples | ForEach-Object { [long]$_.timeStamp + [long]$_.elapsed } | Measure-Object -Maximum).Maximum } else { 0 }
 $durationSeconds = [Math]::Max(0.001, ($endMs - $startMs) / 1000.0)
@@ -326,6 +355,11 @@ $metrics = [ordered]@{
   convergenceSeconds = $convergenceSeconds
   pendingJournal = [long]$evidence.pendingJournal
   pendingOutbox = [long]$evidence.pendingOutbox
+  gates = [ordered]@{
+    healthyP95BaselineMs = $HealthyP95BaselineMs
+    failures = @($gateFailures)
+  }
+  verdict = if ($gateFailures.Count -eq 0) { "PASS" } else { "NO-GO" }
 }
 $metricsPath = Join-Path $resultsDir "metrics.json"
 Write-JsonFile $metricsPath $metrics
@@ -344,7 +378,10 @@ $summary = @(
   "- Terminal coverage percent: $terminalCoveragePercent ($($terminalSamples.Count) terminal samples / $($createSuccessSamples.Count) successful creates)",
   "- Convergence: verdict=$(if ($converged) { 'PASS' } else { 'NO-GO' }), seconds=$convergenceSeconds, pendingJournal=$($evidence.pendingJournal), pendingOutbox=$($evidence.pendingOutbox), drift=$($evidence.finalDriftUnits)",
   "- Inventory snapshot: available=$($inventory.available), reserved=$($inventory.reserved), confirmed=$($inventory.confirmed)",
-  "- Verdict: measurement is local evidence; convergence is not certified until journal/outbox snapshots are attached."
+  "- Verdict: $($metrics.verdict). $($gateFailures -join ' ')"
 )
 $summary | Out-File -LiteralPath (Join-Path $resultsDir "summary.md") -Encoding utf8
 Write-Host "Reservation evidence written to $resultsDir"
+if ($gateFailures.Count -gt 0) {
+  throw "Reservation workload gate failed: $($gateFailures -join ' ')"
+}

@@ -21,20 +21,30 @@
         </elementProp>
       </ThreadGroup>
       <hashTree>
-        <UserParameters guiclass="UserParametersGui" testclass="UserParameters" testname="Correlation per virtual user" enabled="true">
+        <UserParameters guiclass="UserParametersGui" testclass="UserParameters" testname="Actor correlation per virtual user" enabled="true">
           <collectionProp name="UserParameters.names">
             <stringProp name="">actorId</stringProp>
+          </collectionProp>
+          <collectionProp name="UserParameters.thread_values">
+            <collectionProp name="0">
+              <stringProp name="">${__UUID()}</stringProp>
+            </collectionProp>
+          </collectionProp>
+          <boolProp name="UserParameters.per_iteration">false</boolProp>
+        </UserParameters>
+        <hashTree/>
+        <UserParameters guiclass="UserParametersGui" testclass="UserParameters" testname="Logical intent correlation per iteration" enabled="true">
+          <collectionProp name="UserParameters.names">
             <stringProp name="">intentKey</stringProp>
             <stringProp name="">traceparent</stringProp>
           </collectionProp>
           <collectionProp name="UserParameters.thread_values">
             <collectionProp name="0">
               <stringProp name="">${__UUID()}</stringProp>
-              <stringProp name="">${__UUID()}</stringProp>
               <stringProp name="">00-${__groovy(java.util.UUID.randomUUID().toString().replace('-', ''))}-0000000000000001-01</stringProp>
             </collectionProp>
           </collectionProp>
-          <boolProp name="UserParameters.per_iteration">false</boolProp>
+          <boolProp name="UserParameters.per_iteration">true</boolProp>
         </UserParameters>
         <hashTree/>
         <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Reservation correlation headers" enabled="true">
@@ -45,7 +55,7 @@
             </elementProp>
             <elementProp name="" elementType="Header">
               <stringProp name="Header.name">Idempotency-Key</stringProp>
-              <stringProp name="Header.value">${__groovy(props.get('scenario') == 'duplicate-retry' ? vars.get('intentKey') : vars.get('intentKey') + '-' + java.util.UUID.randomUUID())}</stringProp>
+              <stringProp name="Header.value">${intentKey}</stringProp>
             </elementProp>
             <elementProp name="" elementType="Header">
               <stringProp name="Header.name">X-Demo-Actor-Id</stringProp>
