@@ -25,8 +25,8 @@ async function request<T>(
 ): Promise<ApiEnvelope<T>> {
   const url = `${BACKEND}${path}`;
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
   });
   const body = await response.json();
   if (!response.ok) {

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const BASE = 'http://localhost:3002';
+const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
 
 test('admin control desk loads with backend health', async ({ page }) => {
   await page.goto(`${BASE}/admin/control-desk`, { timeout: 15000 });
