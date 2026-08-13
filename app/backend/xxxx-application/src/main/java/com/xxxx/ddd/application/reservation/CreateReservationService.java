@@ -12,6 +12,7 @@ import com.xxxx.ddd.application.reservation.strategy.ReservationStrategy;
 import com.xxxx.ddd.domain.reservation.InventorySnapshot;
 import com.xxxx.ddd.domain.reservation.Reservation;
 import com.xxxx.ddd.domain.reservation.ReservationStatus;
+import io.micrometer.observation.annotation.Observed;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -73,6 +74,7 @@ public class CreateReservationService implements ReservationCoordinationStrategy
         return ReservationStrategy.REDIS_FIRST;
     }
 
+    @Observed(name = "flashsale.reservation.create")
     public CreateReservationResult create(CreateReservationCommand command) {
         Objects.requireNonNull(command, "command must not be null");
         Instant startedAt = Instant.now();
