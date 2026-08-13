@@ -88,6 +88,46 @@ compensation, the transactional outbox, and Kafka publication.
 
 ## 📊 Benchmark Evidence
 
+### 📸 Visual Evidence (JMeter + Grafana + ELK)
+
+To prove the effectiveness of the architecture, the system was load-tested with JMeter (100 concurrent threads) and monitored comprehensively using Prometheus/Grafana (Metrics) and ELK Stack (Centralized Logging).
+
+#### 1. The Superiority of Redis Lua Architecture (Client-side Metrics)
+When applying the `REDIS_LUA_WITH_COMPENSATION` strategy, the system achieved maximum performance without database bottlenecks.
+
+<p align="center">
+  <img src="benchmark/monitoring/jmeter_redis_lua_summary.png" alt="JMeter Summary" width="800"><br>
+  <em>JMeter Summary: 0.00% Error Rate and high throughput.</em>
+</p>
+
+* **Error Rate = 0.00%**: The system perfectly handled 100% of concurrent order requests without any dropped requests or connection errors.
+* **Stable Throughput & Latency**: Based on the Throughput (`jmeter_redis_lua_throughput.png`) and Latency (`jmeter_redis_lua_latency.png`) graphs, the performance remains flat and consistent. This proves the in-memory architecture of Redis combined with Lua Scripts processes inventory with extremely low and uniform latency, avoiding any "lock wait" stuttering.
+
+#### 2. System Resource Monitoring (Server-side Metrics)
+JVM and Server metrics collected via Actuator + Micrometer were visualized on Grafana.
+
+<p align="center">
+  <img src="benchmark/monitoring/grafana_system_metrics.png" alt="Grafana Metrics" width="800"><br>
+  <em>Grafana Dashboard monitoring JVM, CPU, Memory, and Custom Order Latency</em>
+</p>
+
+* The `Order Latency (Seconds)` chart for the `/orders` API shows excellent response times under high load.
+* CPU and Memory Usage of the Java application remained stable without OOM (Out Of Memory) or CPU spikes. Offloading the deduction logic to Redis significantly reduced the load on both the Java application and MySQL.
+
+#### 3. The Importance of Centralized Logging (Bottleneck Detection)
+To clearly see the value of Redis Lua, look at what happens when the system **does not use it** (using the `CONDITIONAL_DB` strategy).
+
+<p align="center">
+  <img src="benchmark/monitoring/elk_conditional_db_bottleneck.png" alt="ELK Bottleneck" width="800"><br>
+  <em>Kibana catching 833 errors (Lock Wait Timeout) during CONDITIONAL_DB load</em>
+</p>
+
+* When 100 concurrent requests hit MySQL directly, **Lock Contention** occurred on the `ticket_item` table.
+* Instead of SSH-ing into servers to grep logs, **Kibana (ELK)** aggregated all logs in real-time. The Histogram shows a massive spike in errors (833 hits), with detailed logs showing `createOrder failed ... strategy=CONDITIONAL_DB`.
+* 👉 **Conclusion:** This is exactly the bottleneck that the `REDIS_LUA_WITH_COMPENSATION` architecture completely resolved.
+
+---
+
 ### Reservation reliability release gates
 
 The release harness extends the original JMeter comparison with identity-bound reset/evidence
