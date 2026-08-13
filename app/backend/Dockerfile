@@ -18,7 +18,9 @@ COPY app/backend/ app/backend/
 
 # Build the fat JAR (tests already passed in CI)
 RUN mvn -B -q -pl app/backend/xxxx-start -am -DskipTests package \
-    && cp app/backend/xxxx-start/target/xxxx-start-*.jar /app.jar
+    && jar_file=$(find app/backend/xxxx-start/target -maxdepth 1 -type f -name 'xxxx-start-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1) \
+    && test -n "$jar_file" \
+    && cp "$jar_file" /app.jar
 
 # ── Runtime stage ────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
