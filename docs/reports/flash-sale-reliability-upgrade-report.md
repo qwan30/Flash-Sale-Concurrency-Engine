@@ -2,12 +2,37 @@
 
 ## Certification status
 
-`NO-GO — working-tree evidence is not a release candidate`
+`NO-GO — implementation and CI are green, but the plan's final effectiveness certification is incomplete`
 
 The current checkout contains the reservation lifecycle, recovery, admission, observability, UI,
-benchmark, and optional OTel evidence lanes. The target branch still has intentional uncommitted
-changes and unrelated dirty artifacts, so this report does not present a release SHA or claim final
-same-SHA certification.
+benchmark, and optional OTel evidence lanes. The implementation PR is mergeable and its required
+CI checks pass, but the plan still requires same-SHA baseline comparison, deterministic fault
+effectiveness evidence, and a complete manual browser control audit. Those gates are not silently
+treated as complete.
+
+## Current verification overlay — 2026-08-13
+
+- Candidate SHA: `b5d98de374a0d5f3729b1e3cdbe54af7b730a23c` on PR branch
+  `pr/phase-17-release`. The exact SHA is pushed to the PR head and the PR is reported by GitHub
+  as `MERGEABLE` and `OPEN`. This report does not authorize or perform the merge.
+- Local verification is green: frontend client tests 26/26, controller reactor Maven tests 58/58,
+  full Docker-backed `flashsale-integration` reactor tests passed, and current Playwright control
+  desk/smoke/screenshot suites passed 17/17 (5 operator-control plus 12 smoke/screenshot tests).
+- GitHub checks for this exact SHA are all successful: backend unit, integration, observability,
+  package, frontend lint/typecheck/build, infrastructure validation, and Vercel deployment checks.
+- A current-SHA healthy JMeter run (`benchmark/results/reservation-healthy-20260813-093337Z`)
+  executed 5,000 samples at 100 threads and recorded p95 74 ms, p99 1,412 ms, 46 successful
+  creates, zero final drift, zero pending journal/outbox entries, and convergence in 8.178 s.
+  HTTP 429/503 admission responses were expected by the harness. The run is **NO-GO** because
+  `HealthyP95BaselineMs` was intentionally not supplied; no same-machine pre-change baseline is
+  available in this candidate, so no latency-regression claim is made.
+- The current JMeter run does not complete Phase 14: no exact-SHA before/after effectiveness
+  report exists for all five deterministic fault points, no k6 runtime measurement is available,
+  and the manual connected-Chrome/in-app-browser control matrix is still outstanding. Automated
+  Playwright evidence is not a substitute for that manual audit.
+- The only remaining working-tree change is the pre-existing local screenshot
+  `app/frontend/e2e/screenshots/local-booking-demo.png`; it was not modified or committed by this
+  review.
 
 ## Current verification overlay — 2026-08-11
 
