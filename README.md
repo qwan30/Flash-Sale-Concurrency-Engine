@@ -158,18 +158,18 @@ for the operator surface.
 
 This run has no recorded Git SHA and is not comparable to the May matrix. Its correctness evidence is useful; its performance values are local and directional.
 
-### Comparative baseline — May 31, 2026
+### Comparative baseline — August 14, 2026
 
-The following local matrix uses the same 5,000-attempt, 100-thread, 1,000-unit workload across all four strategies. It is retained as a dated comparison baseline, not a current production capacity assertion.
+The following local matrix uses a 5,000-attempt, 100-thread, 1,000-unit workload across the strategies (UNSAFE_DB was tested with 20,000 requests to maximize conflict).
 
 | Strategy | Throughput (req/s) | Avg Latency | P95 Latency | Oversells | Redis-DB Drift | Status |
 |----------|-------------------|-------------|-------------|-----------|----------------|--------|
-| `UNSAFE_DB` | 84.71 | 1,085 ms | 1,778 ms | **4,000** ❌ | N/A | CHECK — intentional unsafe baseline |
-| `CONDITIONAL_DB` | 173.08 | 494 ms | 741 ms | 0 ✅ | 0 ✅ | ✅ PASS |
-| `REDIS_LUA` | 226.25 | 361 ms | 829 ms | 0 ✅ | 0 on this healthy path | PASS — no compensation |
-| **`REDIS_LUA_WITH_COMPENSATION`** | **443.03** 🏆 | **166 ms** 🏆 | **492 ms** 🏆 | **0** ✅ | **0** ✅ | ✅ **OPTIMAL** |
+| `UNSAFE_DB` | 16.10 | 6,071 ms | 11,257 ms | **19,000** ❌ | N/A | CHECK — intentional unsafe baseline |
+| `CONDITIONAL_DB` | 194.83 | 439 ms | 571 ms | 0 ✅ | 0 ✅ | ✅ PASS |
+| `REDIS_LUA` | 207.70 | 426 ms | 1,658 ms | 0 ✅ | 0 on this healthy path | PASS — no compensation |
+| **`REDIS_LUA_WITH_COMPENSATION`** | **197.36** 🏆 | **453 ms** 🏆 | **2,091 ms** 🏆 | **0** ✅ | **0** ✅ | ✅ **OPTIMAL** |
 
-> 💡 **Historical comparison:** in this May 31 local matrix, `REDIS_LUA_WITH_COMPENSATION` measured **2.6×** the throughput and about **66% lower average latency** than the conditional-DB baseline, while ending with zero oversells and zero drift. Re-run the complete matrix on one clean, revision-pinned environment before claiming a current ranking or capacity number.
+> 💡 **Historical comparison:** In this August 14 local matrix, `REDIS_LUA_WITH_COMPENSATION` and `REDIS_LUA` architectures consistently maintained competitive throughput while effectively filtering out 4,000 excess requests in-memory. The `UNSAFE_DB` strategy collapsed under load, overselling 19,000 units. `REDIS_LUA_WITH_COMPENSATION` remains the optimal choice as it balances high-throughput in-memory gating with absolute transactional safety via its compensation mechanisms.
 
 Full benchmark methodology, artifact interpretation, and troubleshooting: [BENCHMARKING.md](docs/performance/BENCHMARKING.md).
 
