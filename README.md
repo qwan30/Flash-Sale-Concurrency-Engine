@@ -71,7 +71,7 @@ This lab exists to **test the answers empirically**, not just theorize about the
 
 ## 🎯 System Architecture Overview
 
-![Strategy routing, Redis gating, compensation, and outbox flow](docs/images/strategy-routing-and-recovery.png)
+<img src="docs/images/architecture-overview.png" alt="System Architecture Overview" width="800">
 
 This diagram shows the request path from the strategy registry through Redis/MySQL persistence,
 compensation, the transactional outbox, and Kafka publication.
@@ -80,7 +80,7 @@ compensation, the transactional outbox, and Kafka publication.
 
 ## ⚡ Strategy Comparison: Historical May 31 Reference Matrix
 
-![Conditional MySQL versus Redis Lua with compensation](docs/images/strategy-comparison-flow.png)
+<img src="docs/images/strategy-comparison.png" alt="Strategy Comparison" width="800">
 
 **The bottleneck shift:** `CONDITIONAL_DB` sends all 5,000 requests to MySQL — row locking serializes them. `REDIS_LUA_WITH_COMPENSATION` filters 4,000 excess requests at Redis (microsecond rejection), so MySQL only processes the 1,000 that actually have stock available. That's an **80% load reduction on the database** before the first SQL statement runs.
 
@@ -175,7 +175,7 @@ Full benchmark methodology, artifact interpretation, and troubleshooting: [BENCH
 
 ## 🏗️ Architecture — DDD Multi-Module Layout
 
-![DDD multi-module architecture](docs/images/ddd-module-layout.png)
+<img src="docs/images/ddd-modules.png" alt="DDD Multi-Module Architecture" width="800">
 
 **5 Maven Modules:** `xxxx-domain` · `xxxx-infrastructure` · `xxxx-application` · `xxxx-controller` · `xxxx-start`
 
