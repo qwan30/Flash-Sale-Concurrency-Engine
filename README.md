@@ -153,6 +153,11 @@ graph LR
 
 **The bottleneck shift:** `CONDITIONAL_DB` sends all 5,000 requests to MySQL — row locking serializes them. `REDIS_LUA_WITH_COMPENSATION` filters 4,000 excess requests at Redis (microsecond rejection), so MySQL only processes the 1,000 that actually have stock available. That's an **80% load reduction on the database** before the first SQL statement runs.
 
+![Strategy routing, Redis gating, compensation, and outbox flow](docs/images/strategy-routing-and-recovery.png)
+
+The routing diagram shows the complete request path: strategy selection, Redis atomic gating,
+MySQL persistence, compensation on failed commits, transactional outbox publication, and Kafka.
+
 ---
 
 ## 📊 Benchmark Evidence
@@ -209,6 +214,12 @@ xychart-beta
 > 💡 **Historical comparison:** in this May 31 local matrix, `REDIS_LUA_WITH_COMPENSATION` measured **2.6×** the throughput and about **66% lower average latency** than the conditional-DB baseline, while ending with zero oversells and zero drift. Re-run the complete matrix on one clean, revision-pinned environment before claiming a current ranking or capacity number.
 
 Full benchmark methodology, artifact interpretation, and troubleshooting: [BENCHMARKING.md](docs/performance/BENCHMARKING.md).
+
+![Conditional MySQL versus Redis Lua with compensation](docs/images/strategy-comparison-flow.png)
+
+This visual is the same historical May 31 comparison represented above, including the intentional
+unsafe/serialized baseline and the Redis fast-rejection path. It is local lab evidence, not a
+production capacity guarantee.
 
 ---
 
@@ -284,6 +295,12 @@ Full benchmark methodology, artifact interpretation, and troubleshooting: [BENCH
 ```
 
 **5 Maven Modules:** `xxxx-domain` · `xxxx-infrastructure` · `xxxx-application` · `xxxx-controller` · `xxxx-start`
+
+### Visual module map
+
+![DDD multi-module architecture](docs/images/ddd-module-layout.png)
+
+The dependency direction remains `domain ← infrastructure ← application ← controller ← start`.
 
 **Key packages inside `xxxx-application`:**
 - `stock.strategy` — `StockDeductionStrategy` interface + 4 implementations (UNSAFE_DB, CONDITIONAL_DB, REDIS_LUA, REDIS_LUA_WITH_COMPENSATION)
