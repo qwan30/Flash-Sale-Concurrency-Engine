@@ -40,9 +40,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * crash is recovered by the existing create-recovery path without double-decrementing MySQL.
  *
  * <p><strong>LOCAL COMPARISON BASELINE ONLY:</strong>
- * The per-ticket lock used here ({@link ReentrantLock}) is deliberately process-local 
- * comparison-lane coordination. This class MUST NOT be presented or used as a multi-replica 
- * production strategy until a distributed lock or an equivalent cross-instance ordering contract 
+ * The per-ticket lock used here ({@link ReentrantLock}) is deliberately process-local
+ * comparison-lane coordination. This class MUST NOT be presented or used as a multi-replica
+ * production strategy until a distributed lock or an equivalent cross-instance ordering contract
  * is measured and enabled. It exists solely to serve as a local baseline comparison against Redis.
  */
 @Component("localMySqlConditionalReservationStrategy")
