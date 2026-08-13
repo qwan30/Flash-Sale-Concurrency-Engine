@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  authorizeBenchmarkControls,
   getConsistency,
   getHealth,
   getTicket,
@@ -59,6 +60,8 @@ export function AdminControlDesk() {
   const [ticketItemId, setTicketItemId] = useState(DEFAULT_TICKET_ID);
   const [stock, setStock] = useState(DEFAULT_STOCK);
   const [yearMonth, setYearMonth] = useState(DEFAULT_YEAR_MONTH);
+  const [operatorToken, setOperatorToken] = useState("");
+  const [controlAccessGranted, setControlAccessGranted] = useState(false);
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -103,6 +106,24 @@ export function AdminControlDesk() {
       toast.success("Benchmark state reset");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to reset benchmark data";
+      setErrorMessage(message);
+      toast.error(message);
+    } finally {
+      setLoadingKey(null);
+    }
+  };
+
+  const onAuthorizeControls = async () => {
+    setLoadingKey("authorize");
+    setErrorMessage(null);
+
+    try {
+      await authorizeBenchmarkControls(operatorToken);
+      setOperatorToken("");
+      setControlAccessGranted(true);
+      toast.success("Benchmark controls authorized for this browser session");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to authorize controls";
       setErrorMessage(message);
       toast.error(message);
     } finally {
@@ -228,9 +249,36 @@ export function AdminControlDesk() {
         <Card>
           <CardHeader>
             <CardTitle>Operations</CardTitle>
-            <CardDescription>Reset the benchmark fixture and sync Redis stock.</CardDescription>
+            <CardDescription>
+              Reset the benchmark fixture and sync Redis stock after authorizing this local operator
+              session. The backend control token stays server-side.
+            </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-5 grid gap-3 rounded-lg border border-black/[0.08] p-4 sm:grid-cols-[1fr_auto] sm:items-end">
+              <Field label="Operator token">
+                <Input
+                  type="password"
+                  autoComplete="off"
+                  value={operatorToken}
+                  data-testid="control-operator-token"
+                  onChange={(event) => setOperatorToken(event.target.value)}
+                />
+              </Field>
+              <Button
+                type="button"
+                variant="secondary"
+                data-testid="control-authorize-btn"
+                onClick={onAuthorizeControls}
+                disabled={!operatorToken || loadingKey === "authorize"}
+              >
+                {loadingKey === "authorize" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {controlAccessGranted ? "Re-authorize controls" : "Authorize controls"}
+              </Button>
+              <p className="text-sm text-[#898989] sm:col-span-2">
+                Authorization expires after 15 minutes and is required before state-changing actions.
+              </p>
+            </div>
             <form className="grid gap-4 sm:grid-cols-3" onSubmit={onReset}>
               <Field label="Ticket ID">
                 <Input
@@ -259,7 +307,11 @@ export function AdminControlDesk() {
                 />
               </Field>
               <div className="flex flex-wrap gap-2 sm:col-span-3">
-                <Button type="submit" data-testid="control-reset-btn" disabled={loadingKey === "reset"}>
+                <Button
+                  type="submit"
+                  data-testid="control-reset-btn"
+                  disabled={!controlAccessGranted || loadingKey === "reset"}
+                >
                   {loadingKey === "reset" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
@@ -272,7 +324,7 @@ export function AdminControlDesk() {
                   variant="secondary"
                   data-testid="control-warmup-btn"
                   onClick={onWarmup}
-                  disabled={loadingKey === "warmup"}
+                  disabled={!controlAccessGranted || loadingKey === "warmup"}
                 >
                   {loadingKey === "warmup" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

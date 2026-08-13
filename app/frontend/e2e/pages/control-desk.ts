@@ -3,8 +3,8 @@ import type { Page, Locator } from '@playwright/test';
 /**
  * Page Object for /admin/control-desk — the operator's primary dashboard.
  *
- * This is where an operator resets stock, warms Redis, runs order probes,
- * and checks consistency before and after a flash sale.
+ * This is where an authenticated local operator resets stock, warms Redis,
+ * runs order probes, and checks consistency before and after a flash sale.
  */
 export class ControlDeskPage {
   readonly page: Page;
@@ -16,6 +16,8 @@ export class ControlDeskPage {
   readonly yearMonthInput: Locator;
   readonly resetButton: Locator;
   readonly warmupButton: Locator;
+  readonly operatorTokenInput: Locator;
+  readonly authorizeControlsButton: Locator;
 
   // Order probe
   readonly probeUserIdInput: Locator;
@@ -43,6 +45,8 @@ export class ControlDeskPage {
     this.yearMonthInput = page.locator('[data-testid="control-year-month"]');
     this.resetButton = page.locator('[data-testid="control-reset-btn"]');
     this.warmupButton = page.locator('[data-testid="control-warmup-btn"]');
+    this.operatorTokenInput = page.locator('[data-testid="control-operator-token"]');
+    this.authorizeControlsButton = page.locator('[data-testid="control-authorize-btn"]');
 
     // Order probe
     this.probeUserIdInput = page.locator('[data-testid="probe-user-id"]');
@@ -64,6 +68,11 @@ export class ControlDeskPage {
 
   async goto() {
     await this.page.goto(this.url);
+  }
+
+  async authorizeControls(operatorToken: string) {
+    await this.operatorTokenInput.fill(operatorToken);
+    await this.authorizeControlsButton.click();
   }
 
   /**

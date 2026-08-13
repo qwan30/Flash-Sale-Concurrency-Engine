@@ -42,8 +42,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "logging.level.org.springframework=WARN",
                 "spring.jpa.show-sql=false",
                 "spring.task.scheduling.enabled=false",
+                "spring.profiles.active=benchmark",
                 "flashsale.reservation.recovery-enabled=false",
                 "flashsale.reservation.expiry-enabled=false",
+                "benchmark.fixture-reset-enabled=true",
                 "benchmark.fixture-reset-token=test-fixture-token"
         })
 class ReservationFixtureResetIntegrationTest {

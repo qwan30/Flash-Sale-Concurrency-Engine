@@ -30,6 +30,11 @@ test.describe('Admin Operator Workflow', () => {
     const desk = new ControlDeskPage(page);
     await desk.goto();
     await expect(page).toHaveURL('/admin/control-desk');
+    const operatorToken = process.env.BENCHMARK_OPERATOR_TOKEN;
+    if (!operatorToken) {
+      throw new Error('BENCHMARK_OPERATOR_TOKEN is required for the control-desk UI test');
+    }
+    await desk.authorizeControls(operatorToken);
 
     // Step 1: Reset stock through the dashboard UI
     await desk.setupSale(TICKET_ITEM_ID, STOCK, YEAR_MONTH);

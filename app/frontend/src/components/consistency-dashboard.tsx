@@ -5,14 +5,13 @@ import {
   CheckCircle2,
   Database,
   Loader2,
-  PackageCheck,
   RefreshCw,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { getConsistency, getTicket, warmupStock } from "@/lib/api";
+import { getConsistency, getTicket } from "@/lib/api";
 import { DEFAULT_TICKET_ID, DEFAULT_YEAR_MONTH } from "@/lib/events";
 import type { ConsistencySnapshot, TicketDetail } from "@/lib/types";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
@@ -70,23 +69,6 @@ export function ConsistencyDashboard() {
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void refreshSnapshot();
-  };
-
-  const onWarmup = async () => {
-    setLoadingKey("warmup");
-    setErrorMessage(null);
-
-    try {
-      const envelope = await warmupStock(ticketItemId);
-      toast.success(envelope.result.message || "Redis stock warmed from DB");
-      await refreshSnapshot();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to warm Redis stock";
-      setErrorMessage(message);
-      toast.error(message);
-    } finally {
-      setLoadingKey(null);
-    }
   };
 
   const isClean = snapshot
@@ -183,21 +165,11 @@ export function ConsistencyDashboard() {
                   <RefreshCw className="h-4 w-4" />
                   Refresh snapshot
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={onWarmup}
-                  disabled={loadingKey === "warmup"}
-                >
-                  {loadingKey === "warmup" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <PackageCheck className="h-4 w-4" />
-                  )}
-                  Warm Redis
-                </Button>
               </div>
             </form>
+            <p className="mt-4 text-sm text-[#898989]">
+              Redis warmup is a privileged lab operation; use the Control Desk or a trusted runner.
+            </p>
           </CardContent>
         </Card>
 

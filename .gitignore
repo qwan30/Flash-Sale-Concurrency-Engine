@@ -62,22 +62,17 @@ history/
 ### Flash-sale lab generated/vendor assets ###
 environment/data/
 environment/grafana-storage/
+app/frontend/benchmark/results/
+app/frontend/e2e/reports/
 benchmark/jmeter/**
 !benchmark/jmeter/
 !benchmark/jmeter/**/*.jmx
 !benchmark/jmeter/README.md
-
-# Benchmark runs: keep the small evidence artifacts under version control so the
-# numbers quoted in docs/performance are reproducible from the repo, but exclude
-# the JMeter HTML dashboards, which vendor Bootstrap/jQuery bundles.
-benchmark/results/**
-!benchmark/results/
-!benchmark/results/*/
-!benchmark/results/*/summary-row.md
-!benchmark/results/*/consistency.json
-!benchmark/results/*/reset.json
-!benchmark/results/*/warmup.json
-!benchmark/results/*/run.json
+benchmark/results/
+reference/opentelemetry-demo/
+reference/saleor/
+temp_diff.txt
+temp_service.java
 
 target-effective-pom
 .env

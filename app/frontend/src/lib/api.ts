@@ -50,6 +50,20 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   return body;
 }
 
+export async function authorizeBenchmarkControls(operatorToken: string): Promise<void> {
+  const response = await fetch("/api/benchmark/operator-session", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: operatorToken }),
+  });
+  const body = await readJson<{ message?: string }>(response);
+
+  if (!response.ok) {
+    throw new Error(body?.message ?? "Unable to authorize benchmark controls");
+  }
+}
+
 export async function getHealth() {
   return requestJson<HealthResponse>("/actuator/health", {
     method: "GET",

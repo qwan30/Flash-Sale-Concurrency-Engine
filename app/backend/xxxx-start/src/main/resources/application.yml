@@ -89,7 +89,11 @@ app:
 
 benchmark:
   results-dir: ${BENCHMARK_RESULTS_DIR:benchmark/results}
+  control-enabled: ${BENCHMARK_CONTROL_ENABLED:false}
+  control-token: ${BENCHMARK_CONTROL_TOKEN:}
+  fixture-reset-enabled: ${BENCHMARK_FIXTURE_RESET_ENABLED:false}
   fixture-reset-token: ${BENCHMARK_FIXTURE_RESET_TOKEN:}
+  fixture-ticket-item-id: ${BENCHMARK_FIXTURE_TICKET_ITEM_ID:950015}
 
 # Admission control for the public order API. The ceiling sits well above the highest
 # throughput observed in the benchmark matrix (443 req/s), so load tests measure the

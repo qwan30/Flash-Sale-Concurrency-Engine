@@ -1,4 +1,9 @@
 import { NextRequest } from "next/server";
+import {
+  applyBenchmarkControlHeaders,
+  canUseBenchmarkControl,
+  isBenchmarkControlRoute,
+} from "@/lib/backend-control-proxy";
 
 type RouteContext = {
   params: Promise<{
@@ -22,6 +27,7 @@ const HOP_BY_HOP_HEADERS = new Set([
 const EXACT_ALLOWED_BACKEND_ROUTES = new Set([
   "GET actuator/health",
   "POST admin/benchmarks/reset",
+  "POST admin/benchmarks/reconcile",
   "GET admin/benchmarks/consistency",
   "GET admin/benchmarks/runs",
   "POST orders",
@@ -55,9 +61,27 @@ function isAllowedBackendRoute(method: string, path: string[]) {
 async function proxy(request: NextRequest, context: RouteContext) {
   const { path } = await context.params;
   const method = request.method.toUpperCase();
+  const normalizedPath = path.join("/");
 
   if (!isAllowedBackendRoute(method, path)) {
     return Response.json({ message: "Backend proxy path is not allowed" }, { status: 404 });
+  }
+
+  if (
+    isBenchmarkControlRoute(method, normalizedPath)
+    && !canUseBenchmarkControl({
+      method,
+      path: normalizedPath,
+      requestOrigin: request.headers.get("origin"),
+      expectedOrigin: process.env.BENCHMARK_OPERATOR_ORIGIN ?? request.nextUrl.origin,
+      session: request.cookies.get("flashsale_benchmark_operator")?.value,
+      operatorToken: process.env.BENCHMARK_OPERATOR_TOKEN,
+    })
+  ) {
+    return Response.json(
+      { message: "Benchmark control requires an authenticated same-origin operator session" },
+      { status: 403 },
+    );
   }
 
   const backendBaseUrl = process.env.BACKEND_BASE_URL ?? "http://localhost:1122";
@@ -68,6 +92,22 @@ async function proxy(request: NextRequest, context: RouteContext) {
   for (const header of HOP_BY_HOP_HEADERS) {
     headers.delete(header);
   }
+  // Never forward caller-controlled benchmark credentials. A control request receives the
+  // backend-only credential below only after the operator/session gate has succeeded.
+  headers.delete("X-Flashsale-Synthetic");
+  headers.delete("X-Flashsale-Control-Token");
+  if (isBenchmarkControlRoute(method, normalizedPath) && !process.env.BENCHMARK_CONTROL_TOKEN) {
+    return Response.json(
+      { message: "Benchmark control is unavailable because the backend credential is not configured" },
+      { status: 503 },
+    );
+  }
+  applyBenchmarkControlHeaders(
+    headers,
+    method,
+    normalizedPath,
+    process.env.BENCHMARK_CONTROL_TOKEN,
+  );
 
   const response = await fetch(targetUrl, {
     method,

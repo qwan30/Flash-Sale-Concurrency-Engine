@@ -2,22 +2,15 @@ package com.xxxx.ddd.controller.http;
 
 import com.xxxx.ddd.application.model.benchmark.BenchmarkRunDetail;
 import com.xxxx.ddd.application.model.benchmark.BenchmarkRunSummary;
-import com.xxxx.ddd.application.model.order.BenchmarkResetRequest;
-import com.xxxx.ddd.application.model.order.BenchmarkResetResponse;
 import com.xxxx.ddd.application.model.order.ConsistencySnapshot;
-import com.xxxx.ddd.application.model.order.CreateOrderResponse;
 import com.xxxx.ddd.application.model.order.OrderStrategy;
 import com.xxxx.ddd.application.service.benchmark.BenchmarkRunService;
-import com.xxxx.ddd.application.service.reservation.ReservationFixtureService;
-import com.xxxx.ddd.application.service.order.OrderReconciliationService;
 import com.xxxx.ddd.application.service.order.TicketOrderAppService;
-import com.xxxx.ddd.application.reservation.ReservationFixtureResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -25,7 +18,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.List;
 import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -45,132 +37,12 @@ class AdminBenchmarkControllerTest {
     @Mock
     private BenchmarkRunService benchmarkRunService;
 
-    @Mock
-    private OrderReconciliationService orderReconciliationService;
-
-    @Mock
-    private ReservationFixtureService reservationFixtureService;
-
     @BeforeEach
     void setUp() {
         AdminBenchmarkController controller = new AdminBenchmarkController();
         ReflectionTestUtils.setField(controller, "ticketOrderAppService", ticketOrderAppService);
         ReflectionTestUtils.setField(controller, "benchmarkRunService", benchmarkRunService);
-        ReflectionTestUtils.setField(controller, "orderReconciliationService", orderReconciliationService);
-        ReflectionTestUtils.setField(controller, "reservationFixtureService", reservationFixtureService);
-        ReflectionTestUtils.setField(controller, "fixtureResetToken", "test-fixture-token");
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
-    }
-
-    @Test
-    void reservationFixtureResetReturnsDurableAndRedisProof() throws Exception {
-        when(reservationFixtureService.reset(any())).thenReturn(
-                ReservationFixtureResult.success(950015L, 1000, 0, "OPEN")
-        );
-
-        mockMvc.perform(post("/admin/reservation-fixtures/reset")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Flashsale-Synthetic", "true")
-                        .header("X-Flashsale-Fixture-Token", "test-fixture-token")
-                        .content("""
-                                {
-                                  "ticketItemId": 950015,
-                                  "stock": 1000,
-                                  "strategy": "REDIS_LUA_WITH_COMPENSATION",
-                                  "reservationFixture": true
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.success").value(true))
-                .andExpect(jsonPath("$.result.reservationFixtureReset").value(true))
-                .andExpect(jsonPath("$.result.reservationStockAfter").value(1000))
-                .andExpect(jsonPath("$.result.reservationRedisStockAfter").value(1000))
-                .andExpect(jsonPath("$.result.admissionState").value("OPEN"));
-    }
-
-    @Test
-    void reservationFixtureResetReturnsServiceUnavailableWhenParityProofFails() throws Exception {
-        when(reservationFixtureService.reset(any())).thenReturn(
-                ReservationFixtureResult.failed(
-                        950015L,
-                        1000,
-                        "REDIS_FIRST",
-                        "Durable and Redis reservation fixture state diverged"));
-
-        mockMvc.perform(post("/admin/reservation-fixtures/reset")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("X-Flashsale-Synthetic", "true")
-                        .header("X-Flashsale-Fixture-Token", "test-fixture-token")
-                        .content("""
-                                {
-                                  "ticketItemId": 950015,
-                                  "stock": 1000,
-                                  "strategy": "REDIS_FIRST",
-                                  "reservationFixture": true
-                                }
-                                """))
-                .andExpect(status().isServiceUnavailable());
-    }
-
-    @Test
-    void reservationFixtureResetRequiresSyntheticHeader() throws Exception {
-        mockMvc.perform(post("/admin/reservation-fixtures/reset")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "ticketItemId": 950015,
-                                  "stock": 1000,
-                                  "strategy": "REDIS_FIRST",
-                                  "reservationFixture": true
-                                }
-                                """))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void warmupStockReturnsSuccess() throws Exception {
-        when(ticketOrderAppService.warmupStock(4L)).thenReturn(
-                CreateOrderResponse.builder()
-                        .success(true)
-                        .code("SUCCESS")
-                        .message("Stock warmed up")
-                        .build()
-        );
-
-        mockMvc.perform(post("/admin/tickets/4/stock/warmup"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.result.code").value("SUCCESS"));
-    }
-
-    @Test
-    void resetBenchmarkReturnsStructuredResponse() throws Exception {
-        when(ticketOrderAppService.resetBenchmark(any(BenchmarkResetRequest.class))).thenReturn(
-                BenchmarkResetResponse.builder()
-                        .success(true)
-                        .message("Benchmark reset")
-                        .ticketItemId(4L)
-                        .stock(1000)
-                        .yearMonth("202606")
-                        .redisStockAfter(1000)
-                        .dbStockAfter(1000)
-                        .dbOrderCount(0L)
-                        .build()
-        );
-
-        mockMvc.perform(post("/admin/benchmarks/reset")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "ticketItemId": 4,
-                                  "stock": 1000,
-                                  "yearMonth": "202606"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.ticketItemId").value(4))
-                .andExpect(jsonPath("$.result.stock").value(1000))
-                .andExpect(jsonPath("$.result.dbOrderCount").value(0));
     }
 
     @Test
@@ -219,25 +91,6 @@ class AdminBenchmarkControllerTest {
                 .andExpect(jsonPath("$.result.dbStockAfter").value(10))
                 .andExpect(jsonPath("$.result.driftAmount").value(-5))
                 .andExpect(jsonPath("$.result.redisDbInconsistencyCount").value(1));
-    }
-
-    @Test
-    void reconcileReturnsRepairResult() throws Exception {
-        OrderReconciliationService.ReconciliationResult reconResult =
-                new OrderReconciliationService.ReconciliationResult();
-        reconResult.setDriftDetected(true);
-        reconResult.setRepaired(true);
-        reconResult.setDriftAmount(-5);
-
-        when(orderReconciliationService.reconcile(anyLong(), anyString())).thenReturn(reconResult);
-
-        mockMvc.perform(post("/admin/benchmarks/reconcile")
-                        .param("ticketItemId", "4")
-                        .param("yearMonth", "202606"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result.driftDetected").value(true))
-                .andExpect(jsonPath("$.result.repaired").value(true))
-                .andExpect(jsonPath("$.result.driftAmount").value(-5));
     }
 
     @Test
