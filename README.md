@@ -283,6 +283,39 @@ the k6 workload is an evidence lane and does not silently replace the default Br
 docker compose -f environment/docker-compose-dev.yml --profile observability up -d
 ```
 
+### 🔬 Hands-On Observability Lab
+Follow these steps to run a complete benchmark with tracing and metrics:
+
+**1. Clean old benchmark results**
+```powershell
+Remove-Item -Recurse -Force benchmark\results\*
+```
+
+**2. Start full observability stack**
+```bash
+# 1. Start Prometheus, Grafana & exporters
+docker compose -f environment/docker-compose-dev.yml --profile observability up -d
+
+# 2. Start Jaeger & OpenTelemetry Collector
+docker compose -f environment/docker-compose-otel.yml --profile otel up -d
+```
+
+**3. Build and run backend with OTEL enabled**
+```bash
+mvn -pl app/backend/xxxx-start -am -DskipTests clean package
+java -Dspring.profiles.active=otel -jar app/backend/xxxx-start/target/xxxx-start-1.0-SNAPSHOT.jar
+```
+
+**4. Push load with JMeter**
+```powershell
+powershell -ExecutionPolicy Bypass -File benchmark/run-jmeter.ps1 -Strategy REDIS_LUA_WITH_COMPENSATION -Threads 100 -TotalRequests 5000 -Stock 1000
+```
+
+**5. View the metrics**
+- **Grafana (Metrics):** `http://localhost:3000` (Default login: `admin`/`admin`). View the *Flashsale Reservation Reliability* dashboard.
+- **Jaeger (Traces):** `http://localhost:16686`. Select `flashsale-backend` and click *Find Traces*.
+- **Local JSON Results:** Check the latest folder in `benchmark/results/` for `consistency.json` and `summary-row.md`.
+
 **Runtime surface when running locally:**
 
 | Service | URL |
