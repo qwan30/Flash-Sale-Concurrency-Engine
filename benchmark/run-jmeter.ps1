@@ -14,7 +14,11 @@ $runId = "$Strategy-$(Get-Date -Format yyyyMMdd-HHmmss)"
 $resultsDir = ".\benchmark\results\$runId"
 New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
 $uri = [Uri]$BaseUrl
-$headers = @{ "Content-Type" = "application/json" }
+$headers = @{ 
+  "Content-Type" = "application/json" 
+  "X-Flashsale-Synthetic" = "true"
+  "X-Flashsale-Control-Token" = "secret"
+}
 
 $resetBody = @{
   ticketItemId = $TicketItemId
@@ -26,7 +30,7 @@ Invoke-RestMethod -Method Post -Uri "$BaseUrl/admin/benchmarks/reset" -Headers $
   ConvertTo-Json -Depth 5 |
   Out-File "$resultsDir\reset.json"
 
-Invoke-RestMethod -Method Post -Uri "$BaseUrl/admin/tickets/$TicketItemId/stock/warmup" |
+Invoke-RestMethod -Method Post -Uri "$BaseUrl/admin/tickets/$TicketItemId/stock/warmup" -Headers $headers |
   ConvertTo-Json -Depth 5 |
   Out-File "$resultsDir\warmup.json"
 
@@ -46,7 +50,7 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path "$resultsDir\results.jtl")) {
   throw "JMeter failed; see console output and $resultsDir"
 }
 
-$consistency = Invoke-RestMethod -Method Get -Uri "$BaseUrl/admin/benchmarks/consistency?ticketItemId=$TicketItemId&yearMonth=$YearMonth"
+$consistency = Invoke-RestMethod -Method Get -Uri "$BaseUrl/admin/benchmarks/consistency?ticketItemId=$TicketItemId&yearMonth=$YearMonth" -Headers $headers
 $consistency | ConvertTo-Json -Depth 5 | Out-File "$resultsDir\consistency.json"
 
 $samples = Import-Csv "$resultsDir\results.jtl"

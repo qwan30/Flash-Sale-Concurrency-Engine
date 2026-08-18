@@ -7,7 +7,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$headers = @{ "Content-Type" = "application/json" }
+$headers = @{ 
+  "Content-Type" = "application/json"
+  "X-Flashsale-Synthetic" = "true"
+  "X-Flashsale-Control-Token" = "secret"
+}
 
 $resetBody = @{
   ticketItemId = $TicketItemId
@@ -16,7 +20,7 @@ $resetBody = @{
 } | ConvertTo-Json
 
 Invoke-RestMethod -Method Post -Uri "$BaseUrl/admin/benchmarks/reset" -Headers $headers -Body $resetBody
-Invoke-RestMethod -Method Post -Uri "$BaseUrl/admin/tickets/$TicketItemId/stock/warmup"
+Invoke-RestMethod -Method Post -Uri "$BaseUrl/admin/tickets/$TicketItemId/stock/warmup" -Headers $headers
 
 $orderBody = @{
   ticketItemId = $TicketItemId
