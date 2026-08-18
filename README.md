@@ -185,44 +185,6 @@ Full benchmark methodology, artifact interpretation, and troubleshooting: [BENCH
 
 ---
 
-## 📸 System Screenshots
-
-<div align="center">
-
-### Operator Dashboard — Home
-<img src="docs/screenshots/home.png" alt="Dashboard Home" width="800">
-
-*Real-time system overview with Redis/DB stock visibility, recent orders, and strategy status*
-
-### Admin Control Desk
-<img src="docs/screenshots/admin-control-desk.png" alt="Admin Control Desk" width="800">
-
-*Benchmark reset, stock warmup, and consistency check operations*
-
-### Strategy Event Timeline
-<img src="docs/screenshots/events.png" alt="Strategy Events" width="800">
-
-*Event log showing order creation, outbox publishing, and compensation triggers across strategies*
-
-### Order Traces
-<img src="docs/screenshots/order-traces.png" alt="Order Traces" width="800">
-
-*End-to-end request tracing: idempotency check → strategy execution → DB commit → response*
-
-### Benchmark Execution
-<img src="docs/screenshots/admin-benchmark.png" alt="Benchmark Panel" width="800">
-
-*One-click benchmark reset and stock warmup before JMeter runs*
-
-### Redis/DB Consistency Verification
-<img src="docs/screenshots/admin-consistency.png" alt="Consistency Check" width="800">
-
-*Post-benchmark drift detection: Redis stock vs DB stock vs expected values*
-
-</div>
-
----
-
 ## 🏗️ Architecture — DDD Multi-Module Layout
 
 <img src="docs/images/ddd-modules.png" alt="DDD Multi-Module Architecture" width="800">
@@ -458,31 +420,6 @@ GET /admin/benchmarks/consistency?ticketItemId=4&yearMonth=202604
 
 ---
 
-## 🎯 Key Interview Takeaways
-
-This repository answers three complex system-design questions that senior engineering interviews probe for:
-
-### 1. "How do you prevent the Lost Update problem under high concurrency?"
-
-**The repo proves three answers, ranked by throughput:**
-- **Conditional DB baseline:** `CONDITIONAL_DB` — `WHERE stock_available >= quantity` makes the read and write atomic in one SQL statement. The May 31 local matrix measured 173.08 req/s and zero oversells.
-- **Redis gate without compensation:** `REDIS_LUA` — Redis Lua EVAL atomically checks and decrements, filtering excess demand before DB contention. It needs a failure-path drift strategy.
-- **Redis gate with compensation:** `REDIS_LUA_WITH_COMPENSATION` — Redis gate + INCR rollback + scheduled reconciliation. The preferred lab strategy; it achieved zero oversells and zero drift in the July 13 local validation.
-
-### 2. "How do you handle partial failures in a dual-write (cache + database) system?"
-
-The compensation loop (immediate INCR on exception), scheduled reconciliation (every 30s), and consistency endpoint form the lab's recovery path for Redis/MySQL drift. They do not remove the need to test failure modes and durable recovery in a production deployment.
-
-### 3. "How do you design an idempotent checkout API?"
-
-The `IdempotencyService.getOrCreate(userId:idempotencyKey)` pattern ensures:
-- First request: validates, reserves stock, creates order, stores `(key → orderId)` mapping, returns result
-- Replay request: looks up existing `(key → orderId)`, returns cached result without touching stock
-- The key is client-generated (`userId + idempotencyKey`), so the client controls retry semantics
-- The current lab mapping is an in-memory `ConcurrentHashMap`; it demonstrates replay behavior locally and is cleared by benchmark reset. It is not a durable or distributed idempotency store.
-
----
-
 ## 🔒 Resilience & Safety
 
 - **Rate Limiting:** Resilience4j `@RateLimiter` on `POST /orders` — sheds load with HTTP 429 before a request reaches stock deduction. Configurable via `ORDER_API_RATE_LIMIT` (default 20,000 req/s, deliberately above benchmark throughput so load tests measure the strategies, not the limiter).
@@ -491,21 +428,6 @@ The `IdempotencyService.getOrCreate(userId:idempotencyKey)` pattern ensures:
 - **Distributed Locking:** Redisson locks guard the ticket-detail cache load path, so a cache miss under load does not stampede MySQL
 - **Idempotency:** in-memory `userId:idempotencyKey` deduplication prevents duplicate local order creation during a process lifetime
 - **Consistency Visibility:** `GET /admin/benchmarks/consistency` exposes Redis stock, DB stock, expected values, and drift in one endpoint
-
----
-
-## 🧯 Failure Modes Handled
-
-Compensation is the usual answer to dual-write failure. The harder question is what happens when the compensation *itself* fails — each mode below has a distinct recovery path and a distinguishable metric.
-
-| # | Failure mode | When it happens | Mechanism | Metric emitted |
-|---|---|---|---|---|
-| 1 | **Stock unavailable** | Redis Lua returns negative remaining, or the conditional `UPDATE` affects 0 rows | Clean rejection before any order row is written | `flashsale.orders{result=failed}` |
-| 2 | **Order insert fails after Redis decrement** | DB rejects or throws once Redis stock is already reserved | Transaction marked rollback-only; Redis restored via compensating `INCR` | `flashsale.compensation{outcome=attempted}` |
-| 3 | **Double fault — compensation itself fails** | The compensating Redis write throws (Redis blip during recovery) | Logged as `COMPENSATION_FAILURE` with exact drift; handed to reconciliation | `flashsale.compensation{outcome=double_fault}` |
-| 4 | **JVM crash mid-transaction** | Process dies between the Redis decrement and the MySQL commit — no in-process handler can run | Scheduled reconciliation compares Redis against DB truth and repairs, bounded by a 30s cycle | `flashsale.reconciliation{action=repair}` |
-
-Implementation: `OrderCreationService` (modes 1–3), `OrderReconciliationService` (mode 4).
 
 ---
 
