@@ -32,6 +32,8 @@ const EXACT_ALLOWED_BACKEND_ROUTES = new Set([
   "GET admin/benchmarks/runs",
   "POST orders",
   "GET orders",
+  "GET __chaos/faults",
+  "DELETE __chaos/faults",
 ]);
 
 const DYNAMIC_ALLOWED_BACKEND_ROUTES: Array<{ method: string; pattern: RegExp }> = [
@@ -43,6 +45,7 @@ const DYNAMIC_ALLOWED_BACKEND_ROUTES: Array<{ method: string; pattern: RegExp }>
   { method: "GET", pattern: /^api\/v1\/reservations\/[0-9a-fA-F-]{36}$/ },
   { method: "POST", pattern: /^api\/v1\/reservations\/[0-9a-fA-F-]{36}\/(confirm|release)$/ },
   { method: "GET", pattern: /^api\/v1\/inventory\/\d+$/ },
+  { method: "PUT", pattern: /^__chaos\/faults\/[A-Za-z0-9_]+$/ },
 ];
 
 function isAllowedBackendRoute(method: string, path: string[]) {
@@ -133,5 +136,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
 }
 
 export async function POST(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
+}
+
+export async function PUT(request: NextRequest, context: RouteContext) {
+  return proxy(request, context);
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
   return proxy(request, context);
 }

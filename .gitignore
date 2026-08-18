@@ -76,4 +76,7 @@ temp_service.java
 
 target-effective-pom
 .env
-.env
+*.excalidraw
+generate_excalidraw.py
+draw_more.py
+test.png

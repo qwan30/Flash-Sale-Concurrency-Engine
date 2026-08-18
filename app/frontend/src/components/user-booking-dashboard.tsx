@@ -34,6 +34,7 @@ import { cn, formatCurrency, formatDateTime, formatNumber } from "@/lib/utils";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SystemXRayPipeline } from "@/components/system-xray-pipeline";
 import {
   Card,
   CardContent,
@@ -272,6 +273,19 @@ export function UserBookingDashboard({
           </form>
         </CardContent>
       </Card>
+
+      {/* Interactive Architecture X-Ray */}
+      <SystemXRayPipeline
+        activeStageId={
+          isSubmitting
+            ? "redis-lua"
+            : lastOrder
+              ? "kafka-stream"
+              : "rate-limiter"
+        }
+        isExecuting={isSubmitting}
+        currentOperation={`POST /orders (${strategy})`}
+      />
     </section>
   );
 }

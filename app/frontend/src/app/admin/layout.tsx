@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const adminLinks = [
+  { href: "/admin/strategy-arena", label: "Strategy Arena" },
   { href: "/admin/control-desk", label: "Control Desk" },
   { href: "/admin/benchmark", label: "Benchmark" },
   { href: "/admin/consistency", label: "Consistency" },
