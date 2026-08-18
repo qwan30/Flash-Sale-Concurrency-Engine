@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Activity,
-  ArrowRight,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Cpu,
   Database,
   Layers,
   RotateCcw,
@@ -17,7 +15,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export type PipelineStage = {
   id: string;
@@ -33,7 +31,6 @@ export type PipelineStage = {
   invariants: string[];
   payloadSample?: Record<string, unknown>;
 };
-
 const DEFAULT_STAGES: PipelineStage[] = [
   {
     id: "rate-limiter",
@@ -168,7 +165,8 @@ export function SystemXRayPipeline({
   currentOperation?: string;
   defaultExpanded?: boolean;
 }) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isExpandedManual, setIsExpandedManual] = useState<boolean | null>(null);
+  const isExpanded = isExpandedManual !== null ? isExpandedManual : Boolean(defaultExpanded || isExecuting);
   const [selectedStage, setSelectedStage] = useState<PipelineStage>(DEFAULT_STAGES[2]);
   const [stepMode, setStepMode] = useState<number | null>(null);
 
@@ -179,13 +177,6 @@ export function SystemXRayPipeline({
       : -1;
 
   const currentStage = DEFAULT_STAGES[activeIndex >= 0 ? activeIndex : 2];
-
-  // Auto-expand when active execution starts
-  useEffect(() => {
-    if (isExecuting) {
-      setIsExpanded(true);
-    }
-  }, [isExecuting]);
 
   const handleStepForward = () => {
     setStepMode((prev) => (prev === null ? 0 : Math.min(DEFAULT_STAGES.length - 1, prev + 1)));
@@ -259,7 +250,7 @@ export function SystemXRayPipeline({
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => setIsExpanded((prev) => !prev)}
+              onClick={() => setIsExpandedManual((prev) => (prev !== null ? !prev : !isExpanded))}
               className="h-7 text-xs"
             >
               {isExpanded ? (
@@ -290,7 +281,7 @@ export function SystemXRayPipeline({
                 onClick={() => {
                   setStepMode(idx);
                   setSelectedStage(stage);
-                  setIsExpanded(true);
+                  setIsExpandedManual(true);
                 }}
                 className={`flex items-center gap-1.5 rounded px-2 py-1 font-medium transition-all ${
                   isCurrent

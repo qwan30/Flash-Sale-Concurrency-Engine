@@ -117,6 +117,7 @@ test.describe('Concurrent Flash Sale', () => {
       const c = consistency.result;
 
       // No overselling, no drift
+      expect(succeeded.length).toBeLessThanOrEqual(STOCK);
       expect(c.dbOrderCount).toBeLessThanOrEqual(STOCK);
       expect(c.redisStockAfter).toBe(STOCK - c.dbOrderCount);
       expect(c.oversoldCount).toBe(0);

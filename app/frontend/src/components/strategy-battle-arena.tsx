@@ -2,20 +2,9 @@
 
 import { useState } from "react";
 import {
-  AlertTriangle,
-  ArrowRight,
-  CheckCircle2,
-  Cpu,
-  Database,
   Flame,
-  Gauge,
   Play,
-  RotateCcw,
-  ShieldAlert,
-  ShieldCheck,
   Swords,
-  Timer,
-  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createOrder, getConsistency, resetBenchmark, warmupStock } from "@/lib/api";
@@ -221,7 +210,7 @@ export function StrategyBattleArena() {
         const res = await runSimulationForStrategy(strat);
         updated[strat] = res;
         setResults({ ...updated });
-      } catch (e) {
+      } catch {
         toast.error(`Strategy ${strat} execution encountered an error`);
         setResults((prev) => ({
           ...prev,

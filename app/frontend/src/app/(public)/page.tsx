@@ -1,11 +1,7 @@
 import {
-  Activity,
   ArrowRight,
   CheckCircle2,
-  Clock3,
-  Cpu,
   Flame,
-  Layers,
   ShieldCheck,
   Swords,
   Ticket,

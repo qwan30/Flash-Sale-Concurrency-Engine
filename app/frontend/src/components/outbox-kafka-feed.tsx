@@ -1,20 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  Activity,
-  ArrowRight,
-  CheckCircle2,
-  Clock,
-  Layers,
-  Radio,
-  RefreshCw,
-  Server,
-  Share2,
-  Zap,
-} from "lucide-react";
+import { useState } from "react";
+import { Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export type OutboxFeedItem = {
@@ -95,7 +83,7 @@ const INITIAL_FEED: OutboxFeedItem[] = [
 ];
 
 export function OutboxKafkaFeed() {
-  const [feed, setFeed] = useState<OutboxFeedItem[]>(INITIAL_FEED);
+  const [feed] = useState<OutboxFeedItem[]>(INITIAL_FEED);
   const [selectedEvent, setSelectedEvent] = useState<OutboxFeedItem>(INITIAL_FEED[0]);
 
   return (

@@ -6,9 +6,8 @@ import { ChaosResilienceMatrix } from "@/components/chaos-resilience-matrix";
 import { OutboxKafkaFeed } from "@/components/outbox-kafka-feed";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, AlertOctagon, Flame, Layers, Server, Share2, Swords, Zap } from "lucide-react";
+import { AlertOctagon, Layers, Share2, Swords, Zap } from "lucide-react";
 
 export default function ControlDeskPage() {
   return (
