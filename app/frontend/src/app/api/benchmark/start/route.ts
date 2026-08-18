@@ -3,9 +3,9 @@ import { spawn } from 'child_process';
 import path from 'path';
 
 const ALLOWED_STRATEGIES = [
-  'PESSIMISTIC_LOCK',
-  'OPTIMISTIC_LOCK',
-  'REDIS_LUA_ONLY',
+  'UNSAFE_DB',
+  'CONDITIONAL_DB',
+  'REDIS_LUA',
   'REDIS_LUA_WITH_COMPENSATION'
 ];
 

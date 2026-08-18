@@ -28,6 +28,7 @@ import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { DemoScenarioDrawer } from "@/components/demo-scenario-drawer";
 import { ReservationStockBuckets } from "@/components/reservation-stock-buckets";
 import { ReservationTimeline } from "@/components/reservation-timeline";
+import { SystemXRayPipeline } from "@/components/system-xray-pipeline";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -658,6 +659,27 @@ export function ReservationJourney({
           </CardContent>
         </Card>
       </div>
+
+      {/* Interactive System X-Ray Architecture Pipeline */}
+      <SystemXRayPipeline
+        activeStageId={
+          busy
+            ? "redis-lua"
+            : status === "CONFIRMED"
+              ? "kafka-stream"
+              : status === "RESERVED"
+                ? "mysql-commit"
+                : processing
+                  ? "journal-claim"
+                  : "rate-limiter"
+        }
+        isExecuting={busy}
+        currentOperation={
+          status === "RESERVED"
+            ? `POST /api/v1/reservations/${reservation?.reservationId?.slice(0, 8) ?? "..."}/confirm`
+            : `POST /api/v1/reservations`
+        }
+      />
     </section>
   );
 }

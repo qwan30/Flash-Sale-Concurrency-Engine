@@ -4,6 +4,7 @@ const publicLinks = [
   { href: "/", label: "Lab Overview" },
   { href: "/events", label: "Fixtures" },
   { href: "/booking", label: "Order Probe" },
+  { href: "/admin/strategy-arena", label: "Strategy Arena" },
   { href: "/my-orders", label: "Order Traces" },
   { href: "/admin/control-desk", label: "Control Desk" },
 ];

@@ -25,6 +25,9 @@ export type EventSummary = {
   saleLabel: string;
   description: string;
   featured?: boolean;
+  scenarioType?: "concert" | "tech" | "sneaker" | "train";
+  concurrencyLevel?: string;
+  initialStock?: number;
 };
 
 export type ApiEnvelope<T> = {
